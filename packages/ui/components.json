@@ -1,0 +1,21 @@
+{
+  "$schema": "https://ui.shadcn.com/schema.json",
+  "style": "base-rhea",
+  "rsc": false,
+  "tsx": true,
+  "tailwind": {
+    "config": "",
+    "css": "src/globals.css",
+    "baseColor": "mauve",
+    "cssVariables": true,
+    "prefix": ""
+  },
+  "aliases": {
+    "components": "@graflare/ui/components",
+    "ui": "@graflare/ui/components",
+    "lib": "@graflare/ui/lib",
+    "utils": "@graflare/ui/lib/utils",
+    "hooks": "@graflare/ui/hooks"
+  },
+  "iconLibrary": "lucide"
+}
