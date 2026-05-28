@@ -1,0 +1,16 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "graflare-web",
+  "compatibility_date": "2026-05-27",
+  "compatibility_flags": ["nodejs_compat"],
+  "main": "@tanstack/react-start/server-entry",
+  "services": [
+    {
+      "binding": "API",
+      "service": "graflare-api"
+    }
+  ],
+  "observability": {
+    "enabled": true
+  }
+}
