@@ -26,17 +26,18 @@ describe("routes", () => {
     })
   })
 
-  it("renders new datasource page at /datasources/new", async () => {
+  it("renders add data source form at /datasources/new", async () => {
     await renderWithRouter("/datasources/new")
     await waitFor(() => {
-      expect(screen.getByRole("heading", { name: "Add Data Source" })).toBeDefined()
+      expect(screen.getByText("Add Data Source")).toBeDefined()
+      expect(screen.getByLabelText("Name")).toBeDefined()
     })
   })
 
   it("renders edit page at /datasources/:id", async () => {
     await renderWithRouter("/datasources/test-id-123")
     await waitFor(() => {
-      expect(screen.getByRole("heading", { name: "Edit Data Source" })).toBeDefined()
+      expect(screen.getByText("Data source not found.")).toBeDefined()
     })
   })
 

@@ -1,17 +1,37 @@
 import { createFileRoute } from "@tanstack/react-router"
+import { getDatasource } from "../../../lib/api"
+import { DatasourceForm } from "../-components/datasource-form"
 
 export const Route = createFileRoute("/datasources/$id/")({
+  loader: ({ params }) => getDatasource({ data: params.id }),
   component: EditDatasourcePage,
 })
 
 function EditDatasourcePage() {
-  const { id } = Route.useParams()
+  const ds = Route.useLoaderData() as {
+    id: string
+    name: string
+    type: string
+    url: string
+    authType: string
+    queryTimeoutMs: number
+  } | null
+
+  if (!ds) {
+    return <p className="text-sm text-muted-foreground">Data source not found.</p>
+  }
+
   return (
-    <div className="space-y-4">
-      <h1 className="text-xl font-semibold">Edit Data Source</h1>
-      <p className="text-sm text-muted-foreground">
-        Editing data source {id}
-      </p>
-    </div>
+    <DatasourceForm
+      mode="edit"
+      initialData={{
+        id: ds.id,
+        name: ds.name,
+        type: ds.type,
+        url: ds.url,
+        authType: ds.authType,
+        queryTimeoutMs: ds.queryTimeoutMs,
+      }}
+    />
   )
 }

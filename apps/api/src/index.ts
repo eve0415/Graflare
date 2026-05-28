@@ -13,6 +13,7 @@ import { accessMiddleware } from "./middleware/access"
 import { orgMiddleware } from "./middleware/org"
 import { datasourceRoutes } from "./routes/datasources"
 import { datasourceTestRoutes } from "./routes/datasources-test"
+import { proxyRoutes } from "./routes/proxy"
 import { encryptCredentials, decryptCredentials } from "./crypto/credentials"
 
 type Bindings = {
@@ -38,6 +39,7 @@ app.use("/api/*", accessMiddleware())
 app.use("/api/*", orgMiddleware())
 app.route("/api/v1/datasources", datasourceRoutes)
 app.route("/api/v1/datasources", datasourceTestRoutes)
+app.route("/api/v1/datasources", proxyRoutes)
 
 export default app
 
@@ -191,12 +193,23 @@ export class GraflareAPI extends WorkerEntrypoint<Bindings> {
     }
   }
 
+  private static ALLOWED_ENDPOINTS = new Set([
+    "/api/v1/query",
+    "/api/v1/query_range",
+    "/api/v1/labels",
+    "/api/v1/series",
+  ])
+
   async proxyQuery(
     orgId: string,
     datasourceId: string,
     endpoint: string,
     params: Record<string, string>,
   ): Promise<PrometheusResponse> {
+    if (!GraflareAPI.ALLOWED_ENDPOINTS.has(endpoint) && !endpoint.startsWith("/api/v1/label/")) {
+      return { status: "error", errorType: "bad_request", error: "Invalid endpoint" }
+    }
+
     const rows = await this.db
       .select()
       .from(datasources)
@@ -223,17 +236,24 @@ export class GraflareAPI extends WorkerEntrypoint<Bindings> {
     }
 
     try {
-      const url = new URL(endpoint, ds.url)
+      const base = new URL(ds.url)
+      base.pathname = base.pathname.replace(/\/$/, "") + endpoint
       const isPost = endpoint.includes("/query")
-      const res = await fetch(
-        isPost ? url.toString() : `${url}?${new URLSearchParams(params)}`,
-        {
-          method: isPost ? "POST" : "GET",
-          headers,
-          ...(isPost && { body: new URLSearchParams(params).toString() }),
-          signal: AbortSignal.timeout(ds.queryTimeoutMs),
-        },
-      )
+
+      const targetUrl = isPost
+        ? base.toString()
+        : `${base}?${new URLSearchParams(params)}`
+
+      if (new URL(targetUrl).origin !== base.origin) {
+        return { status: "error", errorType: "bad_request", error: "URL origin mismatch" }
+      }
+
+      const res = await fetch(targetUrl, {
+        method: isPost ? "POST" : "GET",
+        headers,
+        ...(isPost && { body: new URLSearchParams(params).toString() }),
+        signal: AbortSignal.timeout(ds.queryTimeoutMs),
+      })
 
       return (await res.json()) as PrometheusResponse
     } catch (err) {
