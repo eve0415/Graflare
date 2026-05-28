@@ -8,7 +8,7 @@ import type {
 import { createDatasourceSchema, updateDatasourceSchema } from "@graflare/shared/schemas/datasource"
 import type { PrometheusResponse } from "@graflare/shared/schemas/prometheus"
 import { createDb } from "./db"
-import { datasources, organizations } from "./db/schema"
+import { datasources } from "./db/schema"
 import { accessMiddleware } from "./middleware/access"
 import { orgMiddleware } from "./middleware/org"
 import { datasourceRoutes } from "./routes/datasources"

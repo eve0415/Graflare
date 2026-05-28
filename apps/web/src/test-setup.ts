@@ -6,6 +6,7 @@ vi.mock("@tanstack/react-start", async () => {
     ...actual,
     createServerFn: () => {
       const fn = Object.assign(async () => null, {
+        inputValidator: () => fn,
         validator: () => fn,
         handler: () => fn,
       })

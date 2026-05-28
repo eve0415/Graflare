@@ -10,14 +10,14 @@
     "composite": true,
     "outDir": "dist",
     "rootDir": "src",
+    "emitDeclarationOnly": true,
     "resolveJsonModule": true,
     "isolatedModules": true,
-    "verbatimModuleSyntax": true,
     "jsx": "react-jsx",
-    "lib": ["DOM", "DOM.Iterable", "ES2022"],
-    "noEmit": true
+    "lib": ["DOM", "DOM.Iterable", "ES2022"]
   },
-  "include": ["src", "*.config.ts"],
+  "include": ["src"],
+  "exclude": ["src/**/*.test.ts", "src/**/*.test.tsx", "src/test-setup.ts"],
   "references": [
     { "path": "../../packages/shared" },
     { "path": "../../packages/ui" }

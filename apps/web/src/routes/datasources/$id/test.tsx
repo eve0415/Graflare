@@ -31,7 +31,7 @@ function QueryTestPage() {
   const [end, setEnd] = useState("")
   const [step, setStep] = useState("15s")
   const [loading, setLoading] = useState(false)
-  const [result, setResult] = useState<unknown>(null)
+  const [result, setResult] = useState<Record<string, unknown> | null>(null)
   const [error, setError] = useState<string | null>(null)
 
   async function handleSubmit(e: React.FormEvent) {
@@ -54,7 +54,7 @@ function QueryTestPage() {
       const res = await proxyQuery({
         data: { datasourceId: id, endpoint, params },
       })
-      setResult(res)
+      setResult(res as Record<string, unknown>)
     } catch (err) {
       setError(err instanceof Error ? err.message : "Query failed")
     } finally {
@@ -77,7 +77,7 @@ function QueryTestPage() {
               <textarea
                 id="query"
                 value={query}
-                onChange={(e) => setQuery(e.target.value)}
+                onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) => setQuery(e.target.value)}
                 className="flex min-h-[80px] w-full rounded-lg border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                 style={{ fontFamily: "Geist Mono, monospace" }}
                 placeholder="up"
@@ -88,8 +88,8 @@ function QueryTestPage() {
               <Label htmlFor="queryType">Query Type</Label>
               <Select
                 value={queryType}
-                onValueChange={(v) =>
-                  setQueryType(v as "instant" | "range")
+                onValueChange={(v: string | null) =>
+                  v && setQueryType(v as "instant" | "range")
                 }
               >
                 <SelectTrigger id="queryType">
@@ -109,7 +109,7 @@ function QueryTestPage() {
                   <Input
                     id="start"
                     value={start}
-                    onChange={(e) => setStart(e.target.value)}
+                    onChange={(e: React.ChangeEvent<HTMLInputElement>) => setStart(e.target.value)}
                     placeholder={String(
                       Math.floor(Date.now() / 1000) - 3600,
                     )}
@@ -120,7 +120,7 @@ function QueryTestPage() {
                   <Input
                     id="end"
                     value={end}
-                    onChange={(e) => setEnd(e.target.value)}
+                    onChange={(e: React.ChangeEvent<HTMLInputElement>) => setEnd(e.target.value)}
                     placeholder={String(Math.floor(Date.now() / 1000))}
                   />
                 </div>
@@ -129,7 +129,7 @@ function QueryTestPage() {
                   <Input
                     id="step"
                     value={step}
-                    onChange={(e) => setStep(e.target.value)}
+                    onChange={(e: React.ChangeEvent<HTMLInputElement>) => setStep(e.target.value)}
                     placeholder="15s"
                   />
                 </div>

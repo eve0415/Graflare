@@ -149,7 +149,7 @@ export function DatasourceForm({ mode, initialData }: Props) {
             <Input
               id="name"
               value={form.name}
-              onChange={(e) => update("name", e.target.value)}
+              onChange={(e: React.ChangeEvent<HTMLInputElement>) => update("name", e.target.value)}
               placeholder="Production Prometheus"
               required
             />
@@ -159,7 +159,7 @@ export function DatasourceForm({ mode, initialData }: Props) {
             <Label htmlFor="type">Type</Label>
             <Select
               value={form.type}
-              onValueChange={(v) => update("type", v)}
+              onValueChange={(v: string | null) => v && update("type", v)}
             >
               <SelectTrigger id="type">
                 <SelectValue />
@@ -176,7 +176,7 @@ export function DatasourceForm({ mode, initialData }: Props) {
               id="url"
               type="url"
               value={form.url}
-              onChange={(e) => update("url", e.target.value)}
+              onChange={(e: React.ChangeEvent<HTMLInputElement>) => update("url", e.target.value)}
               placeholder="https://prometheus.example.com"
               required
             />
@@ -186,7 +186,7 @@ export function DatasourceForm({ mode, initialData }: Props) {
             <Label htmlFor="authType">Authentication</Label>
             <Select
               value={form.authType}
-              onValueChange={(v) => update("authType", v)}
+              onValueChange={(v: string | null) => v && update("authType", v)}
             >
               <SelectTrigger id="authType">
                 <SelectValue />
@@ -206,7 +206,7 @@ export function DatasourceForm({ mode, initialData }: Props) {
                 <Input
                   id="username"
                   value={form.username ?? ""}
-                  onChange={(e) => update("username", e.target.value)}
+                  onChange={(e: React.ChangeEvent<HTMLInputElement>) => update("username", e.target.value)}
                 />
               </div>
               <div className="space-y-2">
@@ -215,7 +215,7 @@ export function DatasourceForm({ mode, initialData }: Props) {
                   id="password"
                   type="password"
                   value={form.password ?? ""}
-                  onChange={(e) => update("password", e.target.value)}
+                  onChange={(e: React.ChangeEvent<HTMLInputElement>) => update("password", e.target.value)}
                 />
               </div>
             </>
@@ -228,7 +228,7 @@ export function DatasourceForm({ mode, initialData }: Props) {
                 id="token"
                 type="password"
                 value={form.token ?? ""}
-                onChange={(e) => update("token", e.target.value)}
+                onChange={(e: React.ChangeEvent<HTMLInputElement>) => update("token", e.target.value)}
               />
             </div>
           )}
@@ -242,7 +242,7 @@ export function DatasourceForm({ mode, initialData }: Props) {
               max={120000}
               step={1000}
               value={form.queryTimeoutMs}
-              onChange={(e) =>
+              onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
                 update("queryTimeoutMs", Number.parseInt(e.target.value, 10))
               }
             />
