@@ -1,0 +1,17 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "graflare-api",
+  "main": "src/index.ts",
+  "compatibility_date": "2026-05-27",
+  "compatibility_flags": ["nodejs_compat"],
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "graflare",
+      "database_id": "placeholder-create-via-wrangler"
+    }
+  ],
+  "observability": {
+    "enabled": true
+  }
+}
