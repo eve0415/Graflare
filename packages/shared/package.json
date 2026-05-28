@@ -1,0 +1,25 @@
+{
+  "name": "@graflare/shared",
+  "private": true,
+  "type": "module",
+  "exports": {
+    "./*": {
+      "import": "./src/*.ts",
+      "types": "./src/*.ts"
+    }
+  },
+  "imports": {
+    "#*": [
+      "./src/*",
+      "./src/*.ts"
+    ]
+  },
+  "scripts": {
+    "test": "vitest run",
+    "clean": "rm -rf dist"
+  },
+  "devDependencies": {
+    "vitest": "4.1.7",
+    "zod": "4.4.3"
+  }
+}
