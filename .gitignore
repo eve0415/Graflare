@@ -134,3 +134,18 @@ dist
 .yarn/build-state.yml
 .yarn/install-state.gz
 .pnp.*
+
+# pnpm store
+.pnpm-store/
+
+# Cloudflare Workers
+.wrangler/
+.dev.vars
+worker-configuration.d.ts
+
+# TanStack Start
+.output/
+.vinxi/
+
+# OS
+.DS_Store
