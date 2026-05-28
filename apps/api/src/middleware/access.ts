@@ -74,11 +74,21 @@ function decodeJwtPayload(token: string): { header: { kid: string; alg: string }
 async function verifyJwt(
   token: string,
   teamDomain: string,
+  expectedAud?: string,
 ): Promise<AccessJwtPayload> {
   const { header, payload } = decodeJwtPayload(token)
 
   if (payload.exp < Date.now() / 1000) {
     throw new Error("Token expired")
+  }
+
+  const expectedIss = `https://${teamDomain}.cloudflareaccess.com`
+  if (payload.iss !== expectedIss) {
+    throw new Error("Bad issuer")
+  }
+
+  if (expectedAud && (!Array.isArray(payload.aud) || !payload.aud.includes(expectedAud))) {
+    throw new Error("Bad audience")
   }
 
   const keys = await getPublicKeys(teamDomain)
@@ -116,7 +126,7 @@ export function accessMiddleware(): MiddlewareHandler<AppEnv> {
     }
 
     try {
-      const payload = await verifyJwt(jwt, c.env.ACCESS_TEAM_DOMAIN)
+      const payload = await verifyJwt(jwt, c.env.ACCESS_TEAM_DOMAIN, c.env.ACCESS_AUD)
       c.set("user", {
         email: payload.email,
         name: payload.name ?? payload.email,

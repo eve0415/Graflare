@@ -9,7 +9,7 @@ export function orgMiddleware(): MiddlewareHandler<AppEnv> {
     const user = c.get("user")
     const db = createDb(c.env.DB)
 
-    const orgId = emailToOrgId(user.email)
+    const orgId = await emailToOrgId(user.email)
     const existing = await db
       .select()
       .from(organizations)
@@ -31,16 +31,13 @@ export function orgMiddleware(): MiddlewareHandler<AppEnv> {
   }
 }
 
-function emailToOrgId(email: string): string {
-  const encoder = new TextEncoder()
-  const data = encoder.encode(email.toLowerCase())
-  let hash = 0x811c9dc5
-  for (const byte of data) {
-    hash ^= byte
-    hash = Math.imul(hash, 0x01000193)
-  }
-  const hex = (hash >>> 0).toString(16).padStart(8, "0")
-  return `org-${hex}`
+async function emailToOrgId(email: string): Promise<string> {
+  const data = new TextEncoder().encode(email.toLowerCase())
+  const digest = await crypto.subtle.digest("SHA-256", data)
+  const hex = [...new Uint8Array(digest)]
+    .map((b) => b.toString(16).padStart(2, "0"))
+    .join("")
+  return `org-${hex.slice(0, 32)}`
 }
 
 export { emailToOrgId }
