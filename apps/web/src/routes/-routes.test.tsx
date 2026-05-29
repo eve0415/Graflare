@@ -9,7 +9,7 @@ import { routeTree } from "../routeTree.gen"
 
 afterEach(cleanup)
 
-async function renderWithRouter(initialUrl: string) {
+const renderWithRouter = async (initialUrl: string) => {
   const router = createRouter({
     routeTree,
     history: createMemoryHistory({ initialEntries: [initialUrl] }),

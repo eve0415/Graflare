@@ -9,36 +9,38 @@ import {
   TableRow,
 } from "@graflare/ui/components/table"
 import { Badge } from "@graflare/ui/components/badge"
-import { listDatasources, deleteDatasource } from "../../lib/api"
-import { useState } from "react"
+import { deleteDatasource, listDatasources } from "../../lib/api"
+import { useMemo, useState } from "react"
 
-export const Route = createFileRoute("/datasources/")({
-  loader: () => listDatasources(),
-  component: DatasourceListPage,
-})
-
-interface DatasourceRow {
-  id: string
-  name: string
-  type: string
-  url: string
-  authType: string
-}
-
-function DatasourceListPage() {
-  const datasources = (Route.useLoaderData() ?? []) as DatasourceRow[]
+const DatasourceListPage = () => {
+  const datasources = Route.useLoaderData()
   const router = useRouter()
   const [deleting, setDeleting] = useState<string | null>(null)
 
-  async function handleDelete(id: string) {
-    setDeleting(id)
-    try {
-      await deleteDatasource({ data: id })
-      router.invalidate()
-    } finally {
-      setDeleting(null)
-    }
-  }
+  const rows = useMemo(
+    () =>
+      datasources.map((ds) => ({
+        id: ds.id,
+        name: ds.name,
+        type: ds.type,
+        url: ds.url,
+        authType: ds.authType,
+        params: { id: ds.id },
+        onDelete: () => {
+          const run = async () => {
+            setDeleting(ds.id)
+            try {
+              await deleteDatasource({ data: ds.id })
+              await router.invalidate()
+            } finally {
+              setDeleting(null)
+            }
+          }
+          void run()
+        },
+      })),
+    [datasources, router],
+  )
 
   return (
     <div className="space-y-4">
@@ -49,7 +51,7 @@ function DatasourceListPage() {
         </Link>
       </div>
 
-      {datasources.length === 0 ? (
+      {rows.length === 0 ? (
         <p className="text-sm text-muted-foreground">
           No data sources configured yet.
         </p>
@@ -65,24 +67,24 @@ function DatasourceListPage() {
             </TableRow>
           </TableHeader>
           <TableBody>
-            {datasources.map((ds) => (
-              <TableRow key={ds.id}>
-                <TableCell className="font-medium">{ds.name}</TableCell>
+            {rows.map((row) => (
+              <TableRow key={row.id}>
+                <TableCell className="font-medium">{row.name}</TableCell>
                 <TableCell>
-                  <Badge variant="secondary">{ds.type}</Badge>
+                  <Badge variant="secondary">{row.type}</Badge>
                 </TableCell>
                 <TableCell className="text-muted-foreground text-xs">
-                  {ds.url}
+                  {row.url}
                 </TableCell>
-                <TableCell>{ds.authType}</TableCell>
+                <TableCell>{row.authType}</TableCell>
                 <TableCell>
                   <div className="flex gap-1">
-                    <Link to="/datasources/$id" params={{ id: ds.id }}>
+                    <Link to="/datasources/$id" params={row.params}>
                       <Button variant="ghost" size="xs">
                         Edit
                       </Button>
                     </Link>
-                    <Link to="/datasources/$id/test" params={{ id: ds.id }}>
+                    <Link to="/datasources/$id/test" params={row.params}>
                       <Button variant="ghost" size="xs">
                         Test
                       </Button>
@@ -90,8 +92,8 @@ function DatasourceListPage() {
                     <Button
                       variant="ghost"
                       size="xs"
-                      onClick={() => handleDelete(ds.id)}
-                      disabled={deleting === ds.id}
+                      onClick={row.onDelete}
+                      disabled={deleting === row.id}
                     >
                       Delete
                     </Button>
@@ -105,3 +107,8 @@ function DatasourceListPage() {
     </div>
   )
 }
+
+export const Route = createFileRoute("/datasources/")({
+  loader: () => listDatasources(),
+  component: DatasourceListPage,
+})

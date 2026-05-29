@@ -25,7 +25,6 @@ describe("prometheusResponseSchema", () => {
   it("accepts response with warnings", () => {
     const result = prometheusResponseSchema.safeParse({
       status: "success",
-      data: {},
       warnings: ["some warning"],
     })
     expect(result.success).toBe(true)
@@ -40,7 +39,7 @@ describe("prometheusResponseSchema", () => {
 
   it("rejects missing status", () => {
     const result = prometheusResponseSchema.safeParse({
-      data: {},
+      warnings: ["some warning"],
     })
     expect(result.success).toBe(false)
   })

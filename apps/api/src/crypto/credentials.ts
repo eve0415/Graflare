@@ -1,9 +1,9 @@
 const IV_BYTES = 12
 
-export async function encryptCredentials(
+export const encryptCredentials = async (
   plaintext: string,
   keyBase64: string,
-): Promise<string> {
+): Promise<string> => {
   const key = await importKey(keyBase64)
   const iv = crypto.getRandomValues(new Uint8Array(IV_BYTES))
   const encoded = new TextEncoder().encode(plaintext)
@@ -18,15 +18,15 @@ export async function encryptCredentials(
   combined.set(iv)
   combined.set(new Uint8Array(ciphertext), iv.length)
 
-  return btoa(String.fromCharCode(...combined))
+  return btoa(String.fromCodePoint(...combined))
 }
 
-export async function decryptCredentials(
+export const decryptCredentials = async (
   encrypted: string,
   keyBase64: string,
-): Promise<string> {
+): Promise<string> => {
   const key = await importKey(keyBase64)
-  const combined = Uint8Array.from(atob(encrypted), (c) => c.charCodeAt(0))
+  const combined = Uint8Array.from(atob(encrypted), (c) => c.codePointAt(0) ?? 0)
 
   const iv = combined.slice(0, IV_BYTES)
   const ciphertext = combined.slice(IV_BYTES)
@@ -40,15 +40,15 @@ export async function decryptCredentials(
   return new TextDecoder().decode(decrypted)
 }
 
-async function importKey(keyBase64: string): Promise<CryptoKey> {
-  const raw = Uint8Array.from(atob(keyBase64), (c) => c.charCodeAt(0))
+const importKey = async (keyBase64: string): Promise<CryptoKey> => {
+  const raw = Uint8Array.from(atob(keyBase64), (c) => c.codePointAt(0) ?? 0)
   return crypto.subtle.importKey("raw", raw, { name: "AES-GCM" }, false, [
     "encrypt",
     "decrypt",
   ])
 }
 
-export async function generateEncryptionKey(): Promise<string> {
+export const generateEncryptionKey = (): Promise<string> => {
   const key = crypto.getRandomValues(new Uint8Array(32))
-  return btoa(String.fromCharCode(...key))
+  return Promise.resolve(btoa(String.fromCodePoint(...key)))
 }

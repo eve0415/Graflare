@@ -1,4 +1,4 @@
-import { useState } from "react"
+import { useCallback, useState } from "react"
 import { useNavigate } from "@tanstack/react-router"
 import { Button } from "@graflare/ui/components/button"
 import { Input } from "@graflare/ui/components/input"
@@ -20,16 +20,19 @@ import {
 import { Alert, AlertDescription } from "@graflare/ui/components/alert"
 import {
   createDatasource,
-  updateDatasource,
   testConnection,
+  updateDatasource,
 } from "../../../lib/api"
+
+type DatasourceType = "prometheus"
+type AuthType = "none" | "basic" | "bearer"
 
 interface DatasourceFormData {
   id?: string
   name: string
-  type: string
+  type: DatasourceType
   url: string
-  authType: string
+  authType: AuthType
   queryTimeoutMs: number
   username?: string
   password?: string
@@ -41,7 +44,19 @@ interface Props {
   initialData?: DatasourceFormData
 }
 
-export function DatasourceForm({ mode, initialData }: Props) {
+interface TestResult {
+  success: boolean
+  latencyMs?: number
+  error?: string
+}
+
+const isAuthType = (value: string): value is AuthType =>
+  value === "none" || value === "basic" || value === "bearer"
+
+const isDatasourceType = (value: string): value is DatasourceType =>
+  value === "prometheus"
+
+export const DatasourceForm = ({ mode, initialData }: Props) => {
   const navigate = useNavigate()
   const [form, setForm] = useState<DatasourceFormData>(
     initialData ?? {
@@ -54,83 +69,153 @@ export function DatasourceForm({ mode, initialData }: Props) {
   )
   const [saving, setSaving] = useState(false)
   const [testing, setTesting] = useState(false)
-  const [testResult, setTestResult] = useState<{
-    success: boolean
-    latencyMs?: number
-    error?: string
-  } | null>(null)
+  const [testResult, setTestResult] = useState<TestResult | null>(null)
   const [error, setError] = useState<string | null>(null)
 
-  function update(field: string, value: string | number) {
-    setForm((prev) => ({ ...prev, [field]: value }))
-  }
+  const handleSubmit = useCallback(
+    async (e: React.SyntheticEvent) => {
+      e.preventDefault()
+      setSaving(true)
+      setError(null)
 
-  async function handleSubmit(e: React.FormEvent) {
-    e.preventDefault()
-    setSaving(true)
-    setError(null)
+      try {
+        const credentials =
+          form.authType === "basic"
+            ? { username: form.username, password: form.password }
+            : form.authType === "bearer"
+              ? { token: form.token }
+              : undefined
 
-    try {
-      const credentials =
-        form.authType === "basic"
-          ? { username: form.username, password: form.password }
-          : form.authType === "bearer"
-            ? { token: form.token }
-            : undefined
-
-      if (mode === "create") {
-        await createDatasource({
-          data: {
-            name: form.name,
-            type: form.type as "prometheus",
-            url: form.url,
-            authType: form.authType as "none" | "basic" | "bearer",
-            queryTimeoutMs: form.queryTimeoutMs,
-            credentials,
-          },
-        })
-      } else if (form.id) {
-        await updateDatasource({
-          data: {
-            id: form.id,
+        if (mode === "create") {
+          await createDatasource({
             data: {
               name: form.name,
-              type: form.type as "prometheus",
+              type: form.type,
               url: form.url,
-              authType: form.authType as "none" | "basic" | "bearer",
+              authType: form.authType,
               queryTimeoutMs: form.queryTimeoutMs,
               credentials,
             },
-          },
-        })
+          })
+        } else if (form.id !== undefined) {
+          await updateDatasource({
+            data: {
+              id: form.id,
+              data: {
+                name: form.name,
+                type: form.type,
+                url: form.url,
+                authType: form.authType,
+                queryTimeoutMs: form.queryTimeoutMs,
+                credentials,
+              },
+            },
+          })
+        }
+        await navigate({ to: "/datasources" })
+      } catch (error) {
+        setError(error instanceof Error ? error.message : "Save failed")
+      } finally {
+        setSaving(false)
       }
-      navigate({ to: "/datasources" })
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Save failed")
-    } finally {
-      setSaving(false)
-    }
-  }
+    },
+    [form, mode, navigate],
+  )
 
-  async function handleTest() {
-    if (!form.id) return
+  const handleTest = useCallback(async () => {
+    if (form.id === undefined) return
     setTesting(true)
     setTestResult(null)
     try {
       const result = await testConnection({ data: form.id })
       setTestResult(result)
-    } catch (err) {
+    } catch (error) {
       setTestResult({
         success: false,
-        error: err instanceof Error ? err.message : "Test failed",
+        error: error instanceof Error ? error.message : "Test failed",
       })
     } finally {
       setTesting(false)
     }
-  }
+  }, [form.id])
+
+  const handleNameChange = useCallback(
+    (e: React.ChangeEvent<HTMLInputElement>) => {
+      const { value } = e.target
+      setForm((prev) => ({ ...prev, name: value }))
+    },
+    [],
+  )
+
+  const handleTypeChange = useCallback((value: string | null) => {
+    if (value !== null && isDatasourceType(value)) {
+      setForm((prev) => ({ ...prev, type: value }))
+    }
+  }, [])
+
+  const handleUrlChange = useCallback(
+    (e: React.ChangeEvent<HTMLInputElement>) => {
+      const { value } = e.target
+      setForm((prev) => ({ ...prev, url: value }))
+    },
+    [],
+  )
+
+  const handleAuthTypeChange = useCallback((value: string | null) => {
+    if (value !== null && isAuthType(value)) {
+      setForm((prev) => ({ ...prev, authType: value }))
+    }
+  }, [])
+
+  const handleUsernameChange = useCallback(
+    (e: React.ChangeEvent<HTMLInputElement>) => {
+      const { value } = e.target
+      setForm((prev) => ({ ...prev, username: value }))
+    },
+    [],
+  )
+
+  const handlePasswordChange = useCallback(
+    (e: React.ChangeEvent<HTMLInputElement>) => {
+      const { value } = e.target
+      setForm((prev) => ({ ...prev, password: value }))
+    },
+    [],
+  )
+
+  const handleTokenChange = useCallback(
+    (e: React.ChangeEvent<HTMLInputElement>) => {
+      const { value } = e.target
+      setForm((prev) => ({ ...prev, token: value }))
+    },
+    [],
+  )
+
+  const handleTimeoutChange = useCallback(
+    (e: React.ChangeEvent<HTMLInputElement>) => {
+      const value = Number.parseInt(e.target.value, 10)
+      setForm((prev) => ({ ...prev, queryTimeoutMs: value }))
+    },
+    [],
+  )
+
+  const handleSubmitEvent = useCallback(
+    (e: React.SyntheticEvent) => {
+      void handleSubmit(e)
+    },
+    [handleSubmit],
+  )
+
+  const handleTestClick = useCallback(() => {
+    void handleTest()
+  }, [handleTest])
+
+  const handleCancel = useCallback(() => {
+    void navigate({ to: "/datasources" })
+  }, [navigate])
 
   return (
-    <form onSubmit={handleSubmit}>
+    <form onSubmit={handleSubmitEvent}>
       <Card>
         <CardHeader>
           <CardTitle>
@@ -138,7 +223,7 @@ export function DatasourceForm({ mode, initialData }: Props) {
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
-          {error && (
+          {error !== null && (
             <Alert variant="destructive">
               <AlertDescription>{error}</AlertDescription>
             </Alert>
@@ -149,7 +234,7 @@ export function DatasourceForm({ mode, initialData }: Props) {
             <Input
               id="name"
               value={form.name}
-              onChange={(e: React.ChangeEvent<HTMLInputElement>) => update("name", e.target.value)}
+              onChange={handleNameChange}
               placeholder="Production Prometheus"
               required
             />
@@ -157,10 +242,7 @@ export function DatasourceForm({ mode, initialData }: Props) {
 
           <div className="space-y-2">
             <Label htmlFor="type">Type</Label>
-            <Select
-              value={form.type}
-              onValueChange={(v: string | null) => v && update("type", v)}
-            >
+            <Select value={form.type} onValueChange={handleTypeChange}>
               <SelectTrigger id="type">
                 <SelectValue />
               </SelectTrigger>
@@ -176,7 +258,7 @@ export function DatasourceForm({ mode, initialData }: Props) {
               id="url"
               type="url"
               value={form.url}
-              onChange={(e: React.ChangeEvent<HTMLInputElement>) => update("url", e.target.value)}
+              onChange={handleUrlChange}
               placeholder="https://prometheus.example.com"
               required
             />
@@ -184,10 +266,7 @@ export function DatasourceForm({ mode, initialData }: Props) {
 
           <div className="space-y-2">
             <Label htmlFor="authType">Authentication</Label>
-            <Select
-              value={form.authType}
-              onValueChange={(v: string | null) => v && update("authType", v)}
-            >
+            <Select value={form.authType} onValueChange={handleAuthTypeChange}>
               <SelectTrigger id="authType">
                 <SelectValue />
               </SelectTrigger>
@@ -206,7 +285,7 @@ export function DatasourceForm({ mode, initialData }: Props) {
                 <Input
                   id="username"
                   value={form.username ?? ""}
-                  onChange={(e: React.ChangeEvent<HTMLInputElement>) => update("username", e.target.value)}
+                  onChange={handleUsernameChange}
                 />
               </div>
               <div className="space-y-2">
@@ -215,7 +294,7 @@ export function DatasourceForm({ mode, initialData }: Props) {
                   id="password"
                   type="password"
                   value={form.password ?? ""}
-                  onChange={(e: React.ChangeEvent<HTMLInputElement>) => update("password", e.target.value)}
+                  onChange={handlePasswordChange}
                 />
               </div>
             </>
@@ -228,7 +307,7 @@ export function DatasourceForm({ mode, initialData }: Props) {
                 id="token"
                 type="password"
                 value={form.token ?? ""}
-                onChange={(e: React.ChangeEvent<HTMLInputElement>) => update("token", e.target.value)}
+                onChange={handleTokenChange}
               />
             </div>
           )}
@@ -242,9 +321,7 @@ export function DatasourceForm({ mode, initialData }: Props) {
               max={120000}
               step={1000}
               value={form.queryTimeoutMs}
-              onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
-                update("queryTimeoutMs", Number.parseInt(e.target.value, 10))
-              }
+              onChange={handleTimeoutChange}
             />
           </div>
 
@@ -254,12 +331,12 @@ export function DatasourceForm({ mode, initialData }: Props) {
                 type="button"
                 variant="outline"
                 size="sm"
-                onClick={handleTest}
+                onClick={handleTestClick}
                 disabled={testing}
               >
                 {testing ? "Testing..." : "Test Connection"}
               </Button>
-              {testResult && (
+              {testResult !== null && (
                 <span
                   className={`text-sm ${testResult.success ? "text-green-600" : "text-destructive"}`}
                 >
@@ -275,11 +352,7 @@ export function DatasourceForm({ mode, initialData }: Props) {
           <Button type="submit" disabled={saving}>
             {saving ? "Saving..." : "Save"}
           </Button>
-          <Button
-            type="button"
-            variant="outline"
-            onClick={() => navigate({ to: "/datasources" })}
-          >
+          <Button type="button" variant="outline" onClick={handleCancel}>
             Cancel
           </Button>
         </CardFooter>

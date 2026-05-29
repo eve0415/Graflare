@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest"
 import { PrometheusClient } from "./client"
 
-describe("PrometheusClient", () => {
+describe("prometheus client", () => {
   it("creates with correct config", () => {
     const client = new PrometheusClient(
       "https://prom.example.com",

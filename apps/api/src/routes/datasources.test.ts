@@ -1,5 +1,6 @@
 import { env } from "cloudflare:workers"
-import { describe, expect, it, beforeEach } from "vitest"
+import { beforeEach, describe, expect, it } from "vitest"
+import { datasourceSchema } from "@graflare/shared/schemas/datasource"
 import { createDb } from "../db"
 import { datasources, organizations } from "../db/schema"
 import { datasourceRoutes } from "./datasources"
@@ -8,10 +9,25 @@ import type { AppEnv } from "../index"
 
 const TEST_ORG_ID = "org-test-123"
 const TEST_ENCRYPTION_KEY = btoa(
-  String.fromCharCode(...crypto.getRandomValues(new Uint8Array(32))),
+  String.fromCodePoint(...crypto.getRandomValues(new Uint8Array(32))),
 )
 
-function createApp() {
+const testBindings: AppEnv["Bindings"] = {
+  DB: env.DB,
+  ENCRYPTION_KEY: TEST_ENCRYPTION_KEY,
+  ACCESS_TEAM_DOMAIN: "test-team",
+  ACCESS_AUD: "test-aud",
+}
+
+// The route serializes Date columns to ISO strings and uses a non-UUID test
+// org id, so the full datasourceSchema does not fit the wire shape. Pick only
+// the fields the assertions read; .loose() keeps extra keys so the negative
+// "credentials" check stays meaningful.
+const datasourceResponseSchema = datasourceSchema
+  .pick({ id: true, name: true })
+  .loose()
+
+const createApp = () => {
   const app = new Hono<AppEnv>()
   app.use("/*", async (c, next) => {
     c.set("orgId", TEST_ORG_ID)
@@ -22,9 +38,8 @@ function createApp() {
   return app
 }
 
-function req(path: string, init?: RequestInit) {
-  return new Request(`http://localhost${path}`, init)
-}
+const req = (path: string, init?: RequestInit) =>
+  new Request(`http://localhost${path}`, init)
 
 describe("datasource routes", () => {
   beforeEach(async () => {
@@ -41,10 +56,7 @@ describe("datasource routes", () => {
 
   it("lists datasources (empty)", async () => {
     const app = createApp()
-    const res = await app.request(req("/"), {}, {
-      DB: env.DB,
-      ENCRYPTION_KEY: TEST_ENCRYPTION_KEY,
-    } as unknown as AppEnv["Bindings"])
+    const res = await app.request(req("/"), {}, testBindings)
     expect(res.status).toBe(200)
     expect(await res.json()).toEqual([])
   })
@@ -63,10 +75,10 @@ describe("datasource routes", () => {
         }),
       }),
       {},
-      { DB: env.DB, ENCRYPTION_KEY: TEST_ENCRYPTION_KEY } as unknown as AppEnv["Bindings"],
+      testBindings,
     )
     expect(res.status).toBe(201)
-    const body = await res.json() as Record<string, unknown>
+    const body = datasourceResponseSchema.parse(await res.json())
     expect(body.name).toBe("Test Prom")
     expect(body.id).toBeDefined()
     expect(body).not.toHaveProperty("credentials")
@@ -87,14 +99,15 @@ describe("datasource routes", () => {
         }),
       }),
       {},
-      { DB: env.DB, ENCRYPTION_KEY: TEST_ENCRYPTION_KEY } as unknown as AppEnv["Bindings"],
+      testBindings,
     )
     expect(res.status).toBe(201)
 
     const db = createDb(env.DB)
     const rows = await db.select().from(datasources)
-    expect(rows[0]!.credentials).toBeDefined()
-    expect(rows[0]!.credentials).not.toContain("my-secret-token")
+    const [row] = rows
+    expect(row?.credentials).toBeDefined()
+    expect(row?.credentials).not.toContain("my-secret-token")
   })
 
   it("rejects invalid create input", async () => {
@@ -106,7 +119,7 @@ describe("datasource routes", () => {
         body: JSON.stringify({ name: "", type: "invalid" }),
       }),
       {},
-      { DB: env.DB, ENCRYPTION_KEY: TEST_ENCRYPTION_KEY } as unknown as AppEnv["Bindings"],
+      testBindings,
     )
     expect(res.status).toBe(400)
   })
@@ -125,17 +138,17 @@ describe("datasource routes", () => {
         }),
       }),
       {},
-      { DB: env.DB, ENCRYPTION_KEY: TEST_ENCRYPTION_KEY } as unknown as AppEnv["Bindings"],
+      testBindings,
     )
-    const created = await createRes.json() as Record<string, unknown>
+    const created = datasourceResponseSchema.parse(await createRes.json())
 
     const res = await app.request(
       req(`/${created.id}`),
       {},
-      { DB: env.DB, ENCRYPTION_KEY: TEST_ENCRYPTION_KEY } as unknown as AppEnv["Bindings"],
+      testBindings,
     )
     expect(res.status).toBe(200)
-    const body = await res.json() as Record<string, unknown>
+    const body = datasourceResponseSchema.parse(await res.json())
     expect(body.name).toBe("Get Test")
   })
 
@@ -144,7 +157,7 @@ describe("datasource routes", () => {
     const res = await app.request(
       req("/nonexistent-id"),
       {},
-      { DB: env.DB, ENCRYPTION_KEY: TEST_ENCRYPTION_KEY } as unknown as AppEnv["Bindings"],
+      testBindings,
     )
     expect(res.status).toBe(404)
   })
@@ -163,9 +176,9 @@ describe("datasource routes", () => {
         }),
       }),
       {},
-      { DB: env.DB, ENCRYPTION_KEY: TEST_ENCRYPTION_KEY } as unknown as AppEnv["Bindings"],
+      testBindings,
     )
-    const created = await createRes.json() as Record<string, unknown>
+    const created = datasourceResponseSchema.parse(await createRes.json())
 
     const res = await app.request(
       req(`/${created.id}`, {
@@ -174,10 +187,10 @@ describe("datasource routes", () => {
         body: JSON.stringify({ name: "After Update" }),
       }),
       {},
-      { DB: env.DB, ENCRYPTION_KEY: TEST_ENCRYPTION_KEY } as unknown as AppEnv["Bindings"],
+      testBindings,
     )
     expect(res.status).toBe(200)
-    const body = await res.json() as Record<string, unknown>
+    const body = datasourceResponseSchema.parse(await res.json())
     expect(body.name).toBe("After Update")
   })
 
@@ -195,21 +208,21 @@ describe("datasource routes", () => {
         }),
       }),
       {},
-      { DB: env.DB, ENCRYPTION_KEY: TEST_ENCRYPTION_KEY } as unknown as AppEnv["Bindings"],
+      testBindings,
     )
-    const created = await createRes.json() as Record<string, unknown>
+    const created = datasourceResponseSchema.parse(await createRes.json())
 
     const res = await app.request(
       req(`/${created.id}`, { method: "DELETE" }),
       {},
-      { DB: env.DB, ENCRYPTION_KEY: TEST_ENCRYPTION_KEY } as unknown as AppEnv["Bindings"],
+      testBindings,
     )
     expect(res.status).toBe(204)
 
     const getRes = await app.request(
       req(`/${created.id}`),
       {},
-      { DB: env.DB, ENCRYPTION_KEY: TEST_ENCRYPTION_KEY } as unknown as AppEnv["Bindings"],
+      testBindings,
     )
     expect(getRes.status).toBe(404)
   })

@@ -1,10 +1,10 @@
 import { env } from "cloudflare:workers"
 import { eq } from "drizzle-orm"
-import { describe, expect, it, beforeEach } from "vitest"
+import { beforeEach, describe, expect, it } from "vitest"
 import { createDb } from "./index"
 import { datasources, organizations } from "./schema"
 
-function setup() {
+const setup = () => {
   const db = createDb(env.DB)
   return { db }
 }
@@ -28,7 +28,7 @@ const testDatasource = {
   updatedAt: new Date(1716854400000),
 }
 
-describe("D1 schema", () => {
+describe("d1 schema", () => {
   beforeEach(async () => {
     const { db } = setup()
     await db.delete(datasources)
@@ -40,7 +40,8 @@ describe("D1 schema", () => {
     await db.insert(organizations).values(testOrg)
     const rows = await db.select().from(organizations)
     expect(rows).toHaveLength(1)
-    expect(rows[0]!.name).toBe("Test Org")
+    const [row] = rows
+    expect(row?.name).toBe("Test Org")
   })
 
   it("inserts and reads a datasource", async () => {
@@ -49,8 +50,9 @@ describe("D1 schema", () => {
     await db.insert(datasources).values(testDatasource)
     const rows = await db.select().from(datasources)
     expect(rows).toHaveLength(1)
-    expect(rows[0]!.name).toBe("Test Prometheus")
-    expect(rows[0]!.orgId).toBe(testOrg.id)
+    const [row] = rows
+    expect(row?.name).toBe("Test Prometheus")
+    expect(row?.orgId).toBe(testOrg.id)
   })
 
   it("updates a datasource", async () => {
@@ -65,7 +67,8 @@ describe("D1 schema", () => {
       .select()
       .from(datasources)
       .where(eq(datasources.id, testDatasource.id))
-    expect(rows[0]!.name).toBe("Updated Name")
+    const [row] = rows
+    expect(row?.name).toBe("Updated Name")
   })
 
   it("deletes a datasource", async () => {
@@ -84,7 +87,7 @@ describe("D1 schema", () => {
         ...testDatasource,
         orgId: "nonexistent-org-id",
       }),
-    ).rejects.toThrow()
+    ).rejects.toThrow(/Failed query: insert into "datasources"/)
   })
 
   it("applies default auth_type", async () => {
@@ -93,7 +96,8 @@ describe("D1 schema", () => {
     const { authType: _, ...withoutAuth } = testDatasource
     await db.insert(datasources).values(withoutAuth)
     const rows = await db.select().from(datasources)
-    expect(rows[0]!.authType).toBe("none")
+    const [row] = rows
+    expect(row?.authType).toBe("none")
   })
 
   it("stores and retrieves encrypted credentials", async () => {
@@ -103,6 +107,7 @@ describe("D1 schema", () => {
       .insert(datasources)
       .values({ ...testDatasource, credentials: "encrypted-blob" })
     const rows = await db.select().from(datasources)
-    expect(rows[0]!.credentials).toBe("encrypted-blob")
+    const [row] = rows
+    expect(row?.credentials).toBe("encrypted-blob")
   })
 })

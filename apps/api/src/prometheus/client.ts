@@ -1,12 +1,10 @@
+import type { DatasourceCredentials } from "@graflare/shared/schemas/datasource"
+import { prometheusResponseSchema } from "@graflare/shared/schemas/prometheus"
 import type { PrometheusResponse } from "@graflare/shared/schemas/prometheus"
 
 interface PrometheusAuth {
   type: "none" | "basic" | "bearer"
-  credentials?: {
-    username?: string
-    password?: string
-    token?: string
-  }
+  credentials?: DatasourceCredentials
 }
 
 export class PrometheusClient {
@@ -84,9 +82,9 @@ export class PrometheusClient {
         headers: this.getHeaders(),
         signal: AbortSignal.timeout(this.timeoutMs),
       })
-      return (await res.json()) as PrometheusResponse
-    } catch (err) {
-      return this.errorResponse(err)
+      return prometheusResponseSchema.parse(await res.json())
+    } catch (error) {
+      return this.errorResponse(error)
     }
   }
 
@@ -107,16 +105,16 @@ export class PrometheusClient {
         body: new URLSearchParams(params).toString(),
         signal: AbortSignal.timeout(this.timeoutMs),
       })
-      return (await res.json()) as PrometheusResponse
-    } catch (err) {
-      return this.errorResponse(err)
+      return prometheusResponseSchema.parse(await res.json())
+    } catch (error) {
+      return this.errorResponse(error)
     }
   }
 
-  private errorResponse(err: unknown): PrometheusResponse {
-    const message = err instanceof Error ? err.message : "Request failed"
+  private errorResponse(error: unknown): PrometheusResponse {
+    const message = error instanceof Error ? error.message : "Request failed"
     const isTimeout =
-      err instanceof Error && err.name === "TimeoutError"
+      error instanceof Error && error.name === "TimeoutError"
     return {
       status: "error",
       errorType: isTimeout ? "timeout" : "internal",

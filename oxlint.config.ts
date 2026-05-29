@@ -353,6 +353,9 @@ export default defineConfig({
         'typescript/no-unsafe-return': 'off',
         'prefer-destructuring': 'off',
         'import/no-default-export': 'off',
+        // shadcn primitives are generic wrappers; label/control association
+        // happens at the call site (htmlFor/id), which this rule can't see.
+        'jsx-a11y/label-has-associated-control': 'off',
       },
     },
     // TanStack route files legitimately default-export.

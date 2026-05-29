@@ -1,12 +1,17 @@
 import { Hono } from "hono"
 import { WorkerEntrypoint } from "cloudflare:workers"
-import { eq, and } from "drizzle-orm"
+import { and, eq } from "drizzle-orm"
 import type {
   CreateDatasource,
   UpdateDatasource,
 } from "@graflare/shared/schemas/datasource"
-import { createDatasourceSchema, updateDatasourceSchema } from "@graflare/shared/schemas/datasource"
+import {
+  createDatasourceSchema,
+  datasourceCredentialsSchema,
+  updateDatasourceSchema,
+} from "@graflare/shared/schemas/datasource"
 import type { PrometheusResponse } from "@graflare/shared/schemas/prometheus"
+import { prometheusResponseSchema } from "@graflare/shared/schemas/prometheus"
 import { createDb } from "./db"
 import { datasources } from "./db/schema"
 import { accessMiddleware } from "./middleware/access"
@@ -14,16 +19,16 @@ import { orgMiddleware } from "./middleware/org"
 import { datasourceRoutes } from "./routes/datasources"
 import { datasourceTestRoutes } from "./routes/datasources-test"
 import { proxyRoutes } from "./routes/proxy"
-import { encryptCredentials, decryptCredentials } from "./crypto/credentials"
+import { decryptCredentials, encryptCredentials } from "./crypto/credentials"
 
-type Bindings = {
+interface Bindings {
   DB: D1Database
   ENCRYPTION_KEY: string
   ACCESS_TEAM_DOMAIN: string
   ACCESS_AUD: string
 }
 
-export type AppEnv = {
+export interface AppEnv {
   Bindings: Bindings
   Variables: {
     user: { email: string; name: string }
@@ -48,8 +53,8 @@ export class GraflareAPI extends WorkerEntrypoint<Bindings> {
     return createDb(this.env.DB)
   }
 
-  async health(): Promise<{ status: string }> {
-    return { status: "ok" }
+  health(): Promise<{ status: string }> {
+    return Promise.resolve({ status: "ok" })
   }
 
   async listDatasources(orgId: string) {
@@ -155,23 +160,29 @@ export class GraflareAPI extends WorkerEntrypoint<Bindings> {
       .where(and(eq(datasources.id, id), eq(datasources.orgId, orgId)))
       .limit(1)
 
-    if (rows.length === 0) {
+    const [ds] = rows
+    if (ds === undefined) {
       return { success: false, latencyMs: 0, error: "Not found" }
     }
 
-    const ds = rows[0]!
     const start = Date.now()
 
     try {
       const headers: Record<string, string> = {}
       if (ds.credentials) {
-        const creds = JSON.parse(
-          await decryptCredentials(ds.credentials, this.env.ENCRYPTION_KEY),
+        const creds = datasourceCredentialsSchema.parse(
+          JSON.parse(
+            await decryptCredentials(ds.credentials, this.env.ENCRYPTION_KEY),
+          ),
         )
-        if (ds.authType === "basic" && creds.username && creds.password) {
+        if (
+          ds.authType === "basic" &&
+          creds.username !== undefined &&
+          creds.password !== undefined
+        ) {
           headers["Authorization"] =
             `Basic ${btoa(`${creds.username}:${creds.password}`)}`
-        } else if (ds.authType === "bearer" && creds.token) {
+        } else if (ds.authType === "bearer" && creds.token !== undefined) {
           headers["Authorization"] = `Bearer ${creds.token}`
         }
       }
@@ -186,9 +197,9 @@ export class GraflareAPI extends WorkerEntrypoint<Bindings> {
         return { success: false, latencyMs, error: `Upstream returned ${res.status}` }
       }
       return { success: true, latencyMs }
-    } catch (err) {
+    } catch (error) {
       const latencyMs = Date.now() - start
-      const message = err instanceof Error ? err.message : "Connection failed"
+      const message = error instanceof Error ? error.message : "Connection failed"
       return { success: false, latencyMs, error: message }
     }
   }
@@ -216,11 +227,11 @@ export class GraflareAPI extends WorkerEntrypoint<Bindings> {
       .where(and(eq(datasources.id, datasourceId), eq(datasources.orgId, orgId)))
       .limit(1)
 
-    if (rows.length === 0) {
+    const [ds] = rows
+    if (ds === undefined) {
       return { status: "error", errorType: "not_found", error: "Data source not found" }
     }
 
-    const ds = rows[0]!
     const headers: Record<string, string> = { "Content-Type": "application/x-www-form-urlencoded" }
 
     try {
@@ -230,7 +241,7 @@ export class GraflareAPI extends WorkerEntrypoint<Bindings> {
 
       const targetUrl = isPost
         ? base.toString()
-        : `${base}?${new URLSearchParams(params)}`
+        : `${base.toString()}?${new URLSearchParams(params).toString()}`
 
       if (new URL(targetUrl).origin !== base.origin) {
         return { status: "error", errorType: "bad_request", error: "URL origin mismatch" }
@@ -238,13 +249,19 @@ export class GraflareAPI extends WorkerEntrypoint<Bindings> {
 
       // Attach credentials only after confirming the target origin matches the datasource.
       if (ds.credentials) {
-        const creds = JSON.parse(
-          await decryptCredentials(ds.credentials, this.env.ENCRYPTION_KEY),
+        const creds = datasourceCredentialsSchema.parse(
+          JSON.parse(
+            await decryptCredentials(ds.credentials, this.env.ENCRYPTION_KEY),
+          ),
         )
-        if (ds.authType === "basic" && creds.username && creds.password) {
+        if (
+          ds.authType === "basic" &&
+          creds.username !== undefined &&
+          creds.password !== undefined
+        ) {
           headers["Authorization"] =
             `Basic ${btoa(`${creds.username}:${creds.password}`)}`
-        } else if (ds.authType === "bearer" && creds.token) {
+        } else if (ds.authType === "bearer" && creds.token !== undefined) {
           headers["Authorization"] = `Bearer ${creds.token}`
         }
       }
@@ -256,9 +273,9 @@ export class GraflareAPI extends WorkerEntrypoint<Bindings> {
         signal: AbortSignal.timeout(ds.queryTimeoutMs),
       })
 
-      return (await res.json()) as PrometheusResponse
-    } catch (err) {
-      const message = err instanceof Error ? err.message : "Query failed"
+      return prometheusResponseSchema.parse(await res.json())
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Query failed"
       return { status: "error", errorType: "timeout", error: message }
     }
   }

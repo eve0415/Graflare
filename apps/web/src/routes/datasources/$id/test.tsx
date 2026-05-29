@@ -1,5 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router"
-import { useState } from "react"
+import { useCallback, useState } from "react"
 import { Button } from "@graflare/ui/components/button"
 import { Input } from "@graflare/ui/components/input"
 import { Label } from "@graflare/ui/components/label"
@@ -19,54 +19,103 @@ import {
 import { Alert, AlertDescription } from "@graflare/ui/components/alert"
 import { proxyQuery } from "../../../lib/api"
 
-export const Route = createFileRoute("/datasources/$id/test")({
-  component: QueryTestPage,
-})
+type QueryType = "instant" | "range"
 
-function QueryTestPage() {
+const monoFontStyle = { fontFamily: "Geist Mono, monospace" } as const
+
+const isQueryType = (value: string): value is QueryType =>
+  value === "instant" || value === "range"
+
+const QueryTestPage = () => {
   const { id } = Route.useParams()
   const [query, setQuery] = useState("up")
-  const [queryType, setQueryType] = useState<"instant" | "range">("instant")
+  const [queryType, setQueryType] = useState<QueryType>("instant")
   const [start, setStart] = useState("")
   const [end, setEnd] = useState("")
   const [step, setStep] = useState("15s")
   const [loading, setLoading] = useState(false)
-  const [result, setResult] = useState<Record<string, unknown> | null>(null)
+  const [result, setResult] = useState<unknown>(null)
   const [error, setError] = useState<string | null>(null)
+  const [nowSeconds] = useState(() => Math.floor(Date.now() / 1000))
 
-  async function handleSubmit(e: React.FormEvent) {
-    e.preventDefault()
-    setLoading(true)
-    setError(null)
-    setResult(null)
+  const handleSubmit = useCallback(
+    async (e: React.SyntheticEvent) => {
+      e.preventDefault()
+      setLoading(true)
+      setError(null)
+      setResult(null)
 
-    try {
-      const endpoint =
-        queryType === "instant" ? "/api/v1/query" : "/api/v1/query_range"
+      try {
+        const endpoint =
+          queryType === "instant" ? "/api/v1/query" : "/api/v1/query_range"
 
-      const params: Record<string, string> = { query }
-      if (queryType === "range") {
-        params.start = start || String(Math.floor(Date.now() / 1000) - 3600)
-        params.end = end || String(Math.floor(Date.now() / 1000))
-        params.step = step
+        const params: Record<string, string> = { query }
+        if (queryType === "range") {
+          params.start =
+            start || String(Math.floor(Date.now() / 1000) - 3600)
+          params.end = end || String(Math.floor(Date.now() / 1000))
+          params.step = step
+        }
+
+        const res = await proxyQuery({
+          data: { datasourceId: id, endpoint, params },
+        })
+        setResult(res)
+      } catch (error) {
+        setError(error instanceof Error ? error.message : "Query failed")
+      } finally {
+        setLoading(false)
       }
+    },
+    [queryType, query, start, end, step, id],
+  )
 
-      const res = await proxyQuery({
-        data: { datasourceId: id, endpoint, params },
-      })
-      setResult(res as Record<string, unknown>)
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Query failed")
-    } finally {
-      setLoading(false)
+  const handleSubmitEvent = useCallback(
+    (e: React.SyntheticEvent) => {
+      void handleSubmit(e)
+    },
+    [handleSubmit],
+  )
+
+  const handleQueryChange = useCallback(
+    (e: React.ChangeEvent<HTMLTextAreaElement>) => {
+      setQuery(e.target.value)
+    },
+    [],
+  )
+
+  const handleQueryTypeChange = useCallback((value: string | null) => {
+    if (value !== null && isQueryType(value)) {
+      setQueryType(value)
     }
-  }
+  }, [])
+
+  const handleStartChange = useCallback(
+    (e: React.ChangeEvent<HTMLInputElement>) => {
+      setStart(e.target.value)
+    },
+    [],
+  )
+
+  const handleEndChange = useCallback(
+    (e: React.ChangeEvent<HTMLInputElement>) => {
+      setEnd(e.target.value)
+    },
+    [],
+  )
+
+  const handleStepChange = useCallback(
+    (e: React.ChangeEvent<HTMLInputElement>) => {
+      setStep(e.target.value)
+    },
+    [],
+  )
 
   return (
     <div className="space-y-4">
       <h1 className="text-xl font-semibold">Query Test</h1>
 
-      <form onSubmit={handleSubmit}>
+      <form onSubmit={handleSubmitEvent}>
         <Card>
           <CardHeader>
             <CardTitle className="text-sm">PromQL Query</CardTitle>
@@ -76,22 +125,18 @@ function QueryTestPage() {
               <Label htmlFor="query">Query</Label>
               <textarea
                 id="query"
+                aria-label="Query"
                 value={query}
-                onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) => setQuery(e.target.value)}
+                onChange={handleQueryChange}
                 className="flex min-h-[80px] w-full rounded-lg border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                style={{ fontFamily: "Geist Mono, monospace" }}
+                style={monoFontStyle}
                 placeholder="up"
               />
             </div>
 
             <div className="space-y-2">
               <Label htmlFor="queryType">Query Type</Label>
-              <Select
-                value={queryType}
-                onValueChange={(v: string | null) =>
-                  v && setQueryType(v as "instant" | "range")
-                }
-              >
+              <Select value={queryType} onValueChange={handleQueryTypeChange}>
                 <SelectTrigger id="queryType">
                   <SelectValue />
                 </SelectTrigger>
@@ -109,10 +154,8 @@ function QueryTestPage() {
                   <Input
                     id="start"
                     value={start}
-                    onChange={(e: React.ChangeEvent<HTMLInputElement>) => setStart(e.target.value)}
-                    placeholder={String(
-                      Math.floor(Date.now() / 1000) - 3600,
-                    )}
+                    onChange={handleStartChange}
+                    placeholder={String(nowSeconds - 3600)}
                   />
                 </div>
                 <div className="space-y-2">
@@ -120,8 +163,8 @@ function QueryTestPage() {
                   <Input
                     id="end"
                     value={end}
-                    onChange={(e: React.ChangeEvent<HTMLInputElement>) => setEnd(e.target.value)}
-                    placeholder={String(Math.floor(Date.now() / 1000))}
+                    onChange={handleEndChange}
+                    placeholder={String(nowSeconds)}
                   />
                 </div>
                 <div className="space-y-2">
@@ -129,7 +172,7 @@ function QueryTestPage() {
                   <Input
                     id="step"
                     value={step}
-                    onChange={(e: React.ChangeEvent<HTMLInputElement>) => setStep(e.target.value)}
+                    onChange={handleStepChange}
                     placeholder="15s"
                   />
                 </div>
@@ -143,13 +186,13 @@ function QueryTestPage() {
         </Card>
       </form>
 
-      {error && (
+      {error !== null && (
         <Alert variant="destructive">
           <AlertDescription>{error}</AlertDescription>
         </Alert>
       )}
 
-      {result && (
+      {result !== null && (
         <Card>
           <CardHeader>
             <CardTitle className="text-sm">Result</CardTitle>
@@ -157,7 +200,7 @@ function QueryTestPage() {
           <CardContent>
             <pre
               className="overflow-auto rounded-lg bg-muted p-4 text-xs"
-              style={{ fontFamily: "Geist Mono, monospace" }}
+              style={monoFontStyle}
             >
               {JSON.stringify(result, null, 2)}
             </pre>
@@ -167,3 +210,7 @@ function QueryTestPage() {
     </div>
   )
 }
+
+export const Route = createFileRoute("/datasources/$id/test")({
+  component: QueryTestPage,
+})

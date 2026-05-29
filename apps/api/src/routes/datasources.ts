@@ -1,5 +1,5 @@
+import { and, eq } from "drizzle-orm"
 import { Hono } from "hono"
-import { eq, and } from "drizzle-orm"
 import { createDatasourceSchema, updateDatasourceSchema } from "@graflare/shared/schemas/datasource"
 import { createDb } from "../db"
 import { datasources } from "../db/schema"
@@ -62,7 +62,7 @@ app.post("/", async (c) => {
   const db = createDb(c.env.DB)
   const orgId = c.get("orgId")
 
-  const body = await c.req.json()
+  const body: unknown = await c.req.json()
   const parsed = createDatasourceSchema.safeParse(body)
   if (!parsed.success) {
     return c.json({ error: "Validation failed", details: parsed.error.issues }, 400)
@@ -116,7 +116,7 @@ app.put("/:id", async (c) => {
     return c.json({ error: "Not found" }, 404)
   }
 
-  const body = await c.req.json()
+  const body: unknown = await c.req.json()
   const parsed = updateDatasourceSchema.safeParse(body)
   if (!parsed.success) {
     return c.json({ error: "Validation failed", details: parsed.error.issues }, 400)

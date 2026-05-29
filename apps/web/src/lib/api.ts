@@ -1,82 +1,100 @@
-// @ts-nocheck — server function types depend on Cloudflare runtime context
 import { createServerFn } from "@tanstack/react-start"
+import { env } from "cloudflare:workers"
 import type { CreateDatasource, UpdateDatasource } from "@graflare/shared/schemas/datasource"
+import { prometheusResponseSchema } from "@graflare/shared/schemas/prometheus"
 
-export const listDatasources = createServerFn({ method: "GET" }).handler(
-  async ({ context }) => {
-    const env = (context as { cloudflare?: { env: Record<string, unknown> } })
-      .cloudflare?.env
-    if (!env?.API) return []
-    const api = env.API as { listDatasources(orgId: string): Promise<unknown[]> }
-    return api.listDatasources("default")
-  },
-)
+export interface DatasourceRow {
+  id: string
+  orgId: string
+  name: string
+  type: string
+  url: string
+  authType: string
+  queryTimeoutMs: number
+  createdAt: Date
+  updatedAt: Date
+}
+
+interface TestConnectionResult {
+  success: boolean
+  latencyMs: number
+  error?: string
+}
+
+const toDatasourceRow = (ds: {
+  id: string
+  orgId: string
+  name: string
+  type: string
+  url: string
+  authType: string
+  queryTimeoutMs: number
+  createdAt: Date
+  updatedAt: Date
+}): DatasourceRow => ({
+  id: ds.id,
+  orgId: ds.orgId,
+  name: ds.name,
+  type: ds.type,
+  url: ds.url,
+  authType: ds.authType,
+  queryTimeoutMs: ds.queryTimeoutMs,
+  createdAt: ds.createdAt,
+  updatedAt: ds.updatedAt,
+})
+
+export const listDatasources = createServerFn({ method: "GET" }).handler(async () => {
+  const rows = await env.API.listDatasources("default")
+  return rows.map((ds) => toDatasourceRow(ds))
+})
 
 export const getDatasource = createServerFn({ method: "GET" })
   .inputValidator((id: string) => id)
-  .handler(async ({ data: id, context }) => {
-    const env = (context as { cloudflare?: { env: Record<string, unknown> } })
-      .cloudflare?.env
-    if (!env?.API) return null
-    const api = env.API as {
-      getDatasource(orgId: string, id: string): Promise<unknown>
-    }
-    return api.getDatasource("default", id)
+  .handler(async ({ data: id }) => {
+    const ds = await env.API.getDatasource("default", id)
+    return ds === null ? null : toDatasourceRow(ds)
   })
 
 export const createDatasource = createServerFn({ method: "POST" })
   .inputValidator((input: CreateDatasource) => input)
-  .handler(async ({ data, context }) => {
-    const env = (context as { cloudflare?: { env: Record<string, unknown> } })
-      .cloudflare?.env
-    if (!env?.API) throw new Error("API not available")
-    const api = env.API as {
-      createDatasource(orgId: string, input: CreateDatasource): Promise<unknown>
+  .handler(async ({ data }) => {
+    const ds = await env.API.createDatasource("default", data)
+    return {
+      id: ds.id,
+      orgId: ds.orgId,
+      name: ds.name,
+      type: ds.type,
+      url: ds.url,
+      authType: ds.authType,
+      queryTimeoutMs: ds.queryTimeoutMs,
+      createdAt: ds.createdAt,
+      updatedAt: ds.updatedAt,
     }
-    return api.createDatasource("default", data)
   })
 
 export const updateDatasource = createServerFn({ method: "POST" })
   .inputValidator((input: { id: string; data: UpdateDatasource }) => input)
-  .handler(async ({ data: { id, data }, context }) => {
-    const env = (context as { cloudflare?: { env: Record<string, unknown> } })
-      .cloudflare?.env
-    if (!env?.API) throw new Error("API not available")
-    const api = env.API as {
-      updateDatasource(
-        orgId: string,
-        id: string,
-        input: UpdateDatasource,
-      ): Promise<unknown>
-    }
-    return api.updateDatasource("default", id, data)
+  .handler(async ({ data: { id, data } }) => {
+    const ds = await env.API.updateDatasource("default", id, data)
+    return ds === null ? null : toDatasourceRow(ds)
   })
 
 export const deleteDatasource = createServerFn({ method: "POST" })
   .inputValidator((id: string) => id)
-  .handler(async ({ data: id, context }) => {
-    const env = (context as { cloudflare?: { env: Record<string, unknown> } })
-      .cloudflare?.env
-    if (!env?.API) throw new Error("API not available")
-    const api = env.API as {
-      deleteDatasource(orgId: string, id: string): Promise<void>
-    }
-    await api.deleteDatasource("default", id)
+  .handler(async ({ data: id }) => {
+    await env.API.deleteDatasource("default", id)
   })
 
 export const testConnection = createServerFn({ method: "POST" })
   .inputValidator((id: string) => id)
-  .handler(async ({ data: id, context }) => {
-    const env = (context as { cloudflare?: { env: Record<string, unknown> } })
-      .cloudflare?.env
-    if (!env?.API) throw new Error("API not available")
-    const api = env.API as {
-      testConnection(
-        orgId: string,
-        id: string,
-      ): Promise<{ success: boolean; latencyMs: number; error?: string }>
+  .handler(async ({ data: id }) => {
+    const result = await env.API.testConnection("default", id)
+    const plain: TestConnectionResult = {
+      success: result.success,
+      latencyMs: result.latencyMs,
+      ...(result.error !== undefined && { error: result.error }),
     }
-    return api.testConnection("default", id)
+    return plain
   })
 
 export const proxyQuery = createServerFn({ method: "POST" })
@@ -87,17 +105,15 @@ export const proxyQuery = createServerFn({ method: "POST" })
       params: Record<string, string>
     }) => input,
   )
-  .handler(async ({ data, context }) => {
-    const env = (context as { cloudflare?: { env: Record<string, unknown> } })
-      .cloudflare?.env
-    if (!env?.API) throw new Error("API not available")
-    const api = env.API as {
-      proxyQuery(
-        orgId: string,
-        datasourceId: string,
-        endpoint: string,
-        params: Record<string, string>,
-      ): Promise<unknown>
-    }
-    return api.proxyQuery("default", data.datasourceId, data.endpoint, data.params)
+  .handler(async ({ data }) => {
+    const result = await env.API.proxyQuery(
+      "default",
+      data.datasourceId,
+      data.endpoint,
+      data.params,
+    )
+    // Re-parse to drop the RPC stub's Disposable brand (`[Symbol.dispose]`,
+    // which createServerFn rejects as non-serializable) and restore the exact
+    // schema types (RPC widens tuples like [number, string] to (number|string)[]).
+    return prometheusResponseSchema.parse(result)
   })

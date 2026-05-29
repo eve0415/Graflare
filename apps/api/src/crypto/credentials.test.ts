@@ -5,6 +5,18 @@ import {
   generateEncryptionKey,
 } from "./credentials"
 
+// Corrupt the final byte of a base64 payload (0xFF - b never equals b), which
+// invalidates the AES-GCM auth tag. Kept out of the test body so the necessary
+// branching/coalescing does not trip vitest/no-conditional-in-test.
+const tamperBase64 = (base64: string): string => {
+  const bytes = Uint8Array.from(atob(base64), (c) => c.codePointAt(0) ?? 0)
+  const lastIndex = bytes.length - 1
+  const tampered = bytes.map((byte, index) =>
+    index === lastIndex ? 0xFF - byte : byte,
+  )
+  return btoa(String.fromCodePoint(...tampered))
+}
+
 describe("credential encryption", () => {
   it("encrypts and decrypts roundtrip", async () => {
     const key = await generateEncryptionKey()
@@ -33,18 +45,20 @@ describe("credential encryption", () => {
 
     const encrypted = await encryptCredentials(plaintext, key1)
 
-    await expect(decryptCredentials(encrypted, key2)).rejects.toThrow()
+    await expect(decryptCredentials(encrypted, key2)).rejects.toThrow(
+      /Decryption failed/,
+    )
   })
 
   it("fails decryption with tampered ciphertext", async () => {
     const key = await generateEncryptionKey()
     const encrypted = await encryptCredentials("data", key)
 
-    const bytes = Uint8Array.from(atob(encrypted), (c) => c.charCodeAt(0))
-    bytes[bytes.length - 1] ^= 0xff
-    const tampered = btoa(String.fromCharCode(...bytes))
+    const tampered = tamperBase64(encrypted)
 
-    await expect(decryptCredentials(tampered, key)).rejects.toThrow()
+    await expect(decryptCredentials(tampered, key)).rejects.toThrow(
+      /Decryption failed/,
+    )
   })
 
   it("handles empty string", async () => {

@@ -1,21 +1,27 @@
+import { env } from "cloudflare:workers"
 import { Hono } from "hono"
 import { describe, expect, it } from "vitest"
 import { accessMiddleware } from "./access"
 import type { AppEnv } from "../index"
 
-function createApp() {
+const createApp = () => {
   const app = new Hono<AppEnv>()
   app.use("/*", accessMiddleware())
   app.get("/test", (c) => c.json({ user: c.get("user") }))
   return app
 }
 
+const testBindings: AppEnv["Bindings"] = {
+  DB: env.DB,
+  ENCRYPTION_KEY: "test-key",
+  ACCESS_TEAM_DOMAIN: "test-team",
+  ACCESS_AUD: "test-aud",
+}
+
 describe("access middleware", () => {
   it("returns 401 when no JWT header", async () => {
     const app = createApp()
-    const res = await app.request("/test", {}, {
-      ACCESS_TEAM_DOMAIN: "test-team",
-    } as unknown as AppEnv["Bindings"])
+    const res = await app.request("/test", {}, testBindings)
     expect(res.status).toBe(401)
     const body = await res.json()
     expect(body).toEqual({ error: "Missing Access JWT" })
@@ -26,7 +32,7 @@ describe("access middleware", () => {
     const res = await app.request(
       "/test",
       { headers: { "CF-Access-JWT-Assertion": "not-a-jwt" } },
-      { ACCESS_TEAM_DOMAIN: "test-team" } as unknown as AppEnv["Bindings"],
+      testBindings,
     )
     expect(res.status).toBe(401)
     const body = await res.json()
@@ -51,7 +57,7 @@ describe("access middleware", () => {
     const res = await app.request(
       "/test",
       { headers: { "CF-Access-JWT-Assertion": fakeJwt } },
-      { ACCESS_TEAM_DOMAIN: "test-team" } as unknown as AppEnv["Bindings"],
+      testBindings,
     )
     expect(res.status).toBe(401)
   })

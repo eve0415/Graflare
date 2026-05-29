@@ -25,11 +25,8 @@ describe("datasourceSchema", () => {
 
   it("applies default queryTimeoutMs", () => {
     const { queryTimeoutMs: _, ...without } = validDatasource
-    const result = datasourceSchema.safeParse(without)
-    expect(result.success).toBe(true)
-    if (result.success) {
-      expect(result.data.queryTimeoutMs).toBe(30000)
-    }
+    const parsed = datasourceSchema.parse(without)
+    expect(parsed.queryTimeoutMs).toBe(30000)
   })
 
   it("rejects empty name", () => {
@@ -116,18 +113,15 @@ describe("createDatasourceSchema", () => {
     expect(result.success).toBe(true)
   })
 
-  it("rejects if id is provided", () => {
-    const result = createDatasourceSchema.safeParse({
+  it("strips id when provided", () => {
+    const parsed = createDatasourceSchema.parse({
       id: "550e8400-e29b-41d4-a716-446655440000",
       name: "New Source",
       type: "prometheus",
       url: "https://prom.example.com",
       authType: "none",
     })
-    expect(result.success).toBe(true)
-    if (result.success) {
-      expect("id" in result.data).toBe(false)
-    }
+    expect("id" in parsed).toBe(false)
   })
 })
 

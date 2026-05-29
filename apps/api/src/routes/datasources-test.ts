@@ -1,8 +1,9 @@
+import { and, eq } from "drizzle-orm"
 import { Hono } from "hono"
-import { eq, and } from "drizzle-orm"
+import { datasourceCredentialsSchema } from "@graflare/shared/schemas/datasource"
+import { decryptCredentials } from "../crypto/credentials"
 import { createDb } from "../db"
 import { datasources } from "../db/schema"
-import { decryptCredentials } from "../crypto/credentials"
 import type { AppEnv } from "../index"
 
 const app = new Hono<AppEnv>()
@@ -18,19 +19,18 @@ app.post("/:id/test", async (c) => {
     .where(and(eq(datasources.id, id), eq(datasources.orgId, orgId)))
     .limit(1)
 
-  if (rows.length === 0) {
+  const [ds] = rows
+  if (ds === undefined) {
     return c.json({ error: "Not found" }, 404)
   }
-
-  const ds = rows[0]!
   const start = Date.now()
 
   try {
     const headers: Record<string, string> = {}
 
-    if (ds.credentials) {
-      const creds = JSON.parse(
-        await decryptCredentials(ds.credentials, c.env.ENCRYPTION_KEY),
+    if (ds.credentials !== null) {
+      const creds = datasourceCredentialsSchema.parse(
+        JSON.parse(await decryptCredentials(ds.credentials, c.env.ENCRYPTION_KEY)),
       )
       if (ds.authType === "basic" && creds.username && creds.password) {
         headers["Authorization"] =
@@ -56,9 +56,9 @@ app.post("/:id/test", async (c) => {
     }
 
     return c.json({ success: true, latencyMs })
-  } catch (err) {
+  } catch (error) {
     const latencyMs = Date.now() - start
-    const message = err instanceof Error ? err.message : "Connection failed"
+    const message = error instanceof Error ? error.message : "Connection failed"
     return c.json({ success: false, error: message, latencyMs })
   }
 })

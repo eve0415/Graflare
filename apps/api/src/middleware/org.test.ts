@@ -1,6 +1,6 @@
 import { env } from "cloudflare:workers"
 import { eq } from "drizzle-orm"
-import { describe, expect, it, beforeEach } from "vitest"
+import { beforeEach, describe, expect, it } from "vitest"
 import { createDb } from "../db"
 import { organizations } from "../db/schema"
 import { emailToOrgId } from "./org"
@@ -46,6 +46,7 @@ describe("org middleware", () => {
 
     const after = await db.select().from(organizations).where(eq(organizations.id, orgId))
     expect(after).toHaveLength(1)
-    expect(after[0]!.name).toBe("newuser@example.com")
+    const [org] = after
+    expect(org?.name).toBe("newuser@example.com")
   })
 })
