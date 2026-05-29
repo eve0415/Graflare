@@ -223,18 +223,6 @@ export class GraflareAPI extends WorkerEntrypoint<Bindings> {
     const ds = rows[0]!
     const headers: Record<string, string> = { "Content-Type": "application/x-www-form-urlencoded" }
 
-    if (ds.credentials) {
-      const creds = JSON.parse(
-        await decryptCredentials(ds.credentials, this.env.ENCRYPTION_KEY),
-      )
-      if (ds.authType === "basic" && creds.username && creds.password) {
-        headers["Authorization"] =
-          `Basic ${btoa(`${creds.username}:${creds.password}`)}`
-      } else if (ds.authType === "bearer" && creds.token) {
-        headers["Authorization"] = `Bearer ${creds.token}`
-      }
-    }
-
     try {
       const base = new URL(ds.url)
       base.pathname = base.pathname.replace(/\/$/, "") + endpoint
@@ -246,6 +234,19 @@ export class GraflareAPI extends WorkerEntrypoint<Bindings> {
 
       if (new URL(targetUrl).origin !== base.origin) {
         return { status: "error", errorType: "bad_request", error: "URL origin mismatch" }
+      }
+
+      // Attach credentials only after confirming the target origin matches the datasource.
+      if (ds.credentials) {
+        const creds = JSON.parse(
+          await decryptCredentials(ds.credentials, this.env.ENCRYPTION_KEY),
+        )
+        if (ds.authType === "basic" && creds.username && creds.password) {
+          headers["Authorization"] =
+            `Basic ${btoa(`${creds.username}:${creds.password}`)}`
+        } else if (ds.authType === "bearer" && creds.token) {
+          headers["Authorization"] = `Bearer ${creds.token}`
+        }
       }
 
       const res = await fetch(targetUrl, {
