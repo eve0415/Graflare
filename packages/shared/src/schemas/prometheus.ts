@@ -1,4 +1,4 @@
-import { z } from 'zod';
+import * as z from 'zod/mini';
 
 // A single Prometheus sample: [unix timestamp, value-as-string].
 export const prometheusSampleSchema = z.tuple([z.number(), z.string()]);
@@ -33,10 +33,10 @@ export const prometheusDataSchema = z.union([prometheusQueryDataSchema, z.array(
 
 export const prometheusResponseSchema = z.object({
   status: z.enum(['success', 'error']),
-  data: prometheusDataSchema.optional(),
-  errorType: z.string().optional(),
-  error: z.string().optional(),
-  warnings: z.array(z.string()).optional(),
+  data: z.optional(prometheusDataSchema),
+  errorType: z.optional(z.string()),
+  error: z.optional(z.string()),
+  warnings: z.optional(z.array(z.string())),
 });
 
 export type PrometheusQueryData = z.infer<typeof prometheusQueryDataSchema>;
