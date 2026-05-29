@@ -15,8 +15,7 @@
     ]
   },
   "scripts": {
-    "test": "vitest run",
-    "clean": "rm -rf dist"
+    "test": "vitest run"
   },
   "devDependencies": {
     "vitest": "4.1.7",

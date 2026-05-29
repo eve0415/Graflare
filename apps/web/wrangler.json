@@ -7,7 +7,8 @@
   "services": [
     {
       "binding": "API",
-      "service": "graflare-api"
+      "service": "graflare-api",
+      "entrypoint": "GraflareAPI"
     }
   ],
   "observability": {

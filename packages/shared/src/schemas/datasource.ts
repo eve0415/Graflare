@@ -6,12 +6,20 @@ export type DatasourceAuthType = z.infer<typeof datasourceAuthType>
 export const datasourceType = z.enum(["prometheus"])
 export type DatasourceType = z.infer<typeof datasourceType>
 
+export const datasourceCredentialsSchema = z.object({
+  username: z.string().optional(),
+  password: z.string().optional(),
+  token: z.string().optional(),
+})
+
+export type DatasourceCredentials = z.infer<typeof datasourceCredentialsSchema>
+
 export const datasourceSchema = z.object({
-  id: z.string().uuid(),
-  orgId: z.string().uuid(),
+  id: z.uuid(),
+  orgId: z.uuid(),
   name: z.string().min(1).max(255),
   type: datasourceType,
-  url: z.string().url(),
+  url: z.url(),
   authType: datasourceAuthType,
   queryTimeoutMs: z.number().int().min(1000).max(120000).default(30000),
   createdAt: z.number().int(),
@@ -28,13 +36,7 @@ export const createDatasourceSchema = datasourceSchema
     updatedAt: true,
   })
   .extend({
-    credentials: z
-      .object({
-        username: z.string().optional(),
-        password: z.string().optional(),
-        token: z.string().optional(),
-      })
-      .optional(),
+    credentials: datasourceCredentialsSchema.optional(),
   })
 
 export type CreateDatasource = z.infer<typeof createDatasourceSchema>

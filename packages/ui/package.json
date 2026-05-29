@@ -25,8 +25,7 @@
     ]
   },
   "scripts": {
-    "build": "echo 'source-only package'",
-    "clean": "rm -rf dist"
+    "build": "echo 'source-only package'"
   },
   "devDependencies": {
     "@base-ui/react": "1.5.0",
