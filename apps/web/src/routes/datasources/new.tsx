@@ -1,8 +1,9 @@
-import { createFileRoute } from "@tanstack/react-router"
-import { DatasourceForm } from "./-components/datasource-form"
+import { createFileRoute } from '@tanstack/react-router';
 
-const NewDatasourcePage = () => <DatasourceForm mode="create" />
+import { DatasourceForm } from './-components/datasource-form';
 
-export const Route = createFileRoute("/datasources/new")({
+const NewDatasourcePage = () => <DatasourceForm mode='create' />;
+
+export const Route = createFileRoute('/datasources/new')({
   component: NewDatasourcePage,
-})
+});

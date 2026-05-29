@@ -1,14 +1,12 @@
-import { createFileRoute } from "@tanstack/react-router"
-import {
-  datasourceAuthType,
-  datasourceType,
-} from "@graflare/shared/schemas/datasource"
-import { useMemo } from "react"
-import { getDatasource } from "../../../lib/api"
-import { DatasourceForm } from "../-components/datasource-form"
+import { datasourceAuthType, datasourceType } from '@graflare/shared/schemas/datasource';
+import { createFileRoute } from '@tanstack/react-router';
+import { useMemo } from 'react';
+
+import { DatasourceForm } from '../-components/datasource-form';
+import { getDatasource } from '../../../lib/api';
 
 const EditDatasourcePage = () => {
-  const ds = Route.useLoaderData()
+  const ds = Route.useLoaderData();
 
   const initialData = useMemo(
     () =>
@@ -23,16 +21,16 @@ const EditDatasourcePage = () => {
             queryTimeoutMs: ds.queryTimeoutMs,
           },
     [ds],
-  )
+  );
 
   if (initialData === null) {
-    return <p className="text-sm text-muted-foreground">Data source not found.</p>
+    return <p className='text-muted-foreground text-sm'>Data source not found.</p>;
   }
 
-  return <DatasourceForm mode="edit" initialData={initialData} />
-}
+  return <DatasourceForm mode='edit' initialData={initialData} />;
+};
 
-export const Route = createFileRoute("/datasources/$id/")({
+export const Route = createFileRoute('/datasources/$id/')({
   loader: ({ params }) => getDatasource({ data: params.id }),
   component: EditDatasourcePage,
-})
+});

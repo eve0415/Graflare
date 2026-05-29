@@ -1,6 +1,6 @@
 ---
 paths:
-  - "packages/ui/src/globals.css"
+  - 'packages/ui/src/globals.css'
 ---
 
 # Mauve theme values (packages/ui/src/globals.css)

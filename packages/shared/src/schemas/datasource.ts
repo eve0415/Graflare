@@ -1,18 +1,18 @@
-import { z } from "zod"
+import { z } from 'zod';
 
-export const datasourceAuthType = z.enum(["none", "basic", "bearer"])
-export type DatasourceAuthType = z.infer<typeof datasourceAuthType>
+export const datasourceAuthType = z.enum(['none', 'basic', 'bearer']);
+export type DatasourceAuthType = z.infer<typeof datasourceAuthType>;
 
-export const datasourceType = z.enum(["prometheus"])
-export type DatasourceType = z.infer<typeof datasourceType>
+export const datasourceType = z.enum(['prometheus']);
+export type DatasourceType = z.infer<typeof datasourceType>;
 
 export const datasourceCredentialsSchema = z.object({
   username: z.string().optional(),
   password: z.string().optional(),
   token: z.string().optional(),
-})
+});
 
-export type DatasourceCredentials = z.infer<typeof datasourceCredentialsSchema>
+export type DatasourceCredentials = z.infer<typeof datasourceCredentialsSchema>;
 
 export const datasourceSchema = z.object({
   id: z.uuid(),
@@ -24,9 +24,9 @@ export const datasourceSchema = z.object({
   queryTimeoutMs: z.number().int().min(1000).max(120000).default(30000),
   createdAt: z.number().int(),
   updatedAt: z.number().int(),
-})
+});
 
-export type Datasource = z.infer<typeof datasourceSchema>
+export type Datasource = z.infer<typeof datasourceSchema>;
 
 export const createDatasourceSchema = datasourceSchema
   .omit({
@@ -37,10 +37,10 @@ export const createDatasourceSchema = datasourceSchema
   })
   .extend({
     credentials: datasourceCredentialsSchema.optional(),
-  })
+  });
 
-export type CreateDatasource = z.infer<typeof createDatasourceSchema>
+export type CreateDatasource = z.infer<typeof createDatasourceSchema>;
 
-export const updateDatasourceSchema = createDatasourceSchema.partial()
+export const updateDatasourceSchema = createDatasourceSchema.partial();
 
-export type UpdateDatasource = z.infer<typeof updateDatasourceSchema>
+export type UpdateDatasource = z.infer<typeof updateDatasourceSchema>;

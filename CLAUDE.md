@@ -1,7 +1,7 @@
 # Graflare
 
 Grafana-compatible dashboards + alerting that run natively on Cloudflare Workers and query the
-user's **own** data sources. Graflare is the Grafana *app layer* — dashboards, query proxy,
+user's **own** data sources. Graflare is the Grafana _app layer_ — dashboards, query proxy,
 alerting, notifications — and stores **no metrics itself**.
 
 The product spec (scope, Cloudflare-primitive mapping, alerting design, roadmap, and the

@@ -1,7 +1,7 @@
 ---
 paths:
-  - "apps/web/vite.config.ts"
-  - "apps/web/wrangler.json"
+  - 'apps/web/vite.config.ts'
+  - 'apps/web/wrangler.json'
 ---
 
 # apps/web vite.config.ts — React Compiler wiring
@@ -11,20 +11,15 @@ paths:
 **default** import; `reactCompilerPreset` is a **named** export of `@vitejs/plugin-react`.
 
 ```ts
-import { cloudflare } from "@cloudflare/vite-plugin"
-import babel from "@rolldown/plugin-babel"
-import { tanstackStart } from "@tanstack/react-start/plugin/vite"
-import react, { reactCompilerPreset } from "@vitejs/plugin-react"
-import { defineConfig } from "vite"
+import { cloudflare } from '@cloudflare/vite-plugin';
+import babel from '@rolldown/plugin-babel';
+import { tanstackStart } from '@tanstack/react-start/plugin/vite';
+import react, { reactCompilerPreset } from '@vitejs/plugin-react';
+import { defineConfig } from 'vite';
 
 export default defineConfig({
-  plugins: [
-    cloudflare({ viteEnvironment: { name: "ssr" } }),
-    tanstackStart(),
-    react(),
-    babel({ presets: [reactCompilerPreset()] }),
-  ],
-})
+  plugins: [cloudflare({ viteEnvironment: { name: 'ssr' } }), tanstackStart(), react(), babel({ presets: [reactCompilerPreset()] })],
+});
 ```
 
 `wrangler.json` uses `"main": "@tanstack/react-start/server-entry"` (no custom entry file).

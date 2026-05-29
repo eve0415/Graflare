@@ -1,6 +1,6 @@
 ---
 paths:
-  - "**/tsconfig.json"
+  - '**/tsconfig.json'
 ---
 
 # TypeScript project references + tsgo (this monorepo)

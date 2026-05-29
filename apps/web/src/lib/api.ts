@@ -1,36 +1,37 @@
-import { createServerFn } from "@tanstack/react-start"
-import { env } from "cloudflare:workers"
-import type { CreateDatasource, UpdateDatasource } from "@graflare/shared/schemas/datasource"
-import { prometheusResponseSchema } from "@graflare/shared/schemas/prometheus"
+import type { CreateDatasource, UpdateDatasource } from '@graflare/shared/schemas/datasource';
+
+import { prometheusResponseSchema } from '@graflare/shared/schemas/prometheus';
+import { createServerFn } from '@tanstack/react-start';
+import { env } from 'cloudflare:workers';
 
 export interface DatasourceRow {
-  id: string
-  orgId: string
-  name: string
-  type: string
-  url: string
-  authType: string
-  queryTimeoutMs: number
-  createdAt: Date
-  updatedAt: Date
+  id: string;
+  orgId: string;
+  name: string;
+  type: string;
+  url: string;
+  authType: string;
+  queryTimeoutMs: number;
+  createdAt: Date;
+  updatedAt: Date;
 }
 
 interface TestConnectionResult {
-  success: boolean
-  latencyMs: number
-  error?: string
+  success: boolean;
+  latencyMs: number;
+  error?: string;
 }
 
 const toDatasourceRow = (ds: {
-  id: string
-  orgId: string
-  name: string
-  type: string
-  url: string
-  authType: string
-  queryTimeoutMs: number
-  createdAt: Date
-  updatedAt: Date
+  id: string;
+  orgId: string;
+  name: string;
+  type: string;
+  url: string;
+  authType: string;
+  queryTimeoutMs: number;
+  createdAt: Date;
+  updatedAt: Date;
 }): DatasourceRow => ({
   id: ds.id,
   orgId: ds.orgId,
@@ -41,24 +42,24 @@ const toDatasourceRow = (ds: {
   queryTimeoutMs: ds.queryTimeoutMs,
   createdAt: ds.createdAt,
   updatedAt: ds.updatedAt,
-})
+});
 
-export const listDatasources = createServerFn({ method: "GET" }).handler(async () => {
-  const rows = await env.API.listDatasources("default")
-  return rows.map((ds) => toDatasourceRow(ds))
-})
+export const listDatasources = createServerFn({ method: 'GET' }).handler(async () => {
+  const rows = await env.API.listDatasources('default');
+  return rows.map(ds => toDatasourceRow(ds));
+});
 
-export const getDatasource = createServerFn({ method: "GET" })
+export const getDatasource = createServerFn({ method: 'GET' })
   .inputValidator((id: string) => id)
   .handler(async ({ data: id }) => {
-    const ds = await env.API.getDatasource("default", id)
-    return ds === null ? null : toDatasourceRow(ds)
-  })
+    const ds = await env.API.getDatasource('default', id);
+    return ds === null ? null : toDatasourceRow(ds);
+  });
 
-export const createDatasource = createServerFn({ method: "POST" })
+export const createDatasource = createServerFn({ method: 'POST' })
   .inputValidator((input: CreateDatasource) => input)
   .handler(async ({ data }) => {
-    const ds = await env.API.createDatasource("default", data)
+    const ds = await env.API.createDatasource('default', data);
     return {
       id: ds.id,
       orgId: ds.orgId,
@@ -69,51 +70,40 @@ export const createDatasource = createServerFn({ method: "POST" })
       queryTimeoutMs: ds.queryTimeoutMs,
       createdAt: ds.createdAt,
       updatedAt: ds.updatedAt,
-    }
-  })
+    };
+  });
 
-export const updateDatasource = createServerFn({ method: "POST" })
+export const updateDatasource = createServerFn({ method: 'POST' })
   .inputValidator((input: { id: string; data: UpdateDatasource }) => input)
   .handler(async ({ data: { id, data } }) => {
-    const ds = await env.API.updateDatasource("default", id, data)
-    return ds === null ? null : toDatasourceRow(ds)
-  })
+    const ds = await env.API.updateDatasource('default', id, data);
+    return ds === null ? null : toDatasourceRow(ds);
+  });
 
-export const deleteDatasource = createServerFn({ method: "POST" })
+export const deleteDatasource = createServerFn({ method: 'POST' })
   .inputValidator((id: string) => id)
   .handler(async ({ data: id }) => {
-    await env.API.deleteDatasource("default", id)
-  })
+    await env.API.deleteDatasource('default', id);
+  });
 
-export const testConnection = createServerFn({ method: "POST" })
+export const testConnection = createServerFn({ method: 'POST' })
   .inputValidator((id: string) => id)
   .handler(async ({ data: id }) => {
-    const result = await env.API.testConnection("default", id)
+    const result = await env.API.testConnection('default', id);
     const plain: TestConnectionResult = {
       success: result.success,
       latencyMs: result.latencyMs,
       ...(result.error !== undefined && { error: result.error }),
-    }
-    return plain
-  })
+    };
+    return plain;
+  });
 
-export const proxyQuery = createServerFn({ method: "POST" })
-  .inputValidator(
-    (input: {
-      datasourceId: string
-      endpoint: string
-      params: Record<string, string>
-    }) => input,
-  )
+export const proxyQuery = createServerFn({ method: 'POST' })
+  .inputValidator((input: { datasourceId: string; endpoint: string; params: Record<string, string> }) => input)
   .handler(async ({ data }) => {
-    const result = await env.API.proxyQuery(
-      "default",
-      data.datasourceId,
-      data.endpoint,
-      data.params,
-    )
+    const result = await env.API.proxyQuery('default', data.datasourceId, data.endpoint, data.params);
     // Re-parse to drop the RPC stub's Disposable brand (`[Symbol.dispose]`,
     // which createServerFn rejects as non-serializable) and restore the exact
     // schema types (RPC widens tuples like [number, string] to (number|string)[]).
-    return prometheusResponseSchema.parse(result)
-  })
+    return prometheusResponseSchema.parse(result);
+  });

@@ -1,7 +1,7 @@
 ---
 paths:
-  - "apps/web/**/*.test.tsx"
-  - "apps/web/src/test-setup.ts"
+  - 'apps/web/**/*.test.tsx'
+  - 'apps/web/src/test-setup.ts'
 ---
 
 # apps/web tests (jsdom vitest)

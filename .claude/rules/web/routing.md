@@ -1,8 +1,8 @@
 ---
 paths:
-  - "apps/web/src/routeTree.gen.ts"
-  - "apps/web/src/routes/**"
-  - "apps/web/src/router.tsx"
+  - 'apps/web/src/routeTree.gen.ts'
+  - 'apps/web/src/routes/**'
+  - 'apps/web/src/router.tsx'
 ---
 
 # TanStack Router (apps/web)

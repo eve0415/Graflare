@@ -1,16 +1,18 @@
-import { and, eq } from "drizzle-orm"
-import { Hono } from "hono"
-import { createDatasourceSchema, updateDatasourceSchema } from "@graflare/shared/schemas/datasource"
-import { createDb } from "../db"
-import { datasources } from "../db/schema"
-import { encryptCredentials } from "../crypto/credentials"
-import type { AppEnv } from "../index"
+import type { AppEnv } from '../index';
 
-const app = new Hono<AppEnv>()
+import { createDatasourceSchema, updateDatasourceSchema } from '@graflare/shared/schemas/datasource';
+import { and, eq } from 'drizzle-orm';
+import { Hono } from 'hono';
 
-app.get("/", async (c) => {
-  const db = createDb(c.env.DB)
-  const orgId = c.get("orgId")
+import { encryptCredentials } from '../crypto/credentials';
+import { createDb } from '../db';
+import { datasources } from '../db/schema';
+
+const app = new Hono<AppEnv>();
+
+app.get('/', async c => {
+  const db = createDb(c.env.DB);
+  const orgId = c.get('orgId');
 
   const rows = await db
     .select({
@@ -25,15 +27,15 @@ app.get("/", async (c) => {
       updatedAt: datasources.updatedAt,
     })
     .from(datasources)
-    .where(eq(datasources.orgId, orgId))
+    .where(eq(datasources.orgId, orgId));
 
-  return c.json(rows)
-})
+  return c.json(rows);
+});
 
-app.get("/:id", async (c) => {
-  const db = createDb(c.env.DB)
-  const orgId = c.get("orgId")
-  const id = c.req.param("id")
+app.get('/:id', async c => {
+  const db = createDb(c.env.DB);
+  const orgId = c.get('orgId');
+  const id = c.req.param('id');
 
   const rows = await db
     .select({
@@ -49,35 +51,32 @@ app.get("/:id", async (c) => {
     })
     .from(datasources)
     .where(and(eq(datasources.id, id), eq(datasources.orgId, orgId)))
-    .limit(1)
+    .limit(1);
 
   if (rows.length === 0) {
-    return c.json({ error: "Not found" }, 404)
+    return c.json({ error: 'Not found' }, 404);
   }
 
-  return c.json(rows[0])
-})
+  return c.json(rows[0]);
+});
 
-app.post("/", async (c) => {
-  const db = createDb(c.env.DB)
-  const orgId = c.get("orgId")
+app.post('/', async c => {
+  const db = createDb(c.env.DB);
+  const orgId = c.get('orgId');
 
-  const body: unknown = await c.req.json()
-  const parsed = createDatasourceSchema.safeParse(body)
+  const body: unknown = await c.req.json();
+  const parsed = createDatasourceSchema.safeParse(body);
   if (!parsed.success) {
-    return c.json({ error: "Validation failed", details: parsed.error.issues }, 400)
+    return c.json({ error: 'Validation failed', details: parsed.error.issues }, 400);
   }
 
-  const { credentials, ...rest } = parsed.data
-  const id = crypto.randomUUID()
-  const now = new Date()
+  const { credentials, ...rest } = parsed.data;
+  const id = crypto.randomUUID();
+  const now = new Date();
 
-  let encryptedCreds: string | null = null
+  let encryptedCreds: string | null = null;
   if (credentials) {
-    encryptedCreds = await encryptCredentials(
-      JSON.stringify(credentials),
-      c.env.ENCRYPTION_KEY,
-    )
+    encryptedCreds = await encryptCredentials(JSON.stringify(credentials), c.env.ENCRYPTION_KEY);
   }
 
   await db.insert(datasources).values({
@@ -87,7 +86,7 @@ app.post("/", async (c) => {
     credentials: encryptedCreds,
     createdAt: now,
     updatedAt: now,
-  })
+  });
 
   return c.json(
     {
@@ -98,39 +97,36 @@ app.post("/", async (c) => {
       updatedAt: now,
     },
     201,
-  )
-})
+  );
+});
 
-app.put("/:id", async (c) => {
-  const db = createDb(c.env.DB)
-  const orgId = c.get("orgId")
-  const id = c.req.param("id")
+app.put('/:id', async c => {
+  const db = createDb(c.env.DB);
+  const orgId = c.get('orgId');
+  const id = c.req.param('id');
 
   const existing = await db
     .select()
     .from(datasources)
     .where(and(eq(datasources.id, id), eq(datasources.orgId, orgId)))
-    .limit(1)
+    .limit(1);
 
   if (existing.length === 0) {
-    return c.json({ error: "Not found" }, 404)
+    return c.json({ error: 'Not found' }, 404);
   }
 
-  const body: unknown = await c.req.json()
-  const parsed = updateDatasourceSchema.safeParse(body)
+  const body: unknown = await c.req.json();
+  const parsed = updateDatasourceSchema.safeParse(body);
   if (!parsed.success) {
-    return c.json({ error: "Validation failed", details: parsed.error.issues }, 400)
+    return c.json({ error: 'Validation failed', details: parsed.error.issues }, 400);
   }
 
-  const { credentials, ...rest } = parsed.data
-  const now = new Date()
+  const { credentials, ...rest } = parsed.data;
+  const now = new Date();
 
-  let encryptedCreds: string | undefined
+  let encryptedCreds: string | undefined;
   if (credentials) {
-    encryptedCreds = await encryptCredentials(
-      JSON.stringify(credentials),
-      c.env.ENCRYPTION_KEY,
-    )
+    encryptedCreds = await encryptCredentials(JSON.stringify(credentials), c.env.ENCRYPTION_KEY);
   }
 
   await db
@@ -140,7 +136,7 @@ app.put("/:id", async (c) => {
       ...(encryptedCreds !== undefined && { credentials: encryptedCreds }),
       updatedAt: now,
     })
-    .where(eq(datasources.id, id))
+    .where(eq(datasources.id, id));
 
   const updated = await db
     .select({
@@ -156,29 +152,29 @@ app.put("/:id", async (c) => {
     })
     .from(datasources)
     .where(eq(datasources.id, id))
-    .limit(1)
+    .limit(1);
 
-  return c.json(updated[0])
-})
+  return c.json(updated[0]);
+});
 
-app.delete("/:id", async (c) => {
-  const db = createDb(c.env.DB)
-  const orgId = c.get("orgId")
-  const id = c.req.param("id")
+app.delete('/:id', async c => {
+  const db = createDb(c.env.DB);
+  const orgId = c.get('orgId');
+  const id = c.req.param('id');
 
   const existing = await db
     .select({ id: datasources.id })
     .from(datasources)
     .where(and(eq(datasources.id, id), eq(datasources.orgId, orgId)))
-    .limit(1)
+    .limit(1);
 
   if (existing.length === 0) {
-    return c.json({ error: "Not found" }, 404)
+    return c.json({ error: 'Not found' }, 404);
   }
 
-  await db.delete(datasources).where(eq(datasources.id, id))
+  await db.delete(datasources).where(eq(datasources.id, id));
 
-  return c.body(null, 204)
-})
+  return c.body(null, 204);
+});
 
-export { app as datasourceRoutes }
+export { app as datasourceRoutes };

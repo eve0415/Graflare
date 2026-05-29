@@ -1,9 +1,9 @@
 ---
 paths:
-  - "apps/api/src/middleware/**"
-  - "apps/api/src/routes/proxy.ts"
-  - "apps/api/src/crypto/**"
-  - "apps/api/src/index.ts"
+  - 'apps/api/src/middleware/**'
+  - 'apps/api/src/routes/proxy.ts'
+  - 'apps/api/src/crypto/**'
+  - 'apps/api/src/index.ts'
 ---
 
 # Security invariants (apps/api)
@@ -15,7 +15,7 @@ merging changes to auth middleware, the query proxy, the proxy RPC in `index.ts`
 - **Cloudflare Access JWT — validate signature AND `iss` AND `aud`, not just `exp`.** Verify the
   RS256 signature against the team certs, then require `iss === https://<team>.cloudflareaccess.com`
   and `aud` to include the app's AUD tag (`ACCESS_AUD`). Exp-only validation lets a valid token
-  from *another* Access app through. (Why: cross-app token replay → auth bypass.)
+  from _another_ Access app through. (Why: cross-app token replay → auth bypass.)
 
 - **Tenant/org IDs must use a cryptographic hash (≥128 bits) or an explicit membership row —
   never a short non-crypto hash.** Org ID derives from the user email via SHA-256 (truncated to

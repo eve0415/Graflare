@@ -1,8 +1,8 @@
 ---
 paths:
-  - "apps/api/src/db/**"
-  - "apps/api/drizzle.config.ts"
-  - "apps/api/drizzle/**"
+  - 'apps/api/src/db/**'
+  - 'apps/api/drizzle.config.ts'
+  - 'apps/api/drizzle/**'
 ---
 
 # D1 / Drizzle migrations (apps/api)

@@ -1,4 +1,4 @@
-import type { D1Migration } from "cloudflare:test"
+import type { D1Migration } from 'cloudflare:test';
 
 // vitest-pool-workers injects test-only bindings (configured via miniflare in
 // vitest.config.ts) into the same `Cloudflare.Env` that both `cloudflare:test`
@@ -6,7 +6,7 @@ import type { D1Migration } from "cloudflare:test"
 declare global {
   namespace Cloudflare {
     interface Env {
-      TEST_MIGRATIONS: D1Migration[]
+      TEST_MIGRATIONS: D1Migration[];
     }
   }
 }

@@ -1,6 +1,6 @@
 ---
 paths:
-  - "apps/web/src/lib/api.ts"
+  - 'apps/web/src/lib/api.ts'
 ---
 
 # Server functions / RPC bridge (apps/web/src/lib/api.ts)

@@ -1,8 +1,8 @@
 ---
 paths:
-  - "apps/api/vitest.config.ts"
-  - "apps/api/**/*.test.ts"
-  - "apps/api/src/test-setup.ts"
+  - 'apps/api/vitest.config.ts'
+  - 'apps/api/**/*.test.ts'
+  - 'apps/api/src/test-setup.ts'
 ---
 
 # API Worker tests — @cloudflare/vitest-pool-workers

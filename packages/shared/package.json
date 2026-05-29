@@ -2,17 +2,17 @@
   "name": "@graflare/shared",
   "private": true,
   "type": "module",
-  "exports": {
-    "./*": {
-      "import": "./src/*.ts",
-      "types": "./src/*.ts"
-    }
-  },
   "imports": {
     "#*": [
       "./src/*",
       "./src/*.ts"
     ]
+  },
+  "exports": {
+    "./*": {
+      "import": "./src/*.ts",
+      "types": "./src/*.ts"
+    }
   },
   "scripts": {
     "test": "vitest run"

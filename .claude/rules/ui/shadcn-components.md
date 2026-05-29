@@ -1,7 +1,7 @@
 ---
 paths:
-  - "packages/ui/components.json"
-  - "packages/ui/src/components/**"
+  - 'packages/ui/components.json'
+  - 'packages/ui/src/components/**'
 ---
 
 # Adding shadcn components (packages/ui)

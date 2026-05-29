@@ -2,6 +2,13 @@
   "name": "@graflare/ui",
   "private": true,
   "type": "module",
+  "imports": {
+    "#*": [
+      "./src/*",
+      "./src/*.ts",
+      "./src/*.tsx"
+    ]
+  },
   "exports": {
     "./components/*": {
       "import": "./src/components/*.tsx",
@@ -16,13 +23,6 @@
       "types": "./src/lib/*.ts"
     },
     "./globals.css": "./src/globals.css"
-  },
-  "imports": {
-    "#*": [
-      "./src/*",
-      "./src/*.ts",
-      "./src/*.tsx"
-    ]
   },
   "scripts": {
     "build": "echo 'source-only package'"

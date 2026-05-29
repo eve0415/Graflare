@@ -1,7 +1,7 @@
-import { Outlet, createFileRoute } from "@tanstack/react-router"
+import { Outlet, createFileRoute } from '@tanstack/react-router';
 
-const DatasourceLayout = () => <Outlet />
+const DatasourceLayout = () => <Outlet />;
 
-export const Route = createFileRoute("/datasources/$id")({
+export const Route = createFileRoute('/datasources/$id')({
   component: DatasourceLayout,
-})
+});
