@@ -19,6 +19,7 @@
     "@cloudflare/vitest-pool-workers": "0.16.10",
     "@cloudflare/workers-types": "4.20260528.1",
     "@graflare/shared": "workspace:*",
+    "@hono/standard-validator": "0.2.2",
     "@types/node": "24.12.4",
     "drizzle-kit": "0.31.10",
     "drizzle-orm": "0.45.2",
