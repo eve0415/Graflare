@@ -1,6 +1,5 @@
 import type { AppEnv } from '../index';
 
-import { datasourceSchema } from '@graflare/shared/schemas/datasource';
 import { env } from 'cloudflare:workers';
 import { Hono } from 'hono';
 import { beforeEach, describe, expect, it } from 'vitest';
@@ -20,11 +19,17 @@ const testBindings: AppEnv['Bindings'] = {
   ACCESS_AUD: 'test-aud',
 };
 
-// The route serializes Date columns to ISO strings and uses a non-UUID test
-// org id, so the full datasourceSchema does not fit the wire shape. Pick only
-// the fields the assertions read; .loose() keeps extra keys so the negative
-// "credentials" check stays meaningful.
-const datasourceResponseSchema = datasourceSchema.pick({ id: true, name: true }).loose();
+// The route serializes Date columns to ISO strings and uses a non-UUID test org
+// id, so the full datasourceSchema does not fit the wire shape. Read only the
+// fields the assertions touch via `in`-narrowing (no unsafe cast). The negative
+// "credentials" check below runs against the raw json, so it stays meaningful.
+const readBody = async (res: Response): Promise<{ id: string; name: string }> => {
+  const body: unknown = await res.json();
+  if (typeof body === 'object' && body !== null && 'id' in body && 'name' in body) {
+    return { id: String(body.id), name: String(body.name) };
+  }
+  throw new Error('unexpected datasource response shape');
+};
 
 const createApp = () => {
   const app = new Hono<AppEnv>();
@@ -76,7 +81,7 @@ describe('datasource routes', () => {
       testBindings,
     );
     expect(res.status).toBe(201);
-    const body = datasourceResponseSchema.parse(await res.json());
+    const body = await readBody(res);
     expect(body.name).toBe('Test Prom');
     expect(body.id).toBeDefined();
     expect(body).not.toHaveProperty('credentials');
@@ -138,18 +143,40 @@ describe('datasource routes', () => {
       {},
       testBindings,
     );
-    const created = datasourceResponseSchema.parse(await createRes.json());
+    const created = await readBody(createRes);
 
     const res = await app.request(req(`/${created.id}`), {}, testBindings);
     expect(res.status).toBe(200);
-    const body = datasourceResponseSchema.parse(await res.json());
+    const body = await readBody(res);
     expect(body.name).toBe('Get Test');
   });
 
-  it('returns 404 for nonexistent datasource', async () => {
+  it('returns 404 for a well-formed but nonexistent datasource id', async () => {
     const app = createApp();
-    const res = await app.request(req('/nonexistent-id'), {}, testBindings);
+    const res = await app.request(req('/550e8400-e29b-41d4-a716-446655440000'), {}, testBindings);
     expect(res.status).toBe(404);
+  });
+
+  it('rejects a malformed id on GET with 400 (before the 404 lookup)', async () => {
+    const app = createApp();
+    const res = await app.request(req('/not-a-uuid'), {}, testBindings);
+    expect(res.status).toBe(400);
+  });
+
+  it('rejects a malformed id on PUT with 400', async () => {
+    const app = createApp();
+    const res = await app.request(
+      req('/not-a-uuid', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name: 'x' }) }),
+      {},
+      testBindings,
+    );
+    expect(res.status).toBe(400);
+  });
+
+  it('rejects a malformed id on DELETE with 400', async () => {
+    const app = createApp();
+    const res = await app.request(req('/not-a-uuid', { method: 'DELETE' }), {}, testBindings);
+    expect(res.status).toBe(400);
   });
 
   it('updates a datasource', async () => {
@@ -168,7 +195,7 @@ describe('datasource routes', () => {
       {},
       testBindings,
     );
-    const created = datasourceResponseSchema.parse(await createRes.json());
+    const created = await readBody(createRes);
 
     const res = await app.request(
       req(`/${created.id}`, {
@@ -180,7 +207,7 @@ describe('datasource routes', () => {
       testBindings,
     );
     expect(res.status).toBe(200);
-    const body = datasourceResponseSchema.parse(await res.json());
+    const body = await readBody(res);
     expect(body.name).toBe('After Update');
   });
 
@@ -200,7 +227,7 @@ describe('datasource routes', () => {
       {},
       testBindings,
     );
-    const created = datasourceResponseSchema.parse(await createRes.json());
+    const created = await readBody(createRes);
 
     const res = await app.request(req(`/${created.id}`, { method: 'DELETE' }), {}, testBindings);
     expect(res.status).toBe(204);
