@@ -20,6 +20,10 @@ The pool's API differs from what's commonly documented. `apps/api/vitest.config.
   `applyD1Migrations(env.DB, env.TEST_MIGRATIONS)` (`applyD1Migrations` is imported from
   `cloudflare:test`). The setup runs once outside per-test isolation and only applies
   un-applied migrations.
-- These test files import Workers-only modules, so they're excluded from the `tsgo` build.
+- These test files are type-checked in the package's `tsconfig.test.json` leaf (which carries
+  `@cloudflare/vitest-pool-workers` types). The test-only `TEST_MIGRATIONS` binding is typed by
+  augmenting `Cloudflare.Env` in `src/test-env.d.ts` (this pool version types both
+  `cloudflare:test` and `cloudflare:workers` `env` as `Cloudflare.Env`, so a `ProvidedEnv`
+  augmentation would be dead).
 - Harmless noise: a client test fetches an unreachable host, so workerd prints
   `Network connection lost` / `connect(): Connection refused`. Tests still pass.

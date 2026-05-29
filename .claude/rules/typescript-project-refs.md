@@ -3,32 +3,32 @@ paths:
   - '**/tsconfig.json'
 ---
 
-# TypeScript project references + tsgo (this monorepo)
+# TypeScript config layout (this monorepo)
 
-`pnpm check` runs `tsgo --build` from the root `tsconfig.json`, which walks project references
-into every package. One broken composite config fails the whole build. Apply these before
-editing any `tsconfig.json` here:
+tsconfigs are **noEmit, non-composite, solution-style**. oxlint's type-aware mode
+(`oxlint-tsgolint`) is the type-check gate — there is no `tsgo --build`. Layout:
 
-- **`noEmit: true` conflicts with `composite: true`.** Composite projects must emit. Use
-  `"emitDeclarationOnly": true` instead of `noEmit` for packages that are reference targets.
+- **Root `tsconfig.json`**: the shared strict base `compilerOptions` + `files: []` +
+  `references` to each package.
+- **Per-package `tsconfig.json`**: a solution file — `files: []` + `references` to the leaf
+  configs that exist (`./tsconfig.src.json`, `./tsconfig.node.json`, `./tsconfig.test.json`).
+- **Leaf configs** `extends` the root base and differ only by `lib`/`types`/`jsx`/`include`/
+  `files`: `src` (app/lib source + `worker-configuration.d.ts`, excludes tests), `node`
+  (`types: ["node"]`, `files: [vite/vitest/drizzle.config.ts]`), `test` (`*.test.*` +
+  `test-setup.ts`, test-runtime `types`).
 
-- **Don't put `*.config.ts` in `include` when `rootDir: "src"`.** Files like `vite.config.ts` /
-  `vitest.config.ts` / `drizzle.config.ts` live at the package root, outside `src`, and trigger
-  `TS6059: not under rootDir`. Leave `include: ["src"]` and let the bundler handle config files.
+Rules when editing:
 
-- **Exclude test files that import Workers-only modules.** Anything importing `cloudflare:workers`
-  or `cloudflare:test` (api test files, `test-setup.ts`) only resolves inside the
-  vitest-pool-workers runtime — `exclude` them from the tsgo build, or `pnpm check` fails on
-  unresolved modules.
+- **Never add `composite`/`declaration`/`emitDeclarationOnly`/`outDir`/`rootDir`.** Nothing emits;
+  packages are source-only (their `exports` point at `./src/*`).
+- Type-aware oxlint resolves a file through the nearest solution `tsconfig.json` by following its
+  `references` into the leaf that includes the file — so every source/test/config file must live
+  in exactly one leaf's `include`/`files` (config files in `node`, tests in `test`, rest in
+  `src`).
+- Put `worker-configuration.d.ts` in a leaf's `include` (not `types`); regenerate it with
+  `pnpm generate`.
+- A source-only package shipping `.tsx` needs `@types/react` + `@types/react-dom` in its `src`
+  leaf `types`; the `node` leaf needs `@types/node` (a devDep of each app that has config files).
 
-- **Source-only packages need their own ambient types.** A package that ships `.tsx` with no app
-  context during `tsgo --build` must list `@types/react` + `@types/react-dom` in its `tsconfig`
-  `types` array; otherwise JSX errors (`JSX.IntrinsicElements`, `react/jsx-runtime`).
-
-- **Leaf apps need not be reference targets.** A leaf app can be composite + `emitDeclarationOnly`
-  while nothing imports its emitted types; keep its `tsconfig` self-contained and exclude
-  tests/config so the root build stays green.
-
-Tooling: `tsgo` is `@typescript/native-preview` (TS native port). Never add `typescript`/`tsc`
-alongside it. Linting is oxlint (+ `oxlint-tsgolint`); see the global typescript-tooling rule
-for tool selection.
+Tooling: `tsgo` is `@typescript/native-preview` (TS native port). Kept for the editor and a
+manual `tsgo --noEmit -p <leaf>` fallback, but it is not a CI gate. Never add `typescript`/`tsc`.
