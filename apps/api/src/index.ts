@@ -2,6 +2,7 @@ import type { CreateDatasource, UpdateDatasource } from '@graflare/shared/schema
 import type { PrometheusResponse } from '@graflare/shared/schemas/prometheus';
 
 import { createDatasourceSchema, datasourceCredentialsSchema, updateDatasourceSchema } from '@graflare/shared/schemas/datasource';
+import { datasourceIdSchema } from '@graflare/shared/schemas/ids';
 import { prometheusResponseSchema } from '@graflare/shared/schemas/prometheus';
 import { WorkerEntrypoint } from 'cloudflare:workers';
 import { and, eq } from 'drizzle-orm';
@@ -70,6 +71,7 @@ export class GraflareAPI extends WorkerEntrypoint<Bindings> {
   }
 
   async getDatasource(orgId: string, id: string) {
+    datasourceIdSchema.parse(id);
     const rows = await this.db
       .select({
         id: datasources.id,
@@ -112,6 +114,7 @@ export class GraflareAPI extends WorkerEntrypoint<Bindings> {
   }
 
   async updateDatasource(orgId: string, id: string, input: UpdateDatasource) {
+    datasourceIdSchema.parse(id);
     const parsed = updateDatasourceSchema.parse(input);
     const { credentials, ...rest } = parsed;
     const now = new Date();
@@ -134,10 +137,12 @@ export class GraflareAPI extends WorkerEntrypoint<Bindings> {
   }
 
   async deleteDatasource(orgId: string, id: string): Promise<void> {
+    datasourceIdSchema.parse(id);
     await this.db.delete(datasources).where(and(eq(datasources.id, id), eq(datasources.orgId, orgId)));
   }
 
   async testConnection(orgId: string, id: string): Promise<{ success: boolean; latencyMs: number; error?: string }> {
+    datasourceIdSchema.parse(id);
     const rows = await this.db
       .select()
       .from(datasources)
@@ -182,6 +187,7 @@ export class GraflareAPI extends WorkerEntrypoint<Bindings> {
   private static ALLOWED_ENDPOINTS = new Set(['/api/v1/query', '/api/v1/query_range', '/api/v1/labels', '/api/v1/series']);
 
   async proxyQuery(orgId: string, datasourceId: string, endpoint: string, params: Record<string, string>): Promise<PrometheusResponse> {
+    datasourceIdSchema.parse(datasourceId);
     if (!GraflareAPI.ALLOWED_ENDPOINTS.has(endpoint) && !endpoint.startsWith('/api/v1/label/')) {
       return { status: 'error', errorType: 'bad_request', error: 'Invalid endpoint' };
     }

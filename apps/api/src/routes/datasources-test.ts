@@ -1,19 +1,22 @@
 import type { AppEnv } from '../index';
 
 import { datasourceCredentialsSchema } from '@graflare/shared/schemas/datasource';
+import { datasourceIdParamSchema } from '@graflare/shared/schemas/proxy';
+import { sValidator } from '@hono/standard-validator';
 import { and, eq } from 'drizzle-orm';
 import { Hono } from 'hono';
 
 import { decryptCredentials } from '../crypto/credentials';
 import { createDb } from '../db';
 import { datasources } from '../db/schema';
+import { onValidationError } from '../middleware/validate';
 
 const app = new Hono<AppEnv>();
 
-app.post('/:id/test', async c => {
+app.post('/:id/test', sValidator('param', datasourceIdParamSchema, onValidationError), async c => {
   const db = createDb(c.env.DB);
   const orgId = c.get('orgId');
-  const id = c.req.param('id');
+  const { id } = c.req.valid('param');
 
   const rows = await db
     .select()

@@ -2,12 +2,15 @@ import type { AppEnv } from '../index';
 import type { DatasourceCredentials } from '@graflare/shared/schemas/datasource';
 
 import { datasourceAuthType, datasourceCredentialsSchema } from '@graflare/shared/schemas/datasource';
+import { datasourceIdParamSchema, instantQueryBodySchema, labelNameParamSchema, labelsQuerySchema, rangeQueryBodySchema } from '@graflare/shared/schemas/proxy';
+import { sValidator } from '@hono/standard-validator';
 import { and, eq } from 'drizzle-orm';
 import { Hono } from 'hono';
 
 import { decryptCredentials } from '../crypto/credentials';
 import { createDb } from '../db';
 import { datasources } from '../db/schema';
+import { onValidationError } from '../middleware/validate';
 import { PrometheusClient } from '../prometheus/client';
 
 const app = new Hono<AppEnv>();
@@ -42,43 +45,64 @@ const getClient = async (c: { env: AppEnv['Bindings']; get: (key: string) => str
   );
 };
 
-app.post('/:id/proxy/api/v1/query', async c => {
+// `match[]` is a repeated query param: Hono hands sValidator('query', …) a bare
+// string for a single value and an array only for repeated ones, so validating
+// it through the query target would reject a legitimate single match[]. Read it
+// with c.req.queries() (always string[] | undefined) and validate that array.
+const readMatch = (c: { req: { queries: (key: string) => string[] | undefined } }) => labelsQuerySchema.safeParse({ 'match[]': c.req.queries('match[]') });
+
+app.post(
+  '/:id/proxy/api/v1/query',
+  sValidator('param', datasourceIdParamSchema, onValidationError),
+  sValidator('form', instantQueryBodySchema, onValidationError),
+  async c => {
+    const client = await getClient(c);
+    if (!client) return c.json({ status: 'error', error: 'Not found' }, 404);
+
+    const { query, time } = c.req.valid('form');
+    const result = await client.instantQuery(query, time === undefined ? undefined : Number(time));
+    return c.json(result);
+  },
+);
+
+app.post(
+  '/:id/proxy/api/v1/query_range',
+  sValidator('param', datasourceIdParamSchema, onValidationError),
+  sValidator('form', rangeQueryBodySchema, onValidationError),
+  async c => {
+    const client = await getClient(c);
+    if (!client) return c.json({ status: 'error', error: 'Not found' }, 404);
+
+    const { query, start, end, step } = c.req.valid('form');
+    const result = await client.rangeQuery(query, Number(start), Number(end), step);
+    return c.json(result);
+  },
+);
+
+app.get('/:id/proxy/api/v1/labels', sValidator('param', datasourceIdParamSchema, onValidationError), async c => {
   const client = await getClient(c);
   if (!client) return c.json({ status: 'error', error: 'Not found' }, 404);
 
-  const body = await c.req.parseBody();
-  const query = typeof body.query === 'string' ? body.query : '';
-  const time = typeof body.time === 'string' ? Number(body.time) : undefined;
-  const result = await client.instantQuery(query, time);
+  const match = readMatch(c);
+  if (!match.success) {
+    return c.json({ error: 'Validation failed', details: match.error.issues }, 400);
+  }
+
+  const result = await client.labels(match.data['match[]']);
   return c.json(result);
 });
 
-app.post('/:id/proxy/api/v1/query_range', async c => {
+app.get('/:id/proxy/api/v1/label/:name/values', sValidator('param', labelNameParamSchema, onValidationError), async c => {
   const client = await getClient(c);
   if (!client) return c.json({ status: 'error', error: 'Not found' }, 404);
 
-  const body = await c.req.parseBody();
-  const query = typeof body.query === 'string' ? body.query : '';
-  const step = typeof body.step === 'string' ? body.step : '';
-  const result = await client.rangeQuery(query, Number(body.start), Number(body.end), step);
-  return c.json(result);
-});
+  const match = readMatch(c);
+  if (!match.success) {
+    return c.json({ error: 'Validation failed', details: match.error.issues }, 400);
+  }
 
-app.get('/:id/proxy/api/v1/labels', async c => {
-  const client = await getClient(c);
-  if (!client) return c.json({ status: 'error', error: 'Not found' }, 404);
-
-  const match = c.req.queries('match[]');
-  const result = await client.labels(match);
-  return c.json(result);
-});
-
-app.get('/:id/proxy/api/v1/label/:name/values', async c => {
-  const client = await getClient(c);
-  if (!client) return c.json({ status: 'error', error: 'Not found' }, 404);
-
-  const match = c.req.queries('match[]');
-  const result = await client.labelValues(c.req.param('name'), match);
+  const { name } = c.req.valid('param');
+  const result = await client.labelValues(name, match.data['match[]']);
   return c.json(result);
 });
 

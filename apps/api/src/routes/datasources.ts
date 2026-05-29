@@ -1,12 +1,15 @@
 import type { AppEnv } from '../index';
 
 import { createDatasourceSchema, updateDatasourceSchema } from '@graflare/shared/schemas/datasource';
+import { datasourceIdParamSchema } from '@graflare/shared/schemas/proxy';
+import { sValidator } from '@hono/standard-validator';
 import { and, eq } from 'drizzle-orm';
 import { Hono } from 'hono';
 
 import { encryptCredentials } from '../crypto/credentials';
 import { createDb } from '../db';
 import { datasources } from '../db/schema';
+import { onValidationError } from '../middleware/validate';
 
 const app = new Hono<AppEnv>();
 
@@ -32,10 +35,10 @@ app.get('/', async c => {
   return c.json(rows);
 });
 
-app.get('/:id', async c => {
+app.get('/:id', sValidator('param', datasourceIdParamSchema, onValidationError), async c => {
   const db = createDb(c.env.DB);
   const orgId = c.get('orgId');
-  const id = c.req.param('id');
+  const { id } = c.req.valid('param');
 
   const rows = await db
     .select({
@@ -60,17 +63,11 @@ app.get('/:id', async c => {
   return c.json(rows[0]);
 });
 
-app.post('/', async c => {
+app.post('/', sValidator('json', createDatasourceSchema, onValidationError), async c => {
   const db = createDb(c.env.DB);
   const orgId = c.get('orgId');
 
-  const body: unknown = await c.req.json();
-  const parsed = createDatasourceSchema.safeParse(body);
-  if (!parsed.success) {
-    return c.json({ error: 'Validation failed', details: parsed.error.issues }, 400);
-  }
-
-  const { credentials, ...rest } = parsed.data;
+  const { credentials, ...rest } = c.req.valid('json');
   const id = crypto.randomUUID();
   const now = new Date();
 
@@ -100,10 +97,10 @@ app.post('/', async c => {
   );
 });
 
-app.put('/:id', async c => {
+app.put('/:id', sValidator('param', datasourceIdParamSchema, onValidationError), sValidator('json', updateDatasourceSchema, onValidationError), async c => {
   const db = createDb(c.env.DB);
   const orgId = c.get('orgId');
-  const id = c.req.param('id');
+  const { id } = c.req.valid('param');
 
   const existing = await db
     .select()
@@ -115,13 +112,7 @@ app.put('/:id', async c => {
     return c.json({ error: 'Not found' }, 404);
   }
 
-  const body: unknown = await c.req.json();
-  const parsed = updateDatasourceSchema.safeParse(body);
-  if (!parsed.success) {
-    return c.json({ error: 'Validation failed', details: parsed.error.issues }, 400);
-  }
-
-  const { credentials, ...rest } = parsed.data;
+  const { credentials, ...rest } = c.req.valid('json');
   const now = new Date();
 
   let encryptedCreds: string | undefined;
@@ -157,10 +148,10 @@ app.put('/:id', async c => {
   return c.json(updated[0]);
 });
 
-app.delete('/:id', async c => {
+app.delete('/:id', sValidator('param', datasourceIdParamSchema, onValidationError), async c => {
   const db = createDb(c.env.DB);
   const orgId = c.get('orgId');
-  const id = c.req.param('id');
+  const { id } = c.req.valid('param');
 
   const existing = await db
     .select({ id: datasources.id })
