@@ -1,6 +1,7 @@
-import type { CreateDatasource, UpdateDatasource } from '@graflare/shared/schemas/datasource';
-
+import { createDatasourceSchema, updateDatasourceInputSchema } from '@graflare/shared/schemas/datasource';
+import { datasourceIdSchema } from '@graflare/shared/schemas/ids';
 import { prometheusResponseSchema } from '@graflare/shared/schemas/prometheus';
+import { proxyQueryInputSchema } from '@graflare/shared/schemas/proxy';
 import { createServerFn } from '@tanstack/react-start';
 import { env } from 'cloudflare:workers';
 
@@ -50,14 +51,14 @@ export const listDatasources = createServerFn({ method: 'GET' }).handler(async (
 });
 
 export const getDatasource = createServerFn({ method: 'GET' })
-  .inputValidator((id: string) => id)
+  .inputValidator(datasourceIdSchema)
   .handler(async ({ data: id }) => {
     const ds = await env.API.getDatasource('default', id);
     return ds === null ? null : toDatasourceRow(ds);
   });
 
 export const createDatasource = createServerFn({ method: 'POST' })
-  .inputValidator((input: CreateDatasource) => input)
+  .inputValidator(createDatasourceSchema)
   .handler(async ({ data }) => {
     const ds = await env.API.createDatasource('default', data);
     return {
@@ -74,20 +75,20 @@ export const createDatasource = createServerFn({ method: 'POST' })
   });
 
 export const updateDatasource = createServerFn({ method: 'POST' })
-  .inputValidator((input: { id: string; data: UpdateDatasource }) => input)
+  .inputValidator(updateDatasourceInputSchema)
   .handler(async ({ data: { id, data } }) => {
     const ds = await env.API.updateDatasource('default', id, data);
     return ds === null ? null : toDatasourceRow(ds);
   });
 
 export const deleteDatasource = createServerFn({ method: 'POST' })
-  .inputValidator((id: string) => id)
+  .inputValidator(datasourceIdSchema)
   .handler(async ({ data: id }) => {
     await env.API.deleteDatasource('default', id);
   });
 
 export const testConnection = createServerFn({ method: 'POST' })
-  .inputValidator((id: string) => id)
+  .inputValidator(datasourceIdSchema)
   .handler(async ({ data: id }) => {
     const result = await env.API.testConnection('default', id);
     const plain: TestConnectionResult = {
@@ -99,7 +100,7 @@ export const testConnection = createServerFn({ method: 'POST' })
   });
 
 export const proxyQuery = createServerFn({ method: 'POST' })
-  .inputValidator((input: { datasourceId: string; endpoint: string; params: Record<string, string> }) => input)
+  .inputValidator(proxyQueryInputSchema)
   .handler(async ({ data }) => {
     const result = await env.API.proxyQuery('default', data.datasourceId, data.endpoint, data.params);
     // Re-parse to drop the RPC stub's Disposable brand (`[Symbol.dispose]`,
