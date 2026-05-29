@@ -14,6 +14,22 @@ describe('prometheusResponseSchema', () => {
     expect(result.success).toBe(true);
   });
 
+  it('accepts a labels response (string array data)', () => {
+    const result = prometheusResponseSchema.safeParse({
+      status: 'success',
+      data: ['__name__', 'job', 'instance'],
+    });
+    expect(result.success).toBe(true);
+  });
+
+  it('accepts a series response (label-set array data)', () => {
+    const result = prometheusResponseSchema.safeParse({
+      status: 'success',
+      data: [{ __name__: 'up', job: 'api' }],
+    });
+    expect(result.success).toBe(true);
+  });
+
   it('accepts error response', () => {
     const result = prometheusResponseSchema.safeParse({
       status: 'error',
