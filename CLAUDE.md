@@ -26,5 +26,9 @@ config. Exact pinned versions live in each `package.json`.
 
 ## Verify before "done"
 
-Run all four (root `package.json` scripts) and fix everything before claiming completion:
-`pnpm check` (tsgo), `pnpm lint` (oxlint), `pnpm test` (vitest), `pnpm build`.
+Run these (root `package.json` scripts) and fix everything before claiming completion:
+`pnpm lint:ci` (oxlint type-aware + oxfmt --check — non-mutating), `pnpm test` (vitest),
+`pnpm build`. oxlint runs in type-aware/type-check mode (via `oxlint-tsgolint`), so it is the
+type-check gate — there is no separate `tsgo` build step. `pnpm lint` is the dev variant: it
+`--fix`es and runs oxfmt, so don't use it as the gate. For a manual type-check of one project,
+`pnpm exec tsgo --noEmit -p <leaf tsconfig>` still works as a fallback.
