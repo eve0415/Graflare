@@ -197,8 +197,8 @@ export const restoreDashboardVersion = createServerFn({ method: 'POST' })
 
 export const importDashboard = createServerFn({ method: 'POST' })
   .inputValidator(importDashboardSchema)
-  .handler(async ({ data }) => {
-    const result = await env.API.importDashboard('default', data);
+  .handler(({ data }) => {
+    const result =  env.API.importDashboard('default', data);
     const dashboard = result.dashboard === null
       ? null
       : { id: result.dashboard.id, title: result.dashboard.title };
