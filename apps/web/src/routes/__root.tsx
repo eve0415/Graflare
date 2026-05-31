@@ -1,5 +1,4 @@
 import type { QueryClient } from '@tanstack/react-query';
-/// <reference types="vite/client" />
 
 import { Separator } from '@graflare/ui/components/separator';
 import { SidebarInset, SidebarProvider, SidebarTrigger } from '@graflare/ui/components/sidebar';
@@ -10,6 +9,8 @@ import { Suspense } from 'react';
 
 import { AppSidebar } from '../components/app-sidebar';
 import { ThemeProvider } from '../components/theme-provider';
+
+import './__root.css';
 
 const bodyStyle = { fontFamily: 'Geist, sans-serif' };
 const fallback = <div className='text-muted-foreground p-4'>Loading...</div>;
