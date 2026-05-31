@@ -60,4 +60,5 @@ export const usePanelData = (
     },
     enabled: datasourceId !== undefined && queries.length > 0,
     refetchInterval,
+    refetchIntervalInBackground: false,
   });
