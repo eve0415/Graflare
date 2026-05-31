@@ -1,6 +1,6 @@
 import type { Panel } from '@graflare/shared/schemas/panel';
 
-import { useMemo } from 'react';
+import { useCallback, useMemo } from 'react';
 import type uPlot from 'uplot';
 
 import { QueryResultTable, formatPrometheusToTable } from '../query-result-table';
@@ -97,14 +97,16 @@ export const TimeSeriesPanel = ({ panel, timeRange, refetchInterval, width, heig
     return formatPrometheusToTable(chartResult);
   }, [chartResult]);
 
-  const dataTable = <QueryResultTable data={tableData} />;
+  const handleRetry = useCallback(() => { void refetch(); }, [refetch]);
+
+  const dataTable = useMemo(() => <QueryResultTable data={tableData} />, [tableData]);
 
   return (
     <PanelFrame
       title={panel.title}
       loading={isLoading}
       error={error instanceof Error ? error.message : null}
-      onRetry={() => { void refetch(); }}
+      onRetry={handleRetry}
       dataTableContent={dataTable}
     >
       {chartData[0] !== undefined && chartData[0].length > 0 ? (

@@ -8,6 +8,8 @@ import { Suspense, useCallback, useMemo, useState } from 'react';
 import { proxyQuery } from '../lib/api';
 import { datasourcesQueryOptions } from '../lib/query-options';
 
+import type { Options as UPlotOptions } from 'uplot';
+
 import { PromQLEditor } from './promql-editor';
 import { QueryResultTable, formatPrometheusToTable } from './query-result-table';
 import { UPlotChart } from './uplot-chart';
@@ -121,7 +123,7 @@ export const ExplorePane = ({ timeRange, label }: ExplorePaneProps) => {
     return [timestamps, ...series];
   }, [queryResult]);
 
-  const chartOptions = useMemo((): import('uplot').Options => ({
+  const chartOptions = useMemo((): UPlotOptions => ({
     width: 800,
     height: 300,
     series: [

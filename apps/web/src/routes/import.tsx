@@ -55,7 +55,7 @@ const ImportPage = () => {
         setFormat(null);
         return;
       }
-      const record = json as Record<string, unknown>;
+      const record = Object.fromEntries(Object.entries(json));
       setParsed(record);
       setFormat(detectFormat(record));
       setParseError(null);

@@ -59,8 +59,10 @@ export const TimeRangePicker = ({ value, onChange }: TimeRangePickerProps) => {
             <PresetButton
               key={p.label}
               label={p.label}
+              from={p.from}
+              to={p.to}
               active={p.from === value.from && p.to === value.to}
-              onClick={() => { handlePreset(p.from, p.to); }}
+              onSelect={handlePreset}
             />
           ))}
         </div>
@@ -71,12 +73,16 @@ export const TimeRangePicker = ({ value, onChange }: TimeRangePickerProps) => {
   );
 };
 
-const PresetButton = ({ label, active, onClick }: { label: string; active: boolean; onClick: () => void }) => (
-  <button
-    type='button'
-    className={`hover:bg-accent rounded-sm px-2 py-1 text-left text-sm ${active ? 'bg-accent font-medium' : ''}`}
-    onClick={onClick}
-  >
-    {label}
-  </button>
-);
+const PresetButton = ({ label, from, to, active, onSelect }: { label: string; from: string; to: string; active: boolean; onSelect: (from: string, to: string) => void }) => {
+  const handleClick = useCallback(() => { onSelect(from, to); }, [from, to, onSelect]);
+
+  return (
+    <button
+      type='button'
+      className={`hover:bg-accent rounded-sm px-2 py-1 text-left text-sm ${active ? 'bg-accent font-medium' : ''}`}
+      onClick={handleClick}
+    >
+      {label}
+    </button>
+  );
+};

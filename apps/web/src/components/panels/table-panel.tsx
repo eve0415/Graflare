@@ -1,6 +1,6 @@
 import type { Panel } from '@graflare/shared/schemas/panel';
 
-import { useMemo } from 'react';
+import { useCallback, useMemo } from 'react';
 
 import { QueryResultTable, formatPrometheusToTable } from '../query-result-table';
 
@@ -38,12 +38,14 @@ export const TablePanel = ({ panel, timeRange, refetchInterval }: TablePanelProp
     return formatPrometheusToTable(allResults);
   }, [data]);
 
+  const handleRetry = useCallback(() => { void refetch(); }, [refetch]);
+
   return (
     <PanelFrame
       title={panel.title}
       loading={isLoading}
       error={error instanceof Error ? error.message : null}
-      onRetry={() => { void refetch(); }}
+      onRetry={handleRetry}
     >
       <QueryResultTable data={tableData} />
     </PanelFrame>

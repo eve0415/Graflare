@@ -36,8 +36,10 @@ export const PromQLEditor = ({ value, onChange, onRun, placeholder }: PromQLEdit
   const onChangeRef = useRef(onChange);
   const onRunRef = useRef(onRun);
 
-  onChangeRef.current = onChange;
-  onRunRef.current = onRun;
+  useEffect(() => {
+    onChangeRef.current = onChange;
+    onRunRef.current = onRun;
+  });
 
   useEffect(() => {
     const container = containerRef.current;
@@ -101,9 +103,7 @@ export const PromQLEditor = ({ value, onChange, onRun, placeholder }: PromQLEdit
     <div
       ref={containerRef}
       className='border-border bg-background overflow-hidden rounded-md border'
-      role='textbox'
       aria-label='PromQL query editor'
-      aria-multiline='true'
     />
   );
 };

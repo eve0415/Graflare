@@ -1,6 +1,6 @@
 import type { Panel } from '@graflare/shared/schemas/panel';
 
-import { useMemo } from 'react';
+import { useCallback, useMemo } from 'react';
 
 import { PanelFrame } from './panel-frame';
 import { usePanelData } from './use-panel-data';
@@ -47,6 +47,8 @@ export const StatPanel = ({ panel, timeRange, refetchInterval }: StatPanelProps)
     return null;
   }, [data]);
 
+  const handleRetry = useCallback(() => { void refetch(); }, [refetch]);
+
   const numericValue = value !== null ? Number(value) : 0;
   const colorMode = panel.displayOptions.stat?.colorMode ?? 'value';
   const textSize = panel.displayOptions.stat?.textSize ?? 48;
@@ -69,18 +71,17 @@ export const StatPanel = ({ panel, timeRange, refetchInterval }: StatPanelProps)
       title={panel.title}
       loading={isLoading}
       error={error instanceof Error ? error.message : null}
-      onRetry={() => { void refetch(); }}
+      onRetry={handleRetry}
     >
-      <div
+      <output
         className='flex h-full items-center justify-center rounded'
         style={bgStyle}
-        role='status'
         aria-label={`${panel.title}: ${value ?? 'no data'}`}
       >
         <span className='font-semibold tabular-nums' style={valueStyle}>
           {value ?? '—'}
         </span>
-      </div>
+      </output>
     </PanelFrame>
   );
 };
