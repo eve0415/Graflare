@@ -2,15 +2,13 @@ import type { QueryClient } from '@tanstack/react-query';
 
 import { Separator } from '@graflare/ui/components/separator';
 import { SidebarInset, SidebarProvider, SidebarTrigger } from '@graflare/ui/components/sidebar';
-import globalsCss from '@graflare/ui/globals.css?url';
+import rootCss from './__root.css?url';
 import { HeadContent, Outlet, Scripts, createRootRouteWithContext } from '@tanstack/react-router';
 import { TanStackRouterDevtools } from '@tanstack/react-router-devtools';
 import { Suspense } from 'react';
 
 import { AppSidebar } from '../components/app-sidebar';
 import { ThemeProvider } from '../components/theme-provider';
-
-import './__root.css';
 
 const bodyStyle = { fontFamily: 'Geist, sans-serif' };
 const fallback = <div className='text-muted-foreground p-4'>Loading...</div>;
@@ -48,7 +46,7 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
   head: () => ({
     meta: [{ charSet: 'utf8' }, { name: 'viewport', content: 'width=device-width, initial-scale=1' }, { title: 'Graflare' }],
     links: [
-      { rel: 'stylesheet', href: globalsCss },
+      { rel: 'stylesheet', href: rootCss },
       {
         rel: 'stylesheet',
         href: 'https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700&family=Geist+Mono:wght@400;500&display=swap',

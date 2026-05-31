@@ -27,6 +27,7 @@
     "@graflare/ui": "workspace:*",
     "@prometheus-io/codemirror-promql": "0.312.0-rc.0",
     "@rolldown/plugin-babel": "0.2.3",
+    "@tailwindcss/vite": "4.3.0",
     "@tanstack/react-devtools": "0.10.5",
     "@tanstack/react-query": "5.100.14",
     "@tanstack/react-router": "1.170.8",
