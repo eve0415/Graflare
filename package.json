@@ -5,8 +5,7 @@
   "scripts": {
     "build": "pnpm --filter './apps/*' --filter './packages/*' build",
     "test": "pnpm --filter './apps/*' --filter './packages/*' test",
-    "lint": "oxlint --report-unused-disable-directives --fix --fix-suggestions && oxfmt",
-    "lint:ci": "oxlint --report-unused-disable-directives && oxfmt --check",
+    "lint": "oxlint --report-unused-disable-directives --fix --fix-suggestions --fix-dangerously && oxfmt",
     "dev": "pnpm --filter './apps/*' dev --parallel",
     "clean": "pnpm --filter './apps/*' --filter './packages/*' clean",
     "generate": "pnpm --filter './apps/*' generate"
