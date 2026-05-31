@@ -81,3 +81,17 @@ export const importDashboardSchema = z.object({
 });
 
 export type ImportDashboard = z.infer<typeof importDashboardSchema>;
+
+export const updateDashboardInputSchema = z.object({
+  id: z.uuid(),
+  data: updateDashboardSchema,
+});
+
+export type UpdateDashboardInput = z.infer<typeof updateDashboardInputSchema>;
+
+export const restoreVersionInputSchema = z.object({
+  dashboardId: z.uuid(),
+  version: z.number(),
+});
+
+export type RestoreVersionInput = z.infer<typeof restoreVersionInputSchema>;

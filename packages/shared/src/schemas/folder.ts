@@ -24,3 +24,10 @@ export const updateFolderSchema = z.partial(createFolderSchema);
 export type UpdateFolder = z.infer<typeof updateFolderSchema>;
 
 export const folderIdParamSchema = z.object({ id: z.uuid() });
+
+export const updateFolderInputSchema = z.object({
+  id: z.uuid(),
+  data: updateFolderSchema,
+});
+
+export type UpdateFolderInput = z.infer<typeof updateFolderInputSchema>;
