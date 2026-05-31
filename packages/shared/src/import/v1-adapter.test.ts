@@ -178,7 +178,7 @@ describe('importV1', () => {
 
     it('includes classic warnings in fallback', () => {
       const result = importV1({
-        title: 123 as unknown as string,
+        title: 123,
       });
 
       expect(result.warnings).toEqual([

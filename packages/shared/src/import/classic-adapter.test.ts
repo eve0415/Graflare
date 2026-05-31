@@ -2,6 +2,14 @@ import { describe, expect, it } from 'vitest';
 
 import { importClassic } from './classic-adapter';
 
+const makePanel = (type: string) => ({
+  type,
+  title: `${type} panel`,
+  targets: [{ refId: 'A', expr: 'up' }],
+  gridPos: { x: 0, y: 0, w: 12, h: 8 },
+  fieldConfig: { defaults: { thresholds: { steps: [] } } },
+});
+
 const minimalDashboard = {
   title: 'Test Dashboard',
   description: 'A test',
@@ -35,7 +43,7 @@ describe('importClassic', () => {
 
     it('returns correct panel properties', () => {
       const result = importClassic(minimalDashboard);
-      const panel = result.dashboard.panels[0];
+      const [panel] = result.dashboard.panels;
 
       expect(panel).toBeDefined();
       expect(panel?.id).toBe('panel-0');
@@ -64,14 +72,6 @@ describe('importClassic', () => {
   });
 
   describe('panel type mapping', () => {
-    const makePanel = (type: string) => ({
-      type,
-      title: `${type} panel`,
-      targets: [{ refId: 'A', expr: 'up' }],
-      gridPos: { x: 0, y: 0, w: 12, h: 8 },
-      fieldConfig: { defaults: { thresholds: { steps: [] } } },
-    });
-
     it('maps "graph" to "timeseries"', () => {
       const result = importClassic({ ...minimalDashboard, panels: [makePanel('graph')] });
       expect(result.dashboard.panels[0]?.type).toBe('timeseries');
@@ -497,7 +497,7 @@ describe('importClassic', () => {
       });
 
       expect(result.dashboard.variables).toHaveLength(1);
-      const v = result.dashboard.variables[0];
+      const [v] = result.dashboard.variables;
       expect(v?.name).toBe('instance');
       expect(v?.type).toBe('query');
       expect(v?.label).toBe('Instance');
@@ -668,7 +668,7 @@ describe('importClassic', () => {
 
   describe('parse failure', () => {
     it('returns fallback when JSON does not match schema', () => {
-      const result = importClassic({ title: 123 as unknown as string });
+      const result = importClassic({ title: 123 });
 
       expect(result.dashboard.title).toBe('Imported Dashboard');
       expect(result.dashboard.description).toBe('');

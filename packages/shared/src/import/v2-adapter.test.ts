@@ -46,7 +46,7 @@ describe('importV2', () => {
 
     it('returns correct panel properties', () => {
       const result = importV2(validV2Dashboard);
-      const panel = result.dashboard.panels[0];
+      const [panel] = result.dashboard.panels;
 
       expect(panel?.id).toBe('panel-0');
       expect(panel?.type).toBe('timeseries');
@@ -369,7 +369,7 @@ describe('importV2', () => {
       });
 
       expect(result.dashboard.variables).toHaveLength(1);
-      const v = result.dashboard.variables[0];
+      const [v] = result.dashboard.variables;
       expect(v?.name).toBe('instance');
       expect(v?.type).toBe('query');
       expect(v?.label).toBe('Instance');
@@ -449,7 +449,7 @@ describe('importV2', () => {
     });
 
     it('returns fallback when apiVersion is wrong type', () => {
-      const result = importV2({ apiVersion: 123 as unknown as string });
+      const result = importV2({ apiVersion: 123 });
 
       expect(result.warnings).toEqual(['Failed to parse Grafana V2 Resource JSON']);
     });
