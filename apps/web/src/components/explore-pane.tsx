@@ -81,11 +81,14 @@ export const ExplorePane = ({ timeRange, label }: ExplorePaneProps) => {
         if (result.status === 'error') {
           setError(result.error ?? 'Query failed');
           setQueryResult(null);
-        } else if (result.data !== undefined && 'resultType' in result.data) {
-          setQueryResult({
-            resultType: result.data.resultType,
-            result: result.data.result as typeof queryResult extends null ? never : NonNullable<typeof queryResult>['result'],
-          });
+        } else if (result.data !== undefined && 'resultType' in result.data && Array.isArray(result.data.result)) {
+          const parsed: { metric: Record<string, string>; values?: [number, string][]; value?: [number, string] }[] = [];
+          for (const item of result.data.result) {
+            if (typeof item === 'object' && item !== null && 'metric' in item) {
+              parsed.push(item);
+            }
+          }
+          setQueryResult({ resultType: result.data.resultType, result: parsed });
         }
       } catch (error) {
         setError(error instanceof Error ? error.message : 'Query failed');

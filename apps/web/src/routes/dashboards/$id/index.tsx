@@ -1,5 +1,6 @@
 import type { Panel } from '@graflare/shared/schemas/panel';
 
+import { panelSchema } from '@graflare/shared/schemas/panel';
 import { useQueryClient, useSuspenseQuery } from '@tanstack/react-query';
 import { createFileRoute } from '@tanstack/react-router';
 import { useCallback, useMemo, useState } from 'react';
@@ -23,6 +24,16 @@ const intervalToMs: Record<RefreshInterval, number | false> = {
   '1h': 3600000,
 };
 
+const parsePanels = (raw: unknown): Panel[] => {
+  if (!Array.isArray(raw)) return [];
+  const result: Panel[] = [];
+  for (const item of raw) {
+    const parsed = panelSchema.safeParse(item);
+    if (parsed.success) result.push(parsed.data);
+  }
+  return result;
+};
+
 const DashboardViewPage = () => {
   const { id } = Route.useParams();
   const queryClient = useQueryClient();
@@ -37,13 +48,13 @@ const DashboardViewPage = () => {
   const dashboardPanels = useMemo(() => {
     if (dashboard === null) return [];
     if (panels.length > 0 && editMode) return panels;
-    return (dashboard.panels ?? []) as Panel[];
+    return parsePanels(dashboard.panels);
   }, [dashboard, panels, editMode]);
 
   const handleEditToggle = useCallback(() => {
     setEditMode(prev => {
       if (!prev && dashboard !== null) {
-        setPanels((dashboard.panels ?? []) as Panel[]);
+        setPanels(parsePanels(dashboard.panels));
       }
       return !prev;
     });

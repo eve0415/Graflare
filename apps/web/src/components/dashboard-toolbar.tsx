@@ -13,6 +13,10 @@ interface TimeRange {
 
 type RefreshInterval = '5s' | '10s' | '30s' | '1m' | '5m' | '15m' | '30m' | '1h' | 'off';
 
+const validIntervals = new Set<string>(['off', '5s', '10s', '30s', '1m', '5m', '15m', '30m', '1h']);
+
+const isRefreshInterval = (val: string): val is RefreshInterval => validIntervals.has(val);
+
 interface DashboardToolbarProps {
   title: string;
   timeRange: TimeRange;
@@ -51,7 +55,7 @@ export const DashboardToolbar = ({
   saving,
 }: DashboardToolbarProps) => {
   const handleRefreshChange = useCallback((val: string) => {
-    onRefreshIntervalChange(val as RefreshInterval);
+    if (isRefreshInterval(val)) onRefreshIntervalChange(val);
   }, [onRefreshIntervalChange]);
 
   return (
