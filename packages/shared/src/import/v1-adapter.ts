@@ -1,28 +1,36 @@
 import type { ImportResult } from './types';
 
+import { grafanaV1Schema } from '../schemas/grafana-v1';
+
 import { importClassic } from './classic-adapter';
 
 export const importV1 = (json: Record<string, unknown>): ImportResult => {
-  const warnings: string[] = [];
-
-  if (!('spec' in json) || typeof json.spec !== 'object' || json.spec === null) {
-    warnings.push('V1 Resource JSON missing "spec" field — attempting to parse as Classic');
-    return { ...importClassic(json), warnings: [...warnings, ...importClassic(json).warnings] };
+  const parsed = grafanaV1Schema.safeParse(json);
+  if (!parsed.success) {
+    const fallback = importClassic(json);
+    return {
+      dashboard: fallback.dashboard,
+      warnings: [
+        'V1 Resource JSON did not match expected schema — falling back to Classic parser',
+        ...fallback.warnings,
+      ],
+    };
   }
 
-  const specRecord = Object.fromEntries(Object.entries(json.spec));
+  const { spec, metadata } = parsed.data;
+  const specRecord: Record<string, unknown> = {};
+  for (const [key, value] of Object.entries(spec)) {
+    specRecord[key] = value;
+  }
 
   const result = importClassic(specRecord);
 
-  if ('metadata' in json && typeof json.metadata === 'object' && json.metadata !== null) {
-    const {metadata} = json;
-    if ('name' in metadata && typeof metadata.name === 'string' && result.dashboard.title === 'Imported Dashboard') {
-      result.dashboard.title = metadata.name;
-    }
+  if (metadata.name !== '' && result.dashboard.title === 'Imported Dashboard') {
+    result.dashboard.title = metadata.name;
   }
 
   return {
     dashboard: result.dashboard,
-    warnings: [...warnings, ...result.warnings],
+    warnings: result.warnings,
   };
 };
