@@ -34,7 +34,7 @@ export const StatPanel = ({ panel, timeRange, refetchInterval }: StatPanelProps)
       if (res.status !== 'success' || res.data === undefined || !('result' in res.data)) continue;
       const results = res.data.result;
       if (!Array.isArray(results) || results.length === 0) continue;
-      const first = results[0];
+      const [first] = results;
       if (typeof first !== 'object' || first === null) continue;
       if ('value' in first && Array.isArray(first.value) && first.value.length >= 2) {
         return String(first.value[1]);
@@ -49,7 +49,7 @@ export const StatPanel = ({ panel, timeRange, refetchInterval }: StatPanelProps)
 
   const handleRetry = useCallback(() => { void refetch(); }, [refetch]);
 
-  const numericValue = value !== null ? Number(value) : 0;
+  const numericValue = value === null ? 0 : Number(value);
   const colorMode = panel.displayOptions.stat?.colorMode ?? 'value';
   const textSize = panel.displayOptions.stat?.textSize ?? 48;
   const thresholdColor = panel.thresholds.length > 0

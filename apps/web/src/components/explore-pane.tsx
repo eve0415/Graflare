@@ -112,7 +112,7 @@ export const ExplorePane = ({ timeRange, label }: ExplorePaneProps) => {
   const chartData = useMemo((): [number[], ...number[][]] => {
     if (queryResult === null || queryResult.result.length === 0) return [[]];
 
-    const firstSeries = queryResult.result[0];
+    const [firstSeries] = queryResult.result;
     if (firstSeries?.values === undefined) return [[]];
 
     const timestamps = firstSeries.values.map(v => v[0]);
@@ -122,6 +122,8 @@ export const ExplorePane = ({ timeRange, label }: ExplorePaneProps) => {
 
     return [timestamps, ...series];
   }, [queryResult]);
+
+  const chartFallback = useMemo(() => <Skeleton className='h-72 w-full' />, []);
 
   const chartOptions = useMemo((): UPlotOptions => ({
     width: 800,
@@ -184,7 +186,7 @@ export const ExplorePane = ({ timeRange, label }: ExplorePaneProps) => {
           </div>
 
           {resultView === 'graph' && chartData[0] !== undefined && chartData[0].length > 0 && (
-            <Suspense fallback={<Skeleton className='h-72 w-full' />}>
+            <Suspense fallback={chartFallback}>
               <UPlotChart options={chartOptions} data={chartData} className='w-full' />
             </Suspense>
           )}

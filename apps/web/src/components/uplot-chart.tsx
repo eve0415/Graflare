@@ -36,7 +36,6 @@ export const UPlotChart = ({ options, data, className }: UPlotChartProps) => {
     <div
       ref={containerRef}
       className={className}
-      role='img'
       aria-label='Time series chart'
     />
   );

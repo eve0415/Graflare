@@ -41,29 +41,24 @@ const notifyListeners = () => {
   for (const listener of listeners) listener();
 };
 
-const themeStore = {
-  subscribe(onStoreChange: () => void) {
-    listeners.add(onStoreChange);
-    return () => { listeners.delete(onStoreChange); };
-  },
-  getSnapshot: (): Theme => currentTheme,
-  getServerSnapshot: (): Theme => 'system',
+const themeSubscribe = (onStoreChange: () => void) => {
+  listeners.add(onStoreChange);
+  return () => { listeners.delete(onStoreChange); };
 };
+const themeGetSnapshot = (): Theme => currentTheme;
+const themeGetServerSnapshot = (): Theme => 'system';
 
-const systemThemeStore = {
-  subscribe(onStoreChange: () => void) {
-    if (typeof globalThis.matchMedia !== 'function') return () => {};
-    const mq = globalThis.matchMedia('(prefers-color-scheme: dark)');
-    mq.addEventListener('change', onStoreChange);
-    return () => { mq.removeEventListener('change', onStoreChange); };
-  },
-  getSnapshot: getSystemTheme,
-  getServerSnapshot: (): 'light' | 'dark' => 'dark',
+const systemThemeSubscribe = (onStoreChange: () => void) => {
+  if (typeof globalThis.matchMedia !== 'function') return () => {};
+  const mq = globalThis.matchMedia('(prefers-color-scheme: dark)');
+  mq.addEventListener('change', onStoreChange);
+  return () => { mq.removeEventListener('change', onStoreChange); };
 };
+const systemThemeGetServerSnapshot = (): 'light' | 'dark' => 'dark';
 
 export const ThemeProvider = ({ children }: { children: React.ReactNode }) => {
-  const theme = useSyncExternalStore(themeStore.subscribe, themeStore.getSnapshot, themeStore.getServerSnapshot);
-  const systemTheme = useSyncExternalStore(systemThemeStore.subscribe, systemThemeStore.getSnapshot, systemThemeStore.getServerSnapshot);
+  const theme = useSyncExternalStore(themeSubscribe, themeGetSnapshot, themeGetServerSnapshot);
+  const systemTheme = useSyncExternalStore(systemThemeSubscribe, getSystemTheme, systemThemeGetServerSnapshot);
 
   const resolved = theme === 'system' ? systemTheme : theme;
 

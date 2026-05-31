@@ -1,7 +1,7 @@
 import { Button } from '@graflare/ui/components/button';
 import { Skeleton } from '@graflare/ui/components/skeleton';
 import { AlertCircle, MoreVertical, Table2 } from 'lucide-react';
-import { Suspense, useCallback, useState } from 'react';
+import { Suspense, useCallback, useMemo, useState } from 'react';
 
 interface PanelFrameProps {
   title: string;
@@ -18,6 +18,8 @@ export const PanelFrame = ({ title, loading, error, onRetry, children, dataTable
   const toggleDataTable = useCallback(() => {
     setShowDataTable(v => !v);
   }, []);
+
+  const suspenseFallback = useMemo(() => <Skeleton className='h-full w-full' />, []);
 
   return (
     <div className='border-border bg-card flex h-full flex-col overflow-hidden rounded-lg border'>
@@ -57,7 +59,7 @@ export const PanelFrame = ({ title, loading, error, onRetry, children, dataTable
         )}
 
         {loading !== true && (error === undefined || error === null) && (
-          <Suspense fallback={<Skeleton className='h-full w-full' />}>
+          <Suspense fallback={suspenseFallback}>
             {showDataTable && dataTableContent !== undefined ? dataTableContent : children}
           </Suspense>
         )}

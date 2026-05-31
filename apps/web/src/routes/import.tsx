@@ -74,27 +74,21 @@ const ImportPage = () => {
     const file = e.target.files?.[0];
     if (file === undefined) return;
 
-    const reader = new FileReader();
-    reader.onload = () => {
-      if (typeof reader.result === 'string') {
-        handleParse(reader.result);
-      }
-    };
-    reader.readAsText(file);
+    void (async () => {
+      const text = await file.text();
+      handleParse(text);
+    })();
   }, [handleParse]);
 
   const handleDrop = useCallback((e: React.DragEvent) => {
     e.preventDefault();
-    const file = e.dataTransfer.files[0];
+    const [file] = e.dataTransfer.files;
     if (file === undefined) return;
 
-    const reader = new FileReader();
-    reader.onload = () => {
-      if (typeof reader.result === 'string') {
-        handleParse(reader.result);
-      }
-    };
-    reader.readAsText(file);
+    void (async () => {
+      const text = await file.text();
+      handleParse(text);
+    })();
   }, [handleParse]);
 
   const handleDragOver = useCallback((e: React.DragEvent) => {
@@ -104,6 +98,10 @@ const ImportPage = () => {
   const handleClickUpload = useCallback(() => {
     fileInputRef.current?.click();
   }, []);
+
+  const handleDropZoneKeyDown = useCallback((e: React.KeyboardEvent) => {
+    if (e.key === 'Enter' || e.key === ' ') handleClickUpload();
+  }, [handleClickUpload]);
 
   const handleImport = useCallback(() => {
     if (parsed === null) return;
@@ -143,14 +141,13 @@ const ImportPage = () => {
         Import a Grafana dashboard from JSON. Supports Classic, V1 Resource, and V2 Resource formats.
       </p>
 
-      <div
-        className='border-border hover:border-foreground/20 flex cursor-pointer flex-col items-center gap-3 rounded-lg border-2 border-dashed p-8 transition-colors'
+      <button
+        type='button'
+        className='border-border hover:border-foreground/20 flex w-full cursor-pointer flex-col items-center gap-3 rounded-lg border-2 border-dashed bg-transparent p-8 transition-colors'
         onDrop={handleDrop}
         onDragOver={handleDragOver}
         onClick={handleClickUpload}
-        onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') handleClickUpload(); }}
-        role='button'
-        tabIndex={0}
+        onKeyDown={handleDropZoneKeyDown}
         aria-label='Upload JSON file'
       >
         <Upload className='text-muted-foreground h-8 w-8' />
@@ -161,9 +158,9 @@ const ImportPage = () => {
           accept='.json'
           className='hidden'
           onChange={handleFileUpload}
-          
+          aria-label='Upload JSON file'
         />
-      </div>
+      </button>
 
       <div className='space-y-2'>
         <label htmlFor='json-input' className='text-sm font-medium'>Or paste JSON</label>

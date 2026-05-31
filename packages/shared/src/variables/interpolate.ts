@@ -75,7 +75,7 @@ export const interpolateVariables = (
 				continue;
 			}
 
-			const name = match[0];
+			const [name] = match;
 			const end = i + 1 + name.length;
 			const value = variables.get(name);
 			if (value === undefined) {

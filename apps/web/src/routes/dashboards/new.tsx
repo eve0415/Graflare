@@ -11,7 +11,7 @@ const NewDashboardPage = () => {
   const [title, setTitle] = useState('');
   const [submitting, setSubmitting] = useState(false);
 
-  const handleSubmit = useCallback((e: React.FormEvent) => {
+  const handleSubmit = useCallback((e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     if (title.trim() === '') return;
 

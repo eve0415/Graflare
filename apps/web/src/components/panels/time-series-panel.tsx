@@ -44,7 +44,7 @@ export const TimeSeriesPanel = ({ panel, timeRange, refetchInterval, width, heig
   const chartData = useMemo((): uPlot.AlignedData => {
     if (chartResult === null || chartResult.length === 0) return [[]];
 
-    const first = chartResult[0];
+    const [first] = chartResult;
     if (first?.values === undefined) return [[]];
 
     const timestamps = first.values.map(v => v[0]);

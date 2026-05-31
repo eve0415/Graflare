@@ -2,15 +2,15 @@ import { vi } from 'vitest';
 
 Object.defineProperty(globalThis, 'matchMedia', {
   writable: true,
-  value: vi.fn((query: string) => ({
+  value: vi.fn<(query: string) => MediaQueryList>((query: string) => ({
     matches: false,
     media: query,
     onchange: null,
-    addListener: vi.fn(),
-    removeListener: vi.fn(),
-    addEventListener: vi.fn(),
-    removeEventListener: vi.fn(),
-    dispatchEvent: vi.fn(),
+    addListener: vi.fn<MediaQueryList['addListener']>(),
+    removeListener: vi.fn<MediaQueryList['removeListener']>(),
+    addEventListener: vi.fn<MediaQueryList['addEventListener']>(),
+    removeEventListener: vi.fn<MediaQueryList['removeEventListener']>(),
+    dispatchEvent: vi.fn<MediaQueryList['dispatchEvent']>(),
   })),
 });
 
@@ -47,14 +47,12 @@ vi.mock('./lib/api', () => ({
   deleteFolder: () => Promise.resolve(),
 }));
 
-vi.mock('react-grid-layout', () => {
-  const MockGrid = ({ children }: { children: React.ReactNode }) => children;
-  return {
-    default: MockGrid,
-    Responsive: MockGrid,
-    WidthProvider: () => MockGrid,
-  };
-});
+const MockGrid = ({ children }: { children: React.ReactNode }) => children;
+vi.mock('react-grid-layout', () => ({
+  default: MockGrid,
+  Responsive: MockGrid,
+  WidthProvider: () => MockGrid,
+}));
 
 vi.mock('react-grid-layout/css/styles.css', () => ({}));
 

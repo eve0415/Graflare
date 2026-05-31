@@ -1,6 +1,6 @@
 import type { Panel } from '@graflare/shared/schemas/panel';
 
-import { useMemo } from 'react';
+import { useCallback, useMemo } from 'react';
 
 import { PanelFrame } from './panel-frame';
 import { usePanelData } from './use-panel-data';
@@ -10,6 +10,19 @@ interface GaugePanelProps {
   timeRange: { from: string; to: string };
   refetchInterval: number | false;
 }
+
+const describeArc = (startAngle: number, endAngle: number, radius: number): string => {
+  const startRad = (startAngle * Math.PI) / 180;
+  const endRad = (endAngle * Math.PI) / 180;
+  const cx = 100;
+  const cy = 100;
+  const x1 = cx + radius * Math.cos(startRad);
+  const y1 = cy + radius * Math.sin(startRad);
+  const x2 = cx + radius * Math.cos(endRad);
+  const y2 = cy + radius * Math.sin(endRad);
+  const largeArc = endAngle - startAngle > 180 ? 1 : 0;
+  return `M ${String(x1)} ${String(y1)} A ${String(radius)} ${String(radius)} 0 ${String(largeArc)} 1 ${String(x2)} ${String(y2)}`;
+};
 
 const getThresholdColor = (value: number, thresholds: { value: number; color: string }[]): string => {
   const sorted = [...thresholds].sort((a, b) => b.value - a.value);
@@ -34,7 +47,7 @@ export const GaugePanel = ({ panel, timeRange, refetchInterval }: GaugePanelProp
       if (res.status !== 'success' || res.data === undefined || !('result' in res.data)) continue;
       const results = res.data.result;
       if (!Array.isArray(results) || results.length === 0) continue;
-      const first = results[0];
+      const [first] = results;
       if (typeof first !== 'object' || first === null) continue;
       if ('value' in first && Array.isArray(first.value) && first.value.length >= 2) {
         return Number(first.value[1]);
@@ -51,9 +64,11 @@ export const GaugePanel = ({ panel, timeRange, refetchInterval }: GaugePanelProp
   const max = panel.displayOptions.gauge?.max ?? 100;
   const showMarkers = panel.displayOptions.gauge?.showThresholdMarkers !== false;
 
-  const normalizedValue = value !== null ? Math.max(min, Math.min(max, value)) : min;
+  const normalizedValue = value === null ? min : Math.max(min, Math.min(max, value));
   const percentage = (normalizedValue - min) / (max - min);
   const angle = -90 + percentage * 180;
+
+  const handleRetry = useCallback(() => { void refetch(); }, [refetch]);
 
   const thresholdColor = value !== null && panel.thresholds.length > 0
     ? getThresholdColor(value, panel.thresholds)
@@ -85,33 +100,19 @@ export const GaugePanel = ({ panel, timeRange, refetchInterval }: GaugePanelProp
     return segments;
   }, [panel.thresholds, showMarkers, min, max]);
 
-  const describeArc = (startAngle: number, endAngle: number, radius: number): string => {
-    const startRad = (startAngle * Math.PI) / 180;
-    const endRad = (endAngle * Math.PI) / 180;
-    const cx = 100;
-    const cy = 100;
-    const x1 = cx + radius * Math.cos(startRad);
-    const y1 = cy + radius * Math.sin(startRad);
-    const x2 = cx + radius * Math.cos(endRad);
-    const y2 = cy + radius * Math.sin(endRad);
-    const largeArc = endAngle - startAngle > 180 ? 1 : 0;
-    return `M ${String(x1)} ${String(y1)} A ${String(radius)} ${String(radius)} 0 ${String(largeArc)} 1 ${String(x2)} ${String(y2)}`;
-  };
-
   return (
     <PanelFrame
       title={panel.title}
       loading={isLoading}
       error={error instanceof Error ? error.message : null}
-      onRetry={() => { void refetch(); }}
+      onRetry={handleRetry}
     >
-      <div
-        className='flex h-full flex-col items-center justify-center'
-        role='meter'
-        aria-valuemin={min}
-        aria-valuemax={max}
-        aria-valuenow={value ?? undefined}
-        aria-label={`${panel.title}: ${value !== null ? String(value) : 'no data'}`}
+      <meter
+        className='flex h-full flex-col items-center justify-center appearance-none [&::-webkit-meter-bar]:bg-transparent [&::-webkit-meter-optimum-value]:bg-transparent'
+        min={min}
+        max={max}
+        value={value ?? undefined}
+        aria-label={`${panel.title}: ${value === null ? 'no data' : String(value)}`}
       >
         <svg viewBox='0 0 200 130' className='w-full max-w-48'>
           {arcs.map((arc, i) => (
@@ -135,7 +136,7 @@ export const GaugePanel = ({ panel, timeRange, refetchInterval }: GaugePanelProp
             />
           )}
           <text x='100' y='105' textAnchor='middle' className='fill-foreground text-2xl font-semibold'>
-            {value !== null ? String(Math.round(value * 100) / 100) : '—'}
+            {value === null ? '—' : String(Math.round(value * 100) / 100)}
           </text>
           <text x='20' y='125' textAnchor='middle' className='fill-muted-foreground text-xs'>
             {String(min)}
@@ -144,7 +145,7 @@ export const GaugePanel = ({ panel, timeRange, refetchInterval }: GaugePanelProp
             {String(max)}
           </text>
         </svg>
-      </div>
+      </meter>
     </PanelFrame>
   );
 };

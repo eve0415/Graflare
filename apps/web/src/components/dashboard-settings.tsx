@@ -43,8 +43,10 @@ export const DashboardSettings = ({ open, onClose, title, description, tags, onS
     setDraftTags(e.target.value);
   }, []);
 
+  const handleOpenChange = useCallback((isOpen: boolean) => { if (!isOpen) onClose(); }, [onClose]);
+
   return (
-    <Dialog open={open} onOpenChange={isOpen => { if (!isOpen) onClose(); }}>
+    <Dialog open={open} onOpenChange={handleOpenChange}>
       <DialogContent className='max-w-md'>
         <DialogHeader>
           <DialogTitle>Dashboard Settings</DialogTitle>

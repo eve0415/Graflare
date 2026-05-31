@@ -62,8 +62,17 @@ export const PanelEditor = ({ panel, open, onClose, onSave }: PanelEditorProps) 
     onClose();
   }, [draft, onSave, onClose]);
 
+  const handleOpenChange = useCallback((isOpen: boolean) => { if (!isOpen) onClose(); }, [onClose]);
+
+  const handleThresholdChange = useCallback((index: number, field: 'value' | 'color', value: string) => {
+    const updated = draft.thresholds.map((th, j) =>
+      j === index ? Object.assign(th, { [field]: field === 'value' ? Number(value) : value }) : th,
+    );
+    updateField('thresholds', updated);
+  }, [draft.thresholds, updateField]);
+
   return (
-    <Sheet open={open} onOpenChange={open => { if (!open) onClose(); }}>
+    <Sheet open={open} onOpenChange={handleOpenChange}>
       <SheetContent className='w-[600px] overflow-y-auto sm:max-w-[600px]'>
         <SheetHeader>
           <SheetTitle>Edit Panel</SheetTitle>
@@ -125,12 +134,7 @@ export const PanelEditor = ({ panel, open, onClose, onSave }: PanelEditorProps) 
                 threshold={t}
                 index={i}
                 onRemove={removeThreshold}
-                onChange={(index, field, value) => {
-                  const updated = draft.thresholds.map((th, j) =>
-                    j === index ? Object.assign(th, { [field]: field === 'value' ? Number(value) : value }) : th,
-                  );
-                  updateField('thresholds', updated);
-                }}
+                onChange={handleThresholdChange}
               />
             ))}
           </div>
