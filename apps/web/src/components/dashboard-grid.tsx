@@ -1,14 +1,12 @@
 import type { Panel } from '@graflare/shared/schemas/panel';
 
 import { useMemo } from 'react';
-import ReactGridLayout from 'react-grid-layout';
+import RGL from 'react-grid-layout';
 import 'react-grid-layout/css/styles.css';
-
-const { Responsive, WidthProvider } = ReactGridLayout;
 
 import { PanelRenderer } from './panels/panel-renderer';
 
-const ResponsiveGridLayout = WidthProvider(Responsive);
+const ResponsiveGridLayout = RGL;
 
 interface DashboardGridProps {
   panels: Panel[];
@@ -51,10 +49,10 @@ export const DashboardGrid = ({ panels, timeRange, refreshInterval, editMode, on
 
   return (
     <ResponsiveGridLayout
-      layouts={{ lg: layout }}
-      breakpoints={{ lg: 1200, md: 996, sm: 768, xs: 480, xxs: 0 }}
-      cols={{ lg: COLS, md: 18, sm: 12, xs: 6, xxs: 3 }}
+      layout={layout}
+      cols={COLS}
       rowHeight={ROW_HEIGHT}
+      width={1200}
       isDraggable={editMode}
       isResizable={editMode}
       compactType='vertical'

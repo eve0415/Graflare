@@ -47,6 +47,17 @@ vi.mock('./lib/api', () => ({
   deleteFolder: () => Promise.resolve(),
 }));
 
+vi.mock('react-grid-layout', () => {
+  const MockGrid = ({ children }: { children: React.ReactNode }) => children;
+  return {
+    default: MockGrid,
+    Responsive: MockGrid,
+    WidthProvider: () => MockGrid,
+  };
+});
+
+vi.mock('react-grid-layout/css/styles.css', () => ({}));
+
 vi.mock('./lib/query-options', () => ({
   dashboardsQueryOptions: () => ({ queryKey: ['dashboards'], queryFn: () => Promise.resolve([]) }),
   dashboardQueryOptions: () => ({ queryKey: ['dashboard'], queryFn: () => Promise.resolve(null) }),
