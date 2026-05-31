@@ -27,11 +27,9 @@ const DashboardListPage = () => {
     <div className='space-y-6'>
       <div className='flex items-center justify-between'>
         <h1 className='text-2xl font-semibold tracking-tight'>Dashboards</h1>
-        <Button asChild>
-          <Link to='/dashboards/new'>
-            <Plus className='mr-2 h-4 w-4' />
-            New Dashboard
-          </Link>
+        <Button render={<Link to='/dashboards/new' />}>
+          <Plus className='mr-2 h-4 w-4' />
+          New Dashboard
         </Button>
       </div>
 

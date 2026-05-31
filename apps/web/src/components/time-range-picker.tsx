@@ -46,11 +46,9 @@ export const TimeRangePicker = ({ value, onChange }: TimeRangePickerProps) => {
 
   return (
     <Popover open={open} onOpenChange={setOpen}>
-      <PopoverTrigger asChild>
-        <Button variant='outline' size='sm' aria-label='Select time range'>
-          <Clock className='mr-2 h-3.5 w-3.5' />
-          {display}
-        </Button>
+      <PopoverTrigger render={<Button variant='outline' size='sm' aria-label='Select time range' />}>
+        <Clock className='mr-2 h-3.5 w-3.5' />
+        {display}
       </PopoverTrigger>
       <PopoverContent className='w-56 p-2' align='end'>
         <div className='text-muted-foreground mb-2 px-2 text-xs font-medium'>Quick ranges</div>
