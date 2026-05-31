@@ -60,7 +60,7 @@ export const StatPanel = ({ panel, timeRange, refetchInterval }: StatPanelProps)
   }), [textSize, colorMode, thresholdColor]);
 
   const bgStyle = useMemo(() => {
-    if (colorMode !== 'background' || thresholdColor === undefined) return undefined;
+    if (colorMode !== 'background' || thresholdColor === undefined) return;
     return { backgroundColor: thresholdColor, color: 'white' };
   }, [colorMode, thresholdColor]);
 

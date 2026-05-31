@@ -33,7 +33,7 @@ export const DashboardGrid = ({ panels, timeRange, refreshInterval, editMode, on
   );
 
   const handleLayoutChange = useMemo(() => {
-    if (onLayoutChange === undefined) return undefined;
+    if (onLayoutChange === undefined) return;
     return (newLayout: { i: string; x: number; y: number; w: number; h: number }[]) => {
       const updated = panels.map(p => {
         const layoutItem = newLayout.find(l => l.i === p.id);

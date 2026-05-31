@@ -1,6 +1,6 @@
 import type { Panel } from '@graflare/shared/schemas/panel';
 
-import { useSuspenseQuery, useQueryClient } from '@tanstack/react-query';
+import { useQueryClient, useSuspenseQuery } from '@tanstack/react-query';
 import { createFileRoute } from '@tanstack/react-router';
 import { useCallback, useMemo, useState } from 'react';
 

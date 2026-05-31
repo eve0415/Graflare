@@ -23,7 +23,7 @@ export const UPlotChart = ({ options, data, className }: UPlotChartProps) => {
       chart.destroy();
       chartRef.current = null;
     };
-  }, [options]);
+  }, [data, options]);
 
   useEffect(() => {
     const chart = chartRef.current;

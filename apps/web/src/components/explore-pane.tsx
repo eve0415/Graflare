@@ -85,8 +85,8 @@ export const ExplorePane = ({ timeRange, label }: ExplorePaneProps) => {
             result: result.data.result as typeof queryResult extends null ? never : NonNullable<typeof queryResult>['result'],
           });
         }
-      } catch (err) {
-        setError(err instanceof Error ? err.message : 'Query failed');
+      } catch (error) {
+        setError(error instanceof Error ? error.message : 'Query failed');
       } finally {
         setLoading(false);
       }
@@ -111,7 +111,7 @@ export const ExplorePane = ({ timeRange, label }: ExplorePaneProps) => {
     if (queryResult === null || queryResult.result.length === 0) return [[]];
 
     const firstSeries = queryResult.result[0];
-    if (firstSeries === undefined || firstSeries.values === undefined) return [[]];
+    if (firstSeries?.values === undefined) return [[]];
 
     const timestamps = firstSeries.values.map(v => v[0]);
     const series = queryResult.result.map(r =>

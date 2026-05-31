@@ -127,7 +127,7 @@ export const PanelEditor = ({ panel, open, onClose, onSave }: PanelEditorProps) 
                 onRemove={removeThreshold}
                 onChange={(index, field, value) => {
                   const updated = draft.thresholds.map((th, j) =>
-                    j === index ? { ...th, [field]: field === 'value' ? Number(value) : value } : th,
+                    j === index ? Object.assign(th, { [field]: field === 'value' ? Number(value) : value }) : th,
                   );
                   updateField('thresholds', updated);
                 }}

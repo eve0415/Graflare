@@ -124,8 +124,8 @@ const ImportPage = () => {
         if (result.dashboard !== null) {
           await navigate({ to: '/dashboards/$id', params: { id: result.dashboard.id } });
         }
-      } catch (err) {
-        setImportError(err instanceof Error ? err.message : 'Import failed');
+      } catch (error) {
+        setImportError(error instanceof Error ? error.message : 'Import failed');
       } finally {
         setImporting(false);
       }
@@ -161,7 +161,7 @@ const ImportPage = () => {
           accept='.json'
           className='hidden'
           onChange={handleFileUpload}
-          aria-hidden='true'
+          
         />
       </div>
 

@@ -1,9 +1,8 @@
 import { autocompletion } from '@codemirror/autocomplete';
-import { syntaxHighlighting } from '@codemirror/language';
 import { EditorState } from '@codemirror/state';
 import { EditorView, keymap, placeholder as placeholderExt } from '@codemirror/view';
 import { PromQLExtension } from '@prometheus-io/codemirror-promql';
-import { useCallback, useEffect, useRef } from 'react';
+import { useEffect, useRef } from 'react';
 
 interface PromQLEditorProps {
   value: string;
@@ -85,7 +84,7 @@ export const PromQLEditor = ({ value, onChange, onRun, placeholder }: PromQLEdit
       view.destroy();
       viewRef.current = null;
     };
-  }, []);
+  }, [placeholder, value]);
 
   useEffect(() => {
     const view = viewRef.current;

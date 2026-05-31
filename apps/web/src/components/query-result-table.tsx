@@ -1,5 +1,4 @@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@graflare/ui/components/table';
-import { useMemo } from 'react';
 
 interface QueryResultTableProps {
   data: {

@@ -1,7 +1,7 @@
 import type { Panel } from '@graflare/shared/schemas/panel';
 
 import { useMemo } from 'react';
-import uPlot from 'uplot';
+import type uPlot from 'uplot';
 
 import { QueryResultTable, formatPrometheusToTable } from '../query-result-table';
 import { UPlotChart } from '../uplot-chart';
@@ -45,7 +45,7 @@ export const TimeSeriesPanel = ({ panel, timeRange, refetchInterval, width, heig
     if (chartResult === null || chartResult.length === 0) return [[]];
 
     const first = chartResult[0];
-    if (first === undefined || first.values === undefined) return [[]];
+    if (first?.values === undefined) return [[]];
 
     const timestamps = first.values.map(v => v[0]);
     const series = chartResult.map(r => (r.values ?? []).map(v => Number(v[1])));
@@ -73,7 +73,7 @@ export const TimeSeriesPanel = ({ panel, timeRange, refetchInterval, width, heig
       plugins: sorted.length > 0 ? [{
         hooks: {
           drawSeries: (u: uPlot) => {
-            const ctx = u.ctx;
+            const {ctx} = u;
             for (const threshold of sorted) {
               const y = u.valToPos(threshold.value, 'y', true);
               ctx.save();
