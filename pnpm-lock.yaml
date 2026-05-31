@@ -137,6 +137,9 @@ importers:
       wrangler:
         specifier: 4.95.0
         version: 4.95.0(@cloudflare/workers-types@4.20260528.1)
+      zod:
+        specifier: 4.4.3
+        version: 4.4.3
 
   packages/shared:
     devDependencies:
