@@ -1,10 +1,18 @@
-import globalsCss from '@graflare/ui/globals.css?url';
+import type { QueryClient } from '@tanstack/react-query';
 /// <reference types="vite/client" />
-import { HeadContent, Link, Outlet, Scripts, createRootRoute } from '@tanstack/react-router';
+
+import { Separator } from '@graflare/ui/components/separator';
+import { SidebarInset, SidebarProvider, SidebarTrigger } from '@graflare/ui/components/sidebar';
+import globalsCss from '@graflare/ui/globals.css?url';
+import { HeadContent, Outlet, Scripts, createRootRouteWithContext } from '@tanstack/react-router';
 import { TanStackRouterDevtools } from '@tanstack/react-router-devtools';
+import { Suspense } from 'react';
+
+import { AppSidebar } from '../components/app-sidebar';
+import { ThemeProvider } from '../components/theme-provider';
 
 const bodyStyle = { fontFamily: 'Geist, sans-serif' };
-const navActiveProps = { className: 'text-foreground' };
+const fallback = <div className='text-muted-foreground p-4'>Loading...</div>;
 
 const RootComponent = () => (
   <html lang='en'>
@@ -12,28 +20,30 @@ const RootComponent = () => (
       <HeadContent />
     </head>
     <body className='bg-background text-foreground min-h-screen antialiased' style={bodyStyle}>
-      <header className='border-border border-b'>
-        <div className='mx-auto flex h-12 max-w-5xl items-center gap-4 px-4'>
-          <Link to='/' className='text-sm font-semibold'>
-            Graflare
-          </Link>
-          <nav className='flex gap-3'>
-            <Link to='/datasources' className='text-muted-foreground hover:text-foreground text-sm' activeProps={navActiveProps}>
-              Data Sources
-            </Link>
-          </nav>
-        </div>
-      </header>
-      <main className='mx-auto max-w-5xl px-4 py-6'>
-        <Outlet />
-      </main>
+      <ThemeProvider>
+        <SidebarProvider>
+          <AppSidebar />
+          <SidebarInset>
+            <header className='flex h-12 shrink-0 items-center gap-2 border-b px-4'>
+              <SidebarTrigger className='-ml-1' />
+              <Separator orientation='vertical' className='mr-2 !h-4' />
+              <span className='text-sm font-semibold'>Graflare</span>
+            </header>
+            <main className='flex-1 p-6'>
+              <Suspense fallback={fallback}>
+                <Outlet />
+              </Suspense>
+            </main>
+          </SidebarInset>
+        </SidebarProvider>
+      </ThemeProvider>
       <TanStackRouterDevtools position='bottom-right' />
       <Scripts />
     </body>
   </html>
 );
 
-export const Route = createRootRoute({
+export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()({
   head: () => ({
     meta: [{ charSet: 'utf8' }, { name: 'viewport', content: 'width=device-width, initial-scale=1' }, { title: 'Graflare' }],
     links: [

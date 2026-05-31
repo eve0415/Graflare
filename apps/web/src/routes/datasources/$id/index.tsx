@@ -1,12 +1,14 @@
 import { datasourceAuthType, datasourceType } from '@graflare/shared/schemas/datasource';
+import { useSuspenseQuery } from '@tanstack/react-query';
 import { createFileRoute } from '@tanstack/react-router';
 import { useMemo } from 'react';
 
 import { DatasourceForm } from '../-components/datasource-form';
-import { getDatasource } from '../../../lib/api';
+import { datasourceQueryOptions } from '../../../lib/query-options';
 
 const EditDatasourcePage = () => {
-  const ds = Route.useLoaderData();
+  const { id } = Route.useParams();
+  const { data: ds } = useSuspenseQuery(datasourceQueryOptions(id));
 
   const initialData = useMemo(
     () =>
@@ -31,6 +33,6 @@ const EditDatasourcePage = () => {
 };
 
 export const Route = createFileRoute('/datasources/$id/')({
-  loader: ({ params }) => getDatasource({ data: params.id }),
+  loader: ({ params, context }) => context.queryClient.ensureQueryData(datasourceQueryOptions(params.id)),
   component: EditDatasourcePage,
 });
