@@ -67,19 +67,16 @@ export const interpolateVariables = (
 			}
 
 			// bare: $name  (word chars: [A-Za-z0-9_])
-			let end = i + 1;
-			while (end < expr.length && isWordChar(expr[end])) {
-				end++;
-			}
-
-			if (end === i + 1) {
+			const match = /^\w+/.exec(expr.slice(i + 1));
+			if (match === null) {
 				// lone $ with no identifier following
 				result += ch;
 				i++;
 				continue;
 			}
 
-			const name = expr.slice(i + 1, end);
+			const name = match[0];
+			const end = i + 1 + name.length;
 			const value = variables.get(name);
 			if (value === undefined) {
 				result += expr.slice(i, end);
@@ -96,16 +93,4 @@ export const interpolateVariables = (
 	}
 
 	return result;
-};
-
-const isWordChar = (ch: string | undefined): boolean => {
-	if (ch === undefined) return false;
-	const c = ch.codePointAt(0);
-	if (c === undefined) return false;
-	return (
-		(c >= 48 && c <= 57) || // 0-9
-		(c >= 65 && c <= 90) || // A-Z
-		(c >= 97 && c <= 122) || // a-z
-		c === 95 // _
-	);
 };
