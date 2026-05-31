@@ -53,4 +53,61 @@ describe('routes', () => {
       expect(screen.getByRole('heading', { name: 'Query Test' })).toBeDefined();
     });
   });
+
+  it('renders dashboard list at /dashboards', async () => {
+    await renderWithRouter('/dashboards');
+    await waitFor(() => {
+      expect(screen.getByRole('heading', { name: 'Dashboards' })).toBeDefined();
+    });
+  });
+
+  it('renders empty state when no dashboards exist', async () => {
+    await renderWithRouter('/dashboards');
+    await waitFor(() => {
+      expect(screen.getByText('No dashboards yet')).toBeDefined();
+    });
+  });
+
+  it('renders new dashboard form at /dashboards/new', async () => {
+    await renderWithRouter('/dashboards/new');
+    await waitFor(() => {
+      expect(screen.getByRole('heading', { name: 'New Dashboard' })).toBeDefined();
+      expect(screen.getByLabelText('Title')).toBeDefined();
+    });
+  });
+
+  it('renders dashboard not found at /dashboards/:id', async () => {
+    await renderWithRouter('/dashboards/test-id-123');
+    await waitFor(() => {
+      expect(screen.getByText('Dashboard not found.')).toBeDefined();
+    });
+  });
+
+  it('renders import page at /import', async () => {
+    await renderWithRouter('/import');
+    await waitFor(() => {
+      expect(screen.getByRole('heading', { name: 'Import Dashboard' })).toBeDefined();
+    });
+  });
+
+  it('renders import file upload area', async () => {
+    await renderWithRouter('/import');
+    await waitFor(() => {
+      expect(screen.getByText('Drop a JSON file here or click to upload')).toBeDefined();
+    });
+  });
+
+  it('renders explore page at /explore', async () => {
+    await renderWithRouter('/explore');
+    await waitFor(() => {
+      expect(screen.getByRole('heading', { name: 'Explore' })).toBeDefined();
+    });
+  });
+
+  it('renders search input on dashboard list', async () => {
+    await renderWithRouter('/dashboards');
+    await waitFor(() => {
+      expect(screen.getByLabelText('Search dashboards')).toBeDefined();
+    });
+  });
 });
