@@ -1,5 +1,5 @@
 import { Badge } from '@graflare/ui/components/badge';
-import { Button } from '@graflare/ui/components/button';
+import { buttonVariants } from '@graflare/ui/components/button';
 import { Input } from '@graflare/ui/components/input';
 import { useSuspenseQuery } from '@tanstack/react-query';
 import { Link, createFileRoute } from '@tanstack/react-router';
@@ -27,10 +27,10 @@ const DashboardListPage = () => {
     <div className='space-y-6'>
       <div className='flex items-center justify-between'>
         <h1 className='text-2xl font-semibold tracking-tight'>Dashboards</h1>
-        <Button render={<Link to='/dashboards/new' />}>
+        <Link to='/dashboards/new' className={buttonVariants()}>
           <Plus className='mr-2 h-4 w-4' />
           New Dashboard
-        </Button>
+        </Link>
       </div>
 
       <div className='relative'>
