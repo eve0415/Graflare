@@ -140,6 +140,7 @@ dist
 
 # Cloudflare Workers
 .wrangler/
+.localflare/
 .dev.vars
 worker-configuration.d.ts
 

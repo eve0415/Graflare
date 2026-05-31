@@ -9,7 +9,8 @@
     ]
   },
   "scripts": {
-    "dev": "wrangler dev",
+    "dev": "localflare wrangler.json --no-open",
+    "db:migrate:local": "wrangler d1 migrations apply graflare --local",
     "build": "wrangler deploy --dry-run --outdir dist",
     "test": "vitest run",
     "generate": "wrangler types && drizzle-kit generate",

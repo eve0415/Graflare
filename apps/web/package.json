@@ -17,7 +17,7 @@
     "clean": "rm -rf dist .output .vinxi"
   },
   "devDependencies": {
-    "@cloudflare/vite-plugin": "1.37.2",
+    "@cloudflare/vite-plugin": "1.39.0",
     "@graflare/shared": "workspace:*",
     "@graflare/ui": "workspace:*",
     "@rolldown/plugin-babel": "0.2.3",

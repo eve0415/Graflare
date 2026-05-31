@@ -8,7 +8,8 @@
     {
       "binding": "DB",
       "database_name": "graflare",
-      "database_id": "placeholder-create-via-wrangler"
+      "database_id": "placeholder-create-via-wrangler",
+      "migrations_dir": "drizzle"
     }
   ],
   "observability": {
