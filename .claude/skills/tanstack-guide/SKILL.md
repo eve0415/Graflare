@@ -125,7 +125,50 @@ const handleSave = useCallback(async () => {
 For mutations that affect list views, use `router.invalidate()` instead of targeted key
 invalidation.
 
-### Pending states
+### Error boundaries
+
+Three layers handle errors:
+
+| Layer | Handles | Mechanism |
+|-------|---------|-----------|
+| Router `defaultErrorComponent` | Loader rejections | `RouteError` in `createRouter()` config |
+| `QueryBoundary` | Component-level suspense query errors | `QueryErrorResetBoundary` + `react-error-boundary` + `<Suspense>` |
+| `panel-frame.tsx` | Panel data polling errors | `useQuery` error prop (manual) |
+
+`QueryBoundary` composes `QueryErrorResetBoundary` > `ErrorBoundary` > `<Suspense>`. Use it
+around any component that calls `useSuspenseQuery` outside a route loader:
+
+```tsx
+<QueryBoundary pendingFallback={<MySkeleton />}>
+  <ComponentWithSuspenseQuery />
+</QueryBoundary>
+```
+
+Routes with loaders use `pendingComponent` instead (the router manages pending/error):
+
+```ts
+export const Route = createFileRoute('/dashboards/')({
+  loader: ({ context }) => context.queryClient.ensureQueryData(dashboardsQueryOptions()),
+  pendingComponent: DashboardListSkeleton,
+  component: DashboardListPage,
+});
+```
+
+### Pending states taxonomy
+
+| Context | Pending handler | Error handler |
+|---------|-----------------|---------------|
+| Route with loader | `pendingComponent` on route config | Router `defaultErrorComponent` |
+| Component with `useSuspenseQuery` (no loader) | `QueryBoundary` Suspense | `QueryBoundary` ErrorBoundary |
+| Panel data polling | `panel-frame.tsx` props | `panel-frame.tsx` props |
+| Mutations | Manual `useState(false)` | Manual try/catch |
+
+### Skeleton convention
+
+Skeleton components live in `apps/web/src/components/skeletons/`. Each matches the layout
+shape of the page it represents using `<Skeleton>` from `@graflare/ui/components/skeleton`.
+
+### Mutation pending states
 
 Manual `useState` — no `useMutation`, no `useTransition`:
 
@@ -157,13 +200,20 @@ useQuery({
 ```ts
 // apps/web/src/router.tsx
 const queryClient = new QueryClient({
-  defaultOptions: { queries: { staleTime: 30_000 } },
+  defaultOptions: {
+    queries: {
+      staleTime: 30_000,
+      retry: 3,
+      retryDelay: (attemptIndex: number) => Math.min(1000 * 2 ** attemptIndex, 30_000),
+    },
+  },
 });
 
 const router = createRouter({
   routeTree,
   context: { queryClient },
   defaultPreload: 'intent',
+  defaultErrorComponent: RouteError,
   scrollRestoration: true,
 });
 
