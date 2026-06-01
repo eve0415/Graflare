@@ -1,11 +1,11 @@
-import type { AppEnv } from '../index';
+import type { AppEnv } from '../../index';
 
 import { env } from 'cloudflare:workers';
 import { Hono } from 'hono';
 import { beforeEach, describe, expect, it } from 'vitest';
 
-import { createDb } from '../db';
-import { dashboardVersions, dashboards, folders, organizations } from '../db/schema';
+import { createDb } from '../../db';
+import { dashboardVersions, dashboards, folders, organizations } from '../../db/schema';
 
 import { folderRoutes } from './folders';
 

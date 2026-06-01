@@ -23,7 +23,7 @@ import { dashboardVersionRoutes } from './routes/dashboards/dashboard-versions';
 import { dashboardRoutes } from './routes/dashboards/dashboards';
 import { datasourceRoutes } from './routes/datasources/datasources';
 import { datasourceTestRoutes } from './routes/datasources/datasources-test';
-import { folderRoutes } from './routes/folders';
+import { folderRoutes } from './routes/folders/folders';
 import { proxyRoutes } from './routes/datasources/proxy';
 
 interface Bindings {
