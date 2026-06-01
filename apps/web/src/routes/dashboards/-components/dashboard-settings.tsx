@@ -9,7 +9,7 @@ import { useCallback, useState } from 'react';
 
 import { restoreDashboardVersion } from '../-api';
 import { dashboardVersionsQueryOptions } from '../-queries';
-import { QueryBoundary } from '../../../components/query-boundary';
+import { QueryBoundary } from '../../-root/query-boundary';
 import { VersionHistorySkeleton } from './version-history-skeleton';
 
 const versionHistoryFallback = <VersionHistorySkeleton />;

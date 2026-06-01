@@ -4,7 +4,7 @@ import { Separator } from '@graflare/ui/components/separator';
 import { Pencil, RefreshCw, Save, Settings } from 'lucide-react';
 import { useCallback } from 'react';
 
-import { TimeRangePicker } from '../../../components/time-range-picker';
+import { TimeRangePicker } from '../../-root/time-range-picker';
 
 interface TimeRange {
   from: string;

@@ -2,7 +2,7 @@ import { QueryClient } from '@tanstack/react-query';
 import { createRouter } from '@tanstack/react-router';
 import { setupRouterSsrQueryIntegration } from '@tanstack/react-router-ssr-query';
 
-import { RouteError } from './components/route-error';
+import { RouteError } from './routes/-root/route-error';
 import { routeTree } from './routeTree.gen';
 
 export const getRouter = () => {

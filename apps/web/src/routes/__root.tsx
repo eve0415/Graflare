@@ -7,9 +7,9 @@ import rootCss from './__root.css?url';
 import { HeadContent, Outlet, Scripts, createRootRouteWithContext } from '@tanstack/react-router';
 import { TanStackRouterDevtools } from '@tanstack/react-router-devtools';
 
-import { AppSidebar } from '../components/app-sidebar';
-import { QueryBoundary } from '../components/query-boundary';
-import { ThemeProvider } from '../components/theme-provider';
+import { AppSidebar } from './-root/app-sidebar';
+import { QueryBoundary } from './-root/query-boundary';
+import { ThemeProvider } from './-root/theme-provider';
 
 const bodyStyle = { fontFamily: 'Geist, sans-serif' };
 const rootFallback = <Skeleton className='h-64 w-full rounded-lg' />;

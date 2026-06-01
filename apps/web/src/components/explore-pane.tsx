@@ -11,8 +11,8 @@ import { datasourcesQueryOptions } from '../routes/datasources/-queries';
 import type { Options as UPlotOptions } from 'uplot';
 
 import { PromQLEditor } from './promql-editor';
-import { QueryResultTable, formatPrometheusToTable } from './query-result-table';
-import { UPlotChart } from './uplot-chart';
+import { QueryResultTable, formatPrometheusToTable } from '../routes/-root/query-result-table';
+import { UPlotChart } from '../routes/-root/uplot-chart';
 
 interface TimeRange {
   from: string;

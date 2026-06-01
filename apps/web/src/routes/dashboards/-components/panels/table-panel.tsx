@@ -2,7 +2,7 @@ import type { Panel } from '@graflare/shared/schemas/panel';
 
 import { useCallback, useMemo } from 'react';
 
-import { QueryResultTable, formatPrometheusToTable } from '../../../../components/query-result-table';
+import { QueryResultTable, formatPrometheusToTable } from '../../../-root/query-result-table';
 
 import { PanelFrame } from './panel-frame';
 import { usePanelData } from './use-panel-data';
