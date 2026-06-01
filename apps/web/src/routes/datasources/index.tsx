@@ -7,7 +7,7 @@ import { useMemo, useState } from 'react';
 
 import { DatasourceListSkeleton } from '../../components/skeletons/datasource-list-skeleton';
 import { deleteDatasource } from './-api';
-import { datasourcesQueryOptions } from '../../lib/query-options';
+import { datasourcesQueryOptions } from './-queries';
 
 const DatasourceListPage = () => {
   const { data: datasources } = useSuspenseQuery(datasourcesQueryOptions());

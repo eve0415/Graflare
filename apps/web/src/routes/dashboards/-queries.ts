@@ -1,7 +1,6 @@
 import { queryOptions } from '@tanstack/react-query';
 
-import { getDashboard, listDashboardVersions, listDashboards, listFolders } from '../routes/dashboards/-api';
-import { getDatasource, listDatasources } from '../routes/datasources/-api';
+import { getDashboard, listDashboardVersions, listDashboards, listFolders } from './-api';
 
 export const dashboardsQueryOptions = () =>
   queryOptions({
@@ -19,18 +18,6 @@ export const dashboardVersionsQueryOptions = (dashboardId: string) =>
   queryOptions({
     queryKey: ['dashboard-versions', dashboardId],
     queryFn: () => listDashboardVersions({ data: dashboardId }),
-  });
-
-export const datasourcesQueryOptions = () =>
-  queryOptions({
-    queryKey: ['datasources'],
-    queryFn: () => listDatasources(),
-  });
-
-export const datasourceQueryOptions = (id: string) =>
-  queryOptions({
-    queryKey: ['datasource', id],
-    queryFn: () => getDatasource({ data: id }),
   });
 
 export const foldersQueryOptions = () =>

@@ -62,11 +62,14 @@ vi.mock('react-grid-layout', () => ({
 
 vi.mock('react-grid-layout/css/styles.css', () => ({}));
 
-vi.mock('../src/lib/query-options', () => ({
+vi.mock('../src/routes/dashboards/-queries', () => ({
   dashboardsQueryOptions: () => ({ queryKey: ['dashboards'], queryFn: () => Promise.resolve([]) }),
   dashboardQueryOptions: () => ({ queryKey: ['dashboard'], queryFn: () => Promise.resolve(null) }),
   dashboardVersionsQueryOptions: () => ({ queryKey: ['versions'], queryFn: () => Promise.resolve([]) }),
+  foldersQueryOptions: () => ({ queryKey: ['folders'], queryFn: () => Promise.resolve([]) }),
+}));
+
+vi.mock('../src/routes/datasources/-queries', () => ({
   datasourcesQueryOptions: () => ({ queryKey: ['datasources'], queryFn: () => Promise.resolve([]) }),
   datasourceQueryOptions: () => ({ queryKey: ['datasource'], queryFn: () => Promise.resolve(null) }),
-  foldersQueryOptions: () => ({ queryKey: ['folders'], queryFn: () => Promise.resolve([]) }),
 }));

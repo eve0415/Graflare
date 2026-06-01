@@ -5,7 +5,7 @@ import { useMemo } from 'react';
 
 import { DatasourceEditSkeleton } from '../../../components/skeletons/datasource-edit-skeleton';
 import { DatasourceForm } from '../-components/datasource-form';
-import { datasourceQueryOptions } from '../../../lib/query-options';
+import { datasourceQueryOptions } from '../-queries';
 
 const EditDatasourcePage = () => {
   const { id } = Route.useParams();

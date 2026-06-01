@@ -7,7 +7,7 @@ import { Plus, Search } from 'lucide-react';
 import { useCallback, useMemo, useState } from 'react';
 
 import { DashboardListSkeleton } from '../../components/skeletons/dashboard-list-skeleton';
-import { dashboardsQueryOptions } from '../../lib/query-options';
+import { dashboardsQueryOptions } from './-queries';
 
 const DashboardListPage = () => {
   const { data: dashboards } = useSuspenseQuery(dashboardsQueryOptions());

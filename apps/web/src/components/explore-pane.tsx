@@ -6,7 +6,7 @@ import { BarChart3, Play, Table2 } from 'lucide-react';
 import { Suspense, useCallback, useMemo, useState } from 'react';
 
 import { proxyQuery } from '../lib/proxy';
-import { datasourcesQueryOptions } from '../lib/query-options';
+import { datasourcesQueryOptions } from '../routes/datasources/-queries';
 
 import type { Options as UPlotOptions } from 'uplot';
 
