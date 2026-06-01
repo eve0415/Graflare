@@ -21,10 +21,10 @@ import { orgMiddleware } from './middleware/org';
 import { dashboardImportRoutes } from './routes/dashboards/dashboard-import';
 import { dashboardVersionRoutes } from './routes/dashboards/dashboard-versions';
 import { dashboardRoutes } from './routes/dashboards/dashboards';
-import { datasourceRoutes } from './routes/datasources';
-import { datasourceTestRoutes } from './routes/datasources-test';
+import { datasourceRoutes } from './routes/datasources/datasources';
+import { datasourceTestRoutes } from './routes/datasources/datasources-test';
 import { folderRoutes } from './routes/folders';
-import { proxyRoutes } from './routes/proxy';
+import { proxyRoutes } from './routes/datasources/proxy';
 
 interface Bindings {
   DB: D1Database;

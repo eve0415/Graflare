@@ -1,4 +1,4 @@
-import type { AppEnv } from '../index';
+import type { AppEnv } from '../../index';
 
 import { createDatasourceSchema, updateDatasourceSchema } from '@graflare/shared/schemas/datasource';
 import { datasourceIdParamSchema } from '@graflare/shared/schemas/proxy';
@@ -6,10 +6,10 @@ import { sValidator } from '@hono/standard-validator';
 import { and, eq } from 'drizzle-orm';
 import { Hono } from 'hono';
 
-import { encryptCredentials } from '../crypto/credentials';
-import { createDb } from '../db';
-import { datasources } from '../db/schema';
-import { onValidationError } from '../middleware/validate';
+import { encryptCredentials } from '../../crypto/credentials';
+import { createDb } from '../../db';
+import { datasources } from '../../db/schema';
+import { onValidationError } from '../../middleware/validate';
 
 const app = new Hono<AppEnv>();
 

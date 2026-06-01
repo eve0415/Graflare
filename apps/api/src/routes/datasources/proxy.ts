@@ -1,4 +1,4 @@
-import type { AppEnv } from '../index';
+import type { AppEnv } from '../../index';
 import type { DatasourceCredentials } from '@graflare/shared/schemas/datasource';
 
 import { datasourceAuthType, datasourceCredentialsSchema } from '@graflare/shared/schemas/datasource';
@@ -7,11 +7,11 @@ import { sValidator } from '@hono/standard-validator';
 import { and, eq } from 'drizzle-orm';
 import { Hono } from 'hono';
 
-import { decryptCredentials } from '../crypto/credentials';
-import { createDb } from '../db';
-import { datasources } from '../db/schema';
-import { onValidationError } from '../middleware/validate';
-import { PrometheusClient } from '../prometheus/client';
+import { decryptCredentials } from '../../crypto/credentials';
+import { createDb } from '../../db';
+import { datasources } from '../../db/schema';
+import { onValidationError } from '../../middleware/validate';
+import { PrometheusClient } from '../../prometheus/client';
 
 const app = new Hono<AppEnv>();
 

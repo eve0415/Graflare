@@ -1,4 +1,4 @@
-import type { AppEnv } from '../index';
+import type { AppEnv } from '../../index';
 
 import { env } from 'cloudflare:workers';
 import { Hono } from 'hono';
