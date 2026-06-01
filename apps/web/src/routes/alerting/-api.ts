@@ -45,7 +45,7 @@ export const deleteAlertRuleGroup = createServerFn({ method: 'POST' })
     await env.API.deleteAlertRuleGroup('default', id);
   });
 
-export const listAlertRules = createServerFn({ method: 'GET' }).handler(async () => {
+export const listAlertRules = createServerFn({ method: 'GET' }).handler(() => {
   const rows =  env.API.listAlertRules('default');
   return rows.map(r => ({
     id: r.id, orgId: r.orgId, groupId: r.groupId, title: r.title, queries: r.queries,
@@ -100,7 +100,7 @@ export const listAlertInstances = createServerFn({ method: 'GET' })
     }));
   });
 
-export const listContactPoints = createServerFn({ method: 'GET' }).handler(async () => {
+export const listContactPoints = createServerFn({ method: 'GET' }).handler(() => {
   const rows =  env.API.listContactPoints('default');
   return rows.map(r => ({ id: r.id, orgId: r.orgId, name: r.name, type: r.type, settings: r.settings, createdAt: r.createdAt, updatedAt: r.updatedAt }));
 });
@@ -135,7 +135,7 @@ export const deleteContactPoint = createServerFn({ method: 'POST' })
     await env.API.deleteContactPoint('default', id);
   });
 
-export const listNotificationPolicies = createServerFn({ method: 'GET' }).handler(async () => {
+export const listNotificationPolicies = createServerFn({ method: 'GET' }).handler(() => {
   const rows =  env.API.listNotificationPolicies('default');
   return rows.map(r => ({
     id: r.id, orgId: r.orgId, parentId: r.parentId, contactPointId: r.contactPointId,
@@ -167,7 +167,7 @@ export const deleteNotificationPolicy = createServerFn({ method: 'POST' })
     await env.API.deleteNotificationPolicy('default', id);
   });
 
-export const listSilences = createServerFn({ method: 'GET' }).handler(async () => {
+export const listSilences = createServerFn({ method: 'GET' }).handler(() => {
   const rows =  env.API.listSilences('default');
   return rows.map(r => ({
     id: r.id, orgId: r.orgId, matchers: r.matchers, startsAt: r.startsAt,
@@ -205,7 +205,7 @@ export const deleteSilence = createServerFn({ method: 'POST' })
     await env.API.deleteSilence('default', id);
   });
 
-export const listMuteTimings = createServerFn({ method: 'GET' }).handler(async () => {
+export const listMuteTimings = createServerFn({ method: 'GET' }).handler(() => {
   const rows =  env.API.listMuteTimings('default');
   return rows.map(r => ({ id: r.id, orgId: r.orgId, name: r.name, intervals: r.intervals, createdAt: r.createdAt, updatedAt: r.updatedAt }));
 });

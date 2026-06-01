@@ -1,4 +1,4 @@
-import type { LabelMatcher, MuteTimeInterval } from '@graflare/shared/schemas/alerting';
+import type { LabelMatcher } from '@graflare/shared/schemas/alerting';
 
 import { matchLabels } from '@graflare/shared/alerting/matchers';
 import { isMuted } from '@graflare/shared/alerting/mute-check';

@@ -1,5 +1,4 @@
 import type { AlertCondition, AlertInstanceState, AlertQuery, ExecErrState, NoDataState } from '@graflare/shared/schemas/alerting';
-import type { PrometheusQueryData } from '@graflare/shared/schemas/prometheus';
 
 import { evaluateCondition } from '@graflare/shared/alerting/evaluate';
 import { DurableObject } from 'cloudflare:workers';
