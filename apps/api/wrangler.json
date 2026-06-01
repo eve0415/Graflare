@@ -12,6 +12,32 @@
       "migrations_dir": "drizzle"
     }
   ],
+  "durable_objects": {
+    "bindings": [
+      {
+        "name": "ALERT_RULE",
+        "class_name": "AlertRuleDO"
+      }
+    ]
+  },
+  "migrations": [
+    {
+      "tag": "v1",
+      "new_sqlite_classes": ["AlertRuleDO"]
+    }
+  ],
+  "workflows": [
+    {
+      "name": "notification-workflow",
+      "binding": "NOTIFICATION_WORKFLOW",
+      "class_name": "NotificationWorkflow"
+    }
+  ],
+  "send_email": [
+    {
+      "name": "EMAIL"
+    }
+  ],
   "observability": {
     "enabled": true
   }

@@ -40,6 +40,10 @@ import { WorkerEntrypoint } from 'cloudflare:workers';
 import { and, desc, eq, gte, like, lte } from 'drizzle-orm';
 import { Hono } from 'hono';
 
+import type { DurableObjectNamespace } from 'cloudflare:workers';
+
+import type { AlertRuleDO } from './alerting/alert-rule-do';
+
 import { decryptCredentials, encryptCredentials } from './crypto/credentials';
 import { createDb } from './db';
 import {
@@ -79,6 +83,9 @@ interface Bindings {
   ENCRYPTION_KEY: string;
   ACCESS_TEAM_DOMAIN: string;
   ACCESS_AUD: string;
+  ALERT_RULE: DurableObjectNamespace<AlertRuleDO>;
+  NOTIFICATION_WORKFLOW: Workflow;
+  EMAIL: SendEmail;
 }
 
 export interface AppEnv {
@@ -750,6 +757,25 @@ export class GraflareAPI extends WorkerEntrypoint<Bindings> {
       updatedAt: now,
     });
 
+    if (!(parsed.isPaused ?? false)) {
+      const group = await this.getAlertRuleGroup(orgId, parsed.groupId);
+      if (group !== null) {
+        const stub = this.env.ALERT_RULE.getByName(id);
+        await stub.init({
+          orgId,
+          ruleId: id,
+          queries: parsed.queries,
+          condition: parsed.condition,
+          evalIntervalS: group.evalIntervalS,
+          forDurationS: parsed.forDurationS ?? 0,
+          noDataState: parsed.noDataState ?? 'Alerting',
+          execErrState: parsed.execErrState ?? 'Alerting',
+          labels: parsed.labels ?? {},
+          annotations: parsed.annotations ?? {},
+        });
+      }
+    }
+
     return this.getAlertRule(orgId, id);
   }
 
@@ -780,6 +806,8 @@ export class GraflareAPI extends WorkerEntrypoint<Bindings> {
 
   async deleteAlertRule(orgId: string, id: string): Promise<void> {
     alertRuleIdSchema.parse(id);
+    const stub = this.env.ALERT_RULE.getByName(id);
+    await stub.stop();
     await this.db.delete(alertRules).where(and(eq(alertRules.id, id), eq(alertRules.orgId, orgId)));
   }
 
@@ -1138,3 +1166,6 @@ export class GraflareAPI extends WorkerEntrypoint<Bindings> {
     await this.db.delete(annotations).where(and(eq(annotations.id, id), eq(annotations.orgId, orgId)));
   }
 }
+
+export { AlertRuleDO } from './alerting/alert-rule-do';
+export { NotificationWorkflow } from './alerting/notification-workflow';
