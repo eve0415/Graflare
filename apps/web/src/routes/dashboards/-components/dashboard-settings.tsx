@@ -7,10 +7,10 @@ import { useSuspenseQuery } from '@tanstack/react-query';
 import { History, RotateCcw } from 'lucide-react';
 import { useCallback, useState } from 'react';
 
-import { restoreDashboardVersion } from '../routes/dashboards/-api';
-import { dashboardVersionsQueryOptions } from '../routes/dashboards/-queries';
-import { QueryBoundary } from './query-boundary';
-import { VersionHistorySkeleton } from './skeletons/version-history-skeleton';
+import { restoreDashboardVersion } from '../-api';
+import { dashboardVersionsQueryOptions } from '../-queries';
+import { QueryBoundary } from '../../../components/query-boundary';
+import { VersionHistorySkeleton } from './version-history-skeleton';
 
 const versionHistoryFallback = <VersionHistorySkeleton />;
 

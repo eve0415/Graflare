@@ -9,12 +9,12 @@ import { createFileRoute } from '@tanstack/react-router';
 import { Plus } from 'lucide-react';
 import { useCallback, useMemo, useState } from 'react';
 
-import { DashboardGrid } from '../../../components/dashboard-grid';
-import { DashboardSettings } from '../../../components/dashboard-settings';
-import { DashboardToolbar } from '../../../components/dashboard-toolbar';
-import { DashboardViewSkeleton } from '../../../components/skeletons/dashboard-view-skeleton';
-import { PanelEditor } from '../../../components/panel-editor';
-import { VariableBar } from '../../../components/variable-bar';
+import { DashboardGrid } from '../-components/dashboard-grid';
+import { DashboardSettings } from '../-components/dashboard-settings';
+import { DashboardToolbar } from '../-components/dashboard-toolbar';
+import { DashboardViewSkeleton } from '../-components/dashboard-view-skeleton';
+import { PanelEditor } from '../-components/panel-editor';
+import { VariableBar } from '../-components/variable-bar';
 import { updateDashboard } from '../-api';
 import { dashboardQueryOptions } from '../-queries';
 
