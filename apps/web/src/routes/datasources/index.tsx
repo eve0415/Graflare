@@ -1,13 +1,16 @@
 import { Badge } from '@graflare/ui/components/badge';
 import { Button } from '@graflare/ui/components/button';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@graflare/ui/components/table';
+import { useSuspenseQuery } from '@tanstack/react-query';
 import { Link, createFileRoute, useRouter } from '@tanstack/react-router';
 import { useMemo, useState } from 'react';
 
-import { deleteDatasource, listDatasources } from '../../lib/api';
+import { DatasourceListSkeleton } from '../../components/skeletons/datasource-list-skeleton';
+import { deleteDatasource } from '../../lib/api';
+import { datasourcesQueryOptions } from '../../lib/query-options';
 
 const DatasourceListPage = () => {
-  const datasources = Route.useLoaderData();
+  const { data: datasources } = useSuspenseQuery(datasourcesQueryOptions());
   const router = useRouter();
   const [deleting, setDeleting] = useState<string | null>(null);
 
@@ -94,6 +97,7 @@ const DatasourceListPage = () => {
 };
 
 export const Route = createFileRoute('/datasources/')({
-  loader: () => listDatasources(),
+  loader: ({ context }) => context.queryClient.ensureQueryData(datasourcesQueryOptions()),
+  pendingComponent: DatasourceListSkeleton,
   component: DatasourceListPage,
 });
