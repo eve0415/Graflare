@@ -1,0 +1,151 @@
+import type { AppEnv } from '../../index';
+
+import { env } from 'cloudflare:workers';
+import { Hono } from 'hono';
+import { beforeEach, describe, expect, it } from 'vitest';
+
+import { createDb } from '../../db';
+import { alertRuleGroups, alertRules, organizations } from '../../db/schema';
+
+import { alertRuleRoutes } from './alert-rules';
+
+const TEST_ORG_ID = 'org-test-123';
+
+const testBindings: AppEnv['Bindings'] = {
+  DB: env.DB,
+  ENCRYPTION_KEY: btoa(String.fromCodePoint(...crypto.getRandomValues(new Uint8Array(32)))),
+  ACCESS_TEAM_DOMAIN: 'test-team',
+  ACCESS_AUD: 'test-aud',
+};
+
+const createApp = () => {
+  const app = new Hono<AppEnv>();
+  app.use('/*', async (c, next) => {
+    c.set('orgId', TEST_ORG_ID);
+    c.set('user', { email: 'test@example.com', name: 'Test' });
+    await next();
+  });
+  app.route('/', alertRuleRoutes);
+  return app;
+};
+
+const req = (path: string, init?: RequestInit) => new Request(`http://localhost${path}`, init);
+
+const json = (body: unknown): RequestInit => ({
+  method: 'POST',
+  headers: { 'Content-Type': 'application/json' },
+  body: JSON.stringify(body),
+});
+
+let testGroupId: string;
+
+const ruleInput = (overrides?: Record<string, unknown>) => ({
+  groupId: testGroupId,
+  title: 'High CPU',
+  queries: [{ refId: 'A', datasourceId: crypto.randomUUID(), expr: 'rate(cpu_usage[5m])' }],
+  condition: { refId: 'A', reducer: 'last', operator: 'gt', threshold: 80 },
+  ...overrides,
+});
+
+describe('alert-rule routes', () => {
+  beforeEach(async () => {
+    const db = createDb(env.DB);
+    await db.delete(alertRules);
+    await db.delete(alertRuleGroups);
+    await db.delete(organizations);
+    await db.insert(organizations).values({
+      id: TEST_ORG_ID,
+      name: 'Test Org',
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    });
+
+    testGroupId = crypto.randomUUID();
+    await db.insert(alertRuleGroups).values({
+      id: testGroupId,
+      orgId: TEST_ORG_ID,
+      name: 'test-group',
+      evalIntervalS: 60,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    });
+  });
+
+  it('lists rules (empty)', async () => {
+    const app = createApp();
+    const res = await app.request(req('/'), {}, testBindings);
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual([]);
+  });
+
+  it('creates a rule', async () => {
+    const app = createApp();
+    const res = await app.request(req('/', json(ruleInput())), {}, testBindings);
+    expect(res.status).toBe(201);
+    const body: unknown = await res.json();
+    expect(body).toHaveProperty('id');
+    expect(body).toHaveProperty('title', 'High CPU');
+    expect(body).toHaveProperty('forDurationS', 0);
+    expect(body).toHaveProperty('noDataState', 'Alerting');
+    expect(body).toHaveProperty('isPaused', false);
+  });
+
+  it('rejects rule without queries', async () => {
+    const app = createApp();
+    const res = await app.request(req('/', json({ ...ruleInput(), queries: [] })), {}, testBindings);
+    expect(res.status).toBe(400);
+  });
+
+  it('gets a rule by id', async () => {
+    const app = createApp();
+    const createRes = await app.request(req('/', json(ruleInput())), {}, testBindings);
+    const created: unknown = await createRes.json();
+    if (typeof created !== 'object' || created === null || !('id' in created)) throw new Error('bad shape');
+
+    const res = await app.request(req(`/${created.id}`), {}, testBindings);
+    expect(res.status).toBe(200);
+    const body: unknown = await res.json();
+    expect(body).toHaveProperty('title', 'High CPU');
+  });
+
+  it('updates a rule', async () => {
+    const app = createApp();
+    const createRes = await app.request(req('/', json(ruleInput())), {}, testBindings);
+    const created: unknown = await createRes.json();
+    if (typeof created !== 'object' || created === null || !('id' in created)) throw new Error('bad shape');
+
+    const res = await app.request(
+      req(`/${created.id}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ title: 'Low CPU' }) }),
+      {},
+      testBindings,
+    );
+    expect(res.status).toBe(200);
+    const body: unknown = await res.json();
+    expect(body).toHaveProperty('title', 'Low CPU');
+  });
+
+  it('deletes a rule', async () => {
+    const app = createApp();
+    const createRes = await app.request(req('/', json(ruleInput())), {}, testBindings);
+    const created: unknown = await createRes.json();
+    if (typeof created !== 'object' || created === null || !('id' in created)) throw new Error('bad shape');
+
+    const res = await app.request(req(`/${created.id}`, { method: 'DELETE' }), {}, testBindings);
+    expect(res.status).toBe(204);
+
+    const getRes = await app.request(req(`/${created.id}`), {}, testBindings);
+    expect(getRes.status).toBe(404);
+  });
+
+  it('cascade deletes rules when group deleted', async () => {
+    const app = createApp();
+    const createRes = await app.request(req('/', json(ruleInput())), {}, testBindings);
+    expect(createRes.status).toBe(201);
+
+    const db = createDb(env.DB);
+    await db.delete(alertRuleGroups);
+
+    const rows = await db.select().from(alertRules);
+    expect(rows).toHaveLength(0);
+  });
+});
