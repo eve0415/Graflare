@@ -2,6 +2,7 @@ import { QueryClient } from '@tanstack/react-query';
 import { createRouter } from '@tanstack/react-router';
 import { setupRouterSsrQueryIntegration } from '@tanstack/react-router-ssr-query';
 
+import { RouteError } from './components/route-error';
 import { routeTree } from './routeTree.gen';
 
 export const getRouter = () => {
@@ -9,6 +10,8 @@ export const getRouter = () => {
     defaultOptions: {
       queries: {
         staleTime: 30_000,
+        retry: 3,
+        retryDelay: (attemptIndex: number) => Math.min(1000 * 2 ** attemptIndex, 30_000),
       },
     },
   });
@@ -17,6 +20,7 @@ export const getRouter = () => {
     routeTree,
     context: { queryClient },
     defaultPreload: 'intent',
+    defaultErrorComponent: RouteError,
     scrollRestoration: true,
   });
 
