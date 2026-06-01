@@ -1,6 +1,7 @@
 import { queryOptions } from '@tanstack/react-query';
 
-import { getDashboard, getDatasource, listDashboardVersions, listDashboards, listDatasources, listFolders } from './api';
+import { getDashboard, listDashboardVersions, listDashboards, listFolders } from '../routes/dashboards/-api';
+import { getDatasource, listDatasources } from '../routes/datasources/-api';
 
 export const dashboardsQueryOptions = () =>
   queryOptions({

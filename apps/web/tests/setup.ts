@@ -14,7 +14,22 @@ Object.defineProperty(globalThis, 'matchMedia', {
   })),
 });
 
-vi.mock('../src/lib/api', () => ({
+vi.mock('../src/routes/dashboards/-api', () => ({
+  listDashboards: () => Promise.resolve([]),
+  getDashboard: () => Promise.resolve(null),
+  createDashboard: () => Promise.resolve(null),
+  updateDashboard: () => Promise.resolve(null),
+  deleteDashboard: () => Promise.resolve(),
+  listDashboardVersions: () => Promise.resolve([]),
+  restoreDashboardVersion: () => Promise.resolve(null),
+  importDashboard: () => Promise.resolve({ dashboard: null, warnings: [] }),
+  listFolders: () => Promise.resolve([]),
+  createFolder: () => Promise.resolve({ id: 'test-folder', title: 'Test', slug: 'test' }),
+  updateFolder: () => Promise.resolve(null),
+  deleteFolder: () => Promise.resolve(),
+}));
+
+vi.mock('../src/routes/datasources/-api', () => ({
   listDatasources: () => Promise.resolve([]),
   getDatasource: () => Promise.resolve(null),
   createDatasource: () =>
@@ -32,19 +47,10 @@ vi.mock('../src/lib/api', () => ({
   updateDatasource: () => Promise.resolve(null),
   deleteDatasource: () => Promise.resolve(),
   testConnection: () => Promise.resolve({ success: true, latencyMs: 0 }),
+}));
+
+vi.mock('../src/lib/proxy', () => ({
   proxyQuery: () => Promise.resolve({ status: 'success' }),
-  listDashboards: () => Promise.resolve([]),
-  getDashboard: () => Promise.resolve(null),
-  createDashboard: () => Promise.resolve(null),
-  updateDashboard: () => Promise.resolve(null),
-  deleteDashboard: () => Promise.resolve(),
-  listDashboardVersions: () => Promise.resolve([]),
-  restoreDashboardVersion: () => Promise.resolve(null),
-  importDashboard: () => Promise.resolve({ dashboard: null, warnings: [] }),
-  listFolders: () => Promise.resolve([]),
-  createFolder: () => Promise.resolve({ id: 'test-folder', title: 'Test', slug: 'test' }),
-  updateFolder: () => Promise.resolve(null),
-  deleteFolder: () => Promise.resolve(),
 }));
 
 const MockGrid = ({ children }: { children: React.ReactNode }) => children;

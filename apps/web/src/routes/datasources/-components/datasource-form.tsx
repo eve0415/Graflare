@@ -7,7 +7,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { useNavigate } from '@tanstack/react-router';
 import { useCallback, useState } from 'react';
 
-import { createDatasource, testConnection, updateDatasource } from '../../../lib/api';
+import { createDatasource, testConnection, updateDatasource } from '../-api';
 
 type DatasourceType = 'prometheus';
 type AuthType = 'none' | 'basic' | 'bearer';

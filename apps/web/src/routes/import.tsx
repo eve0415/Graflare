@@ -5,7 +5,7 @@ import { createFileRoute, useNavigate } from '@tanstack/react-router';
 import { FileUp, Upload } from 'lucide-react';
 import { useCallback, useRef, useState } from 'react';
 
-import { importDashboard } from '../lib/api';
+import { importDashboard } from './dashboards/-api';
 
 type DetectedFormat = 'classic' | 'v1' | 'v2' | null;
 

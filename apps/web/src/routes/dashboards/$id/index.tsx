@@ -15,7 +15,7 @@ import { DashboardToolbar } from '../../../components/dashboard-toolbar';
 import { DashboardViewSkeleton } from '../../../components/skeletons/dashboard-view-skeleton';
 import { PanelEditor } from '../../../components/panel-editor';
 import { VariableBar } from '../../../components/variable-bar';
-import { updateDashboard } from '../../../lib/api';
+import { updateDashboard } from '../-api';
 import { dashboardQueryOptions } from '../../../lib/query-options';
 
 type RefreshInterval = '5s' | '10s' | '30s' | '1m' | '5m' | '15m' | '30m' | '1h' | 'off';

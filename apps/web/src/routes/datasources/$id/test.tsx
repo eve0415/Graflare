@@ -7,7 +7,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { createFileRoute } from '@tanstack/react-router';
 import { useCallback, useState } from 'react';
 
-import { proxyQuery } from '../../../lib/api';
+import { proxyQuery } from '../../../lib/proxy';
 
 type QueryType = 'instant' | 'range';
 

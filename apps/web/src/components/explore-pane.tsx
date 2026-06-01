@@ -5,7 +5,7 @@ import { useSuspenseQuery } from '@tanstack/react-query';
 import { BarChart3, Play, Table2 } from 'lucide-react';
 import { Suspense, useCallback, useMemo, useState } from 'react';
 
-import { proxyQuery } from '../lib/api';
+import { proxyQuery } from '../lib/proxy';
 import { datasourcesQueryOptions } from '../lib/query-options';
 
 import type { Options as UPlotOptions } from 'uplot';

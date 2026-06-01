@@ -6,7 +6,7 @@ import { Link, createFileRoute, useRouter } from '@tanstack/react-router';
 import { useMemo, useState } from 'react';
 
 import { DatasourceListSkeleton } from '../../components/skeletons/datasource-list-skeleton';
-import { deleteDatasource } from '../../lib/api';
+import { deleteDatasource } from './-api';
 import { datasourcesQueryOptions } from '../../lib/query-options';
 
 const DatasourceListPage = () => {

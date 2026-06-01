@@ -4,7 +4,7 @@ import { Label } from '@graflare/ui/components/label';
 import { createFileRoute, useNavigate } from '@tanstack/react-router';
 import { useCallback, useState } from 'react';
 
-import { createDashboard } from '../../lib/api';
+import { createDashboard } from './-api';
 
 const NewDashboardPage = () => {
   const navigate = useNavigate();
