@@ -6,6 +6,18 @@ import { DurableObject } from 'cloudflare:workers';
 
 import { createPrometheusClient } from '../prometheus/factory';
 
+const ALERT_INSTANCE_STATES = new Set(['Normal', 'Pending', 'Firing', 'Resolved']);
+
+function isAlertInstanceState(s: string): s is AlertInstanceState {
+  return ALERT_INSTANCE_STATES.has(s);
+}
+
+function isAlertRuleConfig(raw: unknown): raw is AlertRuleConfig {
+  if (typeof raw !== 'object' || raw === null) return false;
+  return 'orgId' in raw && 'ruleId' in raw && 'queries' in raw && 'condition' in raw &&
+    'evalIntervalS' in raw && 'forDurationS' in raw && 'noDataState' in raw && 'execErrState' in raw;
+}
+
 interface AlertRuleConfig {
   orgId: string;
   ruleId: string;
@@ -121,7 +133,9 @@ export class AlertRuleDO extends DurableObject<Env> {
 
     if (configRows.length === 0) return;
 
-    const config = JSON.parse(configRows[0].value) as AlertRuleConfig;
+    const configParsed: unknown = JSON.parse(configRows[0].value);
+    if (!isAlertRuleConfig(configParsed)) return;
+    const config = configParsed;
     const now = Date.now();
 
     try {
@@ -178,7 +192,8 @@ export class AlertRuleDO extends DurableObject<Env> {
         ).toArray();
 
         const prev = existing.length > 0 ? existing[0] : null;
-        const prevState = (prev?.state ?? 'Normal') as AlertInstanceState;
+        const prevStateRaw = prev?.state ?? 'Normal';
+        const prevState: AlertInstanceState = isAlertInstanceState(prevStateRaw) ? prevStateRaw : 'Normal';
         const newState = this.transitionState(prevState, result.firing, config.forDurationS, now, prev?.pending_since ?? null);
 
         if (prev === null) {

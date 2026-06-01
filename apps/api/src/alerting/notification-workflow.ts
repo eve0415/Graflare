@@ -9,6 +9,28 @@ import { decryptCredentials } from '../crypto/credentials';
 
 import { renderAlertEmailHtml, renderAlertEmailText } from './templates/alert-email';
 
+function parseStringArray(v: unknown): string[] {
+  return Array.isArray(v) ? v.filter((s): s is string => typeof s === 'string') : [];
+}
+
+function parseStringRecord(v: unknown): Record<string, string> {
+  if (typeof v !== 'object' || v === null) return {};
+  const result: Record<string, string> = {};
+  for (const [key, val] of Object.entries(v)) {
+    if (typeof val === 'string') result[key] = val;
+  }
+  return result;
+}
+
+function parseUnknownRecord(v: unknown): Record<string, unknown> {
+  if (typeof v !== 'object' || v === null) return {};
+  const result: Record<string, unknown> = {};
+  for (const [key, val] of Object.entries(v)) {
+    result[key] = val;
+  }
+  return result;
+}
+
 interface NotificationWorkflowParams {
   orgId: string;
   ruleId: string;
@@ -99,7 +121,7 @@ export class NotificationWorkflow extends WorkflowEntrypoint<Env, NotificationWo
         return {
           contactPointId: matched.contact_point_id,
           groupWaitS: matched.group_wait_s,
-          muteTimingIds: JSON.parse(matched.mute_timing_ids) as string[],
+          muteTimingIds: parseStringArray(JSON.parse(matched.mute_timing_ids)),
         };
       },
     );
@@ -121,7 +143,7 @@ export class NotificationWorkflow extends WorkflowEntrypoint<Env, NotificationWo
 
         return rows.results.map(r => ({
           labelsHash: r.labels_hash,
-          labels: JSON.parse(r.labels) as Record<string, string>,
+          labels: parseStringRecord(JSON.parse(r.labels)),
           state: r.state,
           value: r.value,
           activeAt: r.active_at,
@@ -141,7 +163,10 @@ export class NotificationWorkflow extends WorkflowEntrypoint<Env, NotificationWo
           .bind(params.orgId, now, now)
           .all<SilenceRow>();
 
-        const silenceMatchers: LabelMatcher[][] = silenceRows.results.map(r => JSON.parse(r.matchers) as LabelMatcher[]);
+        const silenceMatchers = silenceRows.results.map(r => {
+          const parsed: unknown = JSON.parse(r.matchers);
+          return Array.isArray(parsed) ? parsed : [];
+        });
 
         return alerts.filter(a => {
           const allLabels = { ...params.ruleLabels, ...a.labels };
@@ -166,8 +191,8 @@ export class NotificationWorkflow extends WorkflowEntrypoint<Env, NotificationWo
 
         const now = new Date();
         return !muteRows.results.some(r => {
-          const intervals: MuteTimeInterval[] = JSON.parse(r.intervals);
-          return isMuted(intervals, now);
+          const intervals: unknown = JSON.parse(r.intervals);
+          return Array.isArray(intervals) && isMuted(intervals, now);
         });
       },
     );
@@ -185,7 +210,7 @@ export class NotificationWorkflow extends WorkflowEntrypoint<Env, NotificationWo
 
         const [row] = rows.results;
         if (row === undefined) return null;
-        return { name: row.name, type: row.type, settings: JSON.parse(row.settings) as Record<string, unknown> };
+        return { name: row.name, type: row.type, settings: parseUnknownRecord(JSON.parse(row.settings)) };
       },
     );
 
@@ -230,7 +255,7 @@ export class NotificationWorkflow extends WorkflowEntrypoint<Env, NotificationWo
 
           const emailAlerts = filteredAlerts.map(a => ({
             ruleName: params.ruleName,
-            state: a.state as 'Firing' | 'Resolved',
+            state: a.state === 'Firing' ? 'Firing' : 'Resolved',
             labels: { ...params.ruleLabels, ...a.labels },
             value: a.value,
             startsAt: a.activeAt !== null ? new Date(a.activeAt).toISOString() : 'N/A',
