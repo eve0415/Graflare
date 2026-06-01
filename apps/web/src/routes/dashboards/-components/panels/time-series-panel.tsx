@@ -3,8 +3,8 @@ import type { Panel } from '@graflare/shared/schemas/panel';
 import { useCallback, useMemo } from 'react';
 import type uPlot from 'uplot';
 
-import { QueryResultTable, formatPrometheusToTable } from '../query-result-table';
-import { UPlotChart } from '../uplot-chart';
+import { QueryResultTable, formatPrometheusToTable } from '../../../../components/query-result-table';
+import { UPlotChart } from '../../../../components/uplot-chart';
 
 import { PanelFrame } from './panel-frame';
 import { usePanelData } from './use-panel-data';

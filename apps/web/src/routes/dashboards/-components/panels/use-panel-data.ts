@@ -2,7 +2,7 @@ import type { PanelQuery } from '@graflare/shared/schemas/panel';
 
 import { useQuery } from '@tanstack/react-query';
 
-import { proxyQuery } from '../../lib/proxy';
+import { proxyQuery } from '../../../../lib/proxy';
 
 interface TimeRange {
   from: string;

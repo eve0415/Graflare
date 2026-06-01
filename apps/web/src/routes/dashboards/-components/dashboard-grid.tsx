@@ -4,7 +4,7 @@ import { useMemo } from 'react';
 import RGL from 'react-grid-layout';
 import 'react-grid-layout/css/styles.css';
 
-import { PanelRenderer } from '../../../components/panels/panel-renderer';
+import { PanelRenderer } from './panels/panel-renderer';
 
 const ResponsiveGridLayout = RGL;
 
