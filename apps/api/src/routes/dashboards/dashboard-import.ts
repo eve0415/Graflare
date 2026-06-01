@@ -1,4 +1,4 @@
-import type { AppEnv } from '../index';
+import type { AppEnv } from '../../index';
 
 import { importDashboardSchema } from '@graflare/shared/schemas/dashboard';
 import { detectFormat, importDashboard } from '@graflare/shared/import';
@@ -6,9 +6,9 @@ import { sValidator } from '@hono/standard-validator';
 import { eq } from 'drizzle-orm';
 import { Hono } from 'hono';
 
-import { createDb } from '../db';
-import { dashboardVersions, dashboards } from '../db/schema';
-import { onValidationError } from '../middleware/validate';
+import { createDb } from '../../db';
+import { dashboardVersions, dashboards } from '../../db/schema';
+import { onValidationError } from '../../middleware/validate';
 
 const slugify = (title: string) =>
   title
