@@ -9,9 +9,9 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
-import { Route as ImportRouteImport } from './routes/import'
-import { Route as ExploreRouteImport } from './routes/explore'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as ImportIndexRouteImport } from './routes/import/index'
+import { Route as ExploreIndexRouteImport } from './routes/explore/index'
 import { Route as DatasourcesIndexRouteImport } from './routes/datasources/index'
 import { Route as DashboardsIndexRouteImport } from './routes/dashboards/index'
 import { Route as DatasourcesNewRouteImport } from './routes/datasources/new'
@@ -21,19 +21,19 @@ import { Route as DatasourcesIdIndexRouteImport } from './routes/datasources/$id
 import { Route as DashboardsIdIndexRouteImport } from './routes/dashboards/$id/index'
 import { Route as DatasourcesIdTestRouteImport } from './routes/datasources/$id/test'
 
-const ImportRoute = ImportRouteImport.update({
-  id: '/import',
-  path: '/import',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const ExploreRoute = ExploreRouteImport.update({
-  id: '/explore',
-  path: '/explore',
-  getParentRoute: () => rootRouteImport,
-} as any)
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ImportIndexRoute = ImportIndexRouteImport.update({
+  id: '/import/',
+  path: '/import/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ExploreIndexRoute = ExploreIndexRouteImport.update({
+  id: '/explore/',
+  path: '/explore/',
   getParentRoute: () => rootRouteImport,
 } as any)
 const DatasourcesIndexRoute = DatasourcesIndexRouteImport.update({
@@ -79,25 +79,25 @@ const DatasourcesIdTestRoute = DatasourcesIdTestRouteImport.update({
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
-  '/explore': typeof ExploreRoute
-  '/import': typeof ImportRoute
   '/dashboards/new': typeof DashboardsNewRoute
   '/datasources/$id': typeof DatasourcesIdRouteWithChildren
   '/datasources/new': typeof DatasourcesNewRoute
   '/dashboards/': typeof DashboardsIndexRoute
   '/datasources/': typeof DatasourcesIndexRoute
+  '/explore/': typeof ExploreIndexRoute
+  '/import/': typeof ImportIndexRoute
   '/datasources/$id/test': typeof DatasourcesIdTestRoute
   '/dashboards/$id/': typeof DashboardsIdIndexRoute
   '/datasources/$id/': typeof DatasourcesIdIndexRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
-  '/explore': typeof ExploreRoute
-  '/import': typeof ImportRoute
   '/dashboards/new': typeof DashboardsNewRoute
   '/datasources/new': typeof DatasourcesNewRoute
   '/dashboards': typeof DashboardsIndexRoute
   '/datasources': typeof DatasourcesIndexRoute
+  '/explore': typeof ExploreIndexRoute
+  '/import': typeof ImportIndexRoute
   '/datasources/$id/test': typeof DatasourcesIdTestRoute
   '/dashboards/$id': typeof DashboardsIdIndexRoute
   '/datasources/$id': typeof DatasourcesIdIndexRoute
@@ -105,13 +105,13 @@ export interface FileRoutesByTo {
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
-  '/explore': typeof ExploreRoute
-  '/import': typeof ImportRoute
   '/dashboards/new': typeof DashboardsNewRoute
   '/datasources/$id': typeof DatasourcesIdRouteWithChildren
   '/datasources/new': typeof DatasourcesNewRoute
   '/dashboards/': typeof DashboardsIndexRoute
   '/datasources/': typeof DatasourcesIndexRoute
+  '/explore/': typeof ExploreIndexRoute
+  '/import/': typeof ImportIndexRoute
   '/datasources/$id/test': typeof DatasourcesIdTestRoute
   '/dashboards/$id/': typeof DashboardsIdIndexRoute
   '/datasources/$id/': typeof DatasourcesIdIndexRoute
@@ -120,38 +120,38 @@ export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths:
     | '/'
-    | '/explore'
-    | '/import'
     | '/dashboards/new'
     | '/datasources/$id'
     | '/datasources/new'
     | '/dashboards/'
     | '/datasources/'
+    | '/explore/'
+    | '/import/'
     | '/datasources/$id/test'
     | '/dashboards/$id/'
     | '/datasources/$id/'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
-    | '/explore'
-    | '/import'
     | '/dashboards/new'
     | '/datasources/new'
     | '/dashboards'
     | '/datasources'
+    | '/explore'
+    | '/import'
     | '/datasources/$id/test'
     | '/dashboards/$id'
     | '/datasources/$id'
   id:
     | '__root__'
     | '/'
-    | '/explore'
-    | '/import'
     | '/dashboards/new'
     | '/datasources/$id'
     | '/datasources/new'
     | '/dashboards/'
     | '/datasources/'
+    | '/explore/'
+    | '/import/'
     | '/datasources/$id/test'
     | '/dashboards/$id/'
     | '/datasources/$id/'
@@ -159,37 +159,37 @@ export interface FileRouteTypes {
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
-  ExploreRoute: typeof ExploreRoute
-  ImportRoute: typeof ImportRoute
   DashboardsNewRoute: typeof DashboardsNewRoute
   DatasourcesIdRoute: typeof DatasourcesIdRouteWithChildren
   DatasourcesNewRoute: typeof DatasourcesNewRoute
   DashboardsIndexRoute: typeof DashboardsIndexRoute
   DatasourcesIndexRoute: typeof DatasourcesIndexRoute
+  ExploreIndexRoute: typeof ExploreIndexRoute
+  ImportIndexRoute: typeof ImportIndexRoute
   DashboardsIdIndexRoute: typeof DashboardsIdIndexRoute
 }
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
-    '/import': {
-      id: '/import'
-      path: '/import'
-      fullPath: '/import'
-      preLoaderRoute: typeof ImportRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/explore': {
-      id: '/explore'
-      path: '/explore'
-      fullPath: '/explore'
-      preLoaderRoute: typeof ExploreRouteImport
-      parentRoute: typeof rootRouteImport
-    }
     '/': {
       id: '/'
       path: '/'
       fullPath: '/'
       preLoaderRoute: typeof IndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/import/': {
+      id: '/import/'
+      path: '/import'
+      fullPath: '/import/'
+      preLoaderRoute: typeof ImportIndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/explore/': {
+      id: '/explore/'
+      path: '/explore'
+      fullPath: '/explore/'
+      preLoaderRoute: typeof ExploreIndexRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/datasources/': {
@@ -267,13 +267,13 @@ const DatasourcesIdRouteWithChildren = DatasourcesIdRoute._addFileChildren(
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
-  ExploreRoute: ExploreRoute,
-  ImportRoute: ImportRoute,
   DashboardsNewRoute: DashboardsNewRoute,
   DatasourcesIdRoute: DatasourcesIdRouteWithChildren,
   DatasourcesNewRoute: DatasourcesNewRoute,
   DashboardsIndexRoute: DashboardsIndexRoute,
   DatasourcesIndexRoute: DatasourcesIndexRoute,
+  ExploreIndexRoute: ExploreIndexRoute,
+  ImportIndexRoute: ImportIndexRoute,
   DashboardsIdIndexRoute: DashboardsIdIndexRoute,
 }
 export const routeTree = rootRouteImport

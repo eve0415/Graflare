@@ -3,7 +3,7 @@ import { useSuspenseQuery } from '@tanstack/react-query';
 import { createFileRoute } from '@tanstack/react-router';
 import { useMemo } from 'react';
 
-import { DatasourceEditSkeleton } from '../../../components/skeletons/datasource-edit-skeleton';
+import { DatasourceEditSkeleton } from '../-components/datasource-edit-skeleton';
 import { DatasourceForm } from '../-components/datasource-form';
 import { datasourceQueryOptions } from '../-queries';
 

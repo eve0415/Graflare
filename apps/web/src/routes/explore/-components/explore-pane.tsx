@@ -5,14 +5,14 @@ import { useSuspenseQuery } from '@tanstack/react-query';
 import { BarChart3, Play, Table2 } from 'lucide-react';
 import { Suspense, useCallback, useMemo, useState } from 'react';
 
-import { proxyQuery } from '../lib/proxy';
-import { datasourcesQueryOptions } from '../routes/datasources/-queries';
+import { proxyQuery } from '../../../lib/proxy';
+import { datasourcesQueryOptions } from '../../datasources/-queries';
 
 import type { Options as UPlotOptions } from 'uplot';
 
 import { PromQLEditor } from './promql-editor';
-import { QueryResultTable, formatPrometheusToTable } from '../routes/-root/query-result-table';
-import { UPlotChart } from '../routes/-root/uplot-chart';
+import { QueryResultTable, formatPrometheusToTable } from '../../-root/query-result-table';
+import { UPlotChart } from '../../-root/uplot-chart';
 
 interface TimeRange {
   from: string;

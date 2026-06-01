@@ -5,7 +5,7 @@ import { useSuspenseQuery } from '@tanstack/react-query';
 import { Link, createFileRoute, useRouter } from '@tanstack/react-router';
 import { useMemo, useState } from 'react';
 
-import { DatasourceListSkeleton } from '../../components/skeletons/datasource-list-skeleton';
+import { DatasourceListSkeleton } from './-components/datasource-list-skeleton';
 import { deleteDatasource } from './-api';
 import { datasourcesQueryOptions } from './-queries';
 

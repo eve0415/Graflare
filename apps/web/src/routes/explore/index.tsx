@@ -4,10 +4,10 @@ import { createFileRoute } from '@tanstack/react-router';
 import { Columns2 } from 'lucide-react';
 import { useCallback, useState } from 'react';
 
-import { ExplorePane } from '../components/explore-pane';
-import { QueryBoundary } from './-root/query-boundary';
-import { ExplorePaneSkeleton } from '../components/skeletons/explore-pane-skeleton';
-import { TimeRangePicker } from './-root/time-range-picker';
+import { ExplorePane } from './-components/explore-pane';
+import { QueryBoundary } from '../-root/query-boundary';
+import { ExplorePaneSkeleton } from './-components/explore-pane-skeleton';
+import { TimeRangePicker } from '../-root/time-range-picker';
 
 interface TimeRange {
   from: string;
@@ -58,6 +58,6 @@ const ExplorePage = () => {
   );
 };
 
-export const Route = createFileRoute('/explore')({
+export const Route = createFileRoute('/explore/')({
   component: ExplorePage,
 });
