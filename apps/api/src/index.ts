@@ -15,7 +15,7 @@ import { Hono } from 'hono';
 
 import { decryptCredentials, encryptCredentials } from './crypto/credentials';
 import { createDb } from './db';
-import { dashboardVersions, dashboards, datasources, folders } from './db/schema';
+import { alertRuleGroups, dashboardVersions, dashboards, datasources, folders } from './db/schema';
 import { accessMiddleware } from './middleware/access';
 import { orgMiddleware } from './middleware/org';
 import { dashboardImportRoutes } from './routes/dashboards/dashboard-import';
@@ -328,6 +328,10 @@ export class GraflareAPI extends WorkerEntrypoint<Bindings> {
         .update(dashboards)
         .set({ folderId: parentFolderId })
         .where(eq(dashboards.folderId, id));
+      await this.db
+        .update(alertRuleGroups)
+        .set({ folderId: parentFolderId })
+        .where(eq(alertRuleGroups.folderId, id));
       await this.db.delete(folders).where(eq(folders.id, id));
     }
   }

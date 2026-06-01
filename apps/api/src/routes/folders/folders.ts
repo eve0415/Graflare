@@ -6,7 +6,7 @@ import { and, eq } from 'drizzle-orm';
 import { Hono } from 'hono';
 
 import { createDb } from '../../db';
-import { dashboards, folders } from '../../db/schema';
+import { alertRuleGroups, dashboards, folders } from '../../db/schema';
 import { onValidationError } from '../../middleware/validate';
 
 const slugify = (title: string) =>
@@ -109,6 +109,11 @@ app.delete('/:id', sValidator('param', folderIdParamSchema, onValidationError), 
     .update(dashboards)
     .set({ folderId: parentFolderId })
     .where(eq(dashboards.folderId, id));
+
+  await db
+    .update(alertRuleGroups)
+    .set({ folderId: parentFolderId })
+    .where(eq(alertRuleGroups.folderId, id));
 
   await db.delete(folders).where(eq(folders.id, id));
 

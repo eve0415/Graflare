@@ -15,6 +15,13 @@
       "when": 1780236470471,
       "tag": "0001_simple_killraven",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "6",
+      "when": 1780317239029,
+      "tag": "0002_dapper_sue_storm",
+      "breakpoints": true
     }
   ]
 }
