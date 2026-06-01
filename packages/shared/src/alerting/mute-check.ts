@@ -28,7 +28,7 @@ function isWithinInterval(interval: MuteTimeInterval, now: Date): boolean {
 
 function parseTimeToMinutes(time: string): number {
   const parts = time.split(':');
-  return parseInt(parts[0], 10) * 60 + parseInt(parts[1], 10);
+  return Number.parseInt(parts[0], 10) * 60 + Number.parseInt(parts[1], 10);
 }
 
 interface LocalizedTime {
@@ -58,9 +58,9 @@ function localizeDate(date: Date, tz: string): LocalizedTime {
 
     return {
       weekday: dayMap[parts['weekday']] ?? date.getUTCDay(),
-      month: parseInt(parts['month'] ?? '1', 10),
-      hours: parseInt(parts['hour'] ?? '0', 10),
-      minutes: parseInt(parts['minute'] ?? '0', 10),
+      month: Number.parseInt(parts['month'] ?? '1', 10),
+      hours: Number.parseInt(parts['hour'] ?? '0', 10),
+      minutes: Number.parseInt(parts['minute'] ?? '0', 10),
     };
   } catch {
     return {

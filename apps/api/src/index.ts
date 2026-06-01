@@ -5,7 +5,7 @@ import type { CreateContactPoint, UpdateContactPoint } from '@graflare/shared/sc
 import type { CreateNotificationPolicy, UpdateNotificationPolicy } from '@graflare/shared/schemas/notification-policy';
 import type { CreateSilence, UpdateSilence } from '@graflare/shared/schemas/silence';
 import type { CreateMuteTiming, UpdateMuteTiming } from '@graflare/shared/schemas/mute-timing';
-import type { CreateAnnotation, AnnotationListQuery } from '@graflare/shared/schemas/annotation';
+import type { AnnotationListQuery, CreateAnnotation } from '@graflare/shared/schemas/annotation';
 import type { CreateDashboard, DashboardListQuery, ImportDashboard, UpdateDashboard } from '@graflare/shared/schemas/dashboard';
 import type { CreateDatasource, UpdateDatasource } from '@graflare/shared/schemas/datasource';
 import type { CreateFolder, UpdateFolder } from '@graflare/shared/schemas/folder';
@@ -18,7 +18,7 @@ import { createContactPointSchema, updateContactPointSchema } from '@graflare/sh
 import { createNotificationPolicySchema, updateNotificationPolicySchema } from '@graflare/shared/schemas/notification-policy';
 import { createSilenceSchema, updateSilenceSchema } from '@graflare/shared/schemas/silence';
 import { createMuteTimingSchema, updateMuteTimingSchema } from '@graflare/shared/schemas/mute-timing';
-import { createAnnotationSchema, annotationListQuerySchema } from '@graflare/shared/schemas/annotation';
+import { annotationListQuerySchema, createAnnotationSchema } from '@graflare/shared/schemas/annotation';
 import { createDashboardSchema, importDashboardSchema, updateDashboardSchema } from '@graflare/shared/schemas/dashboard';
 import { createDatasourceSchema, datasourceCredentialsSchema, updateDatasourceSchema } from '@graflare/shared/schemas/datasource';
 import { createFolderSchema, updateFolderSchema } from '@graflare/shared/schemas/folder';
@@ -863,9 +863,12 @@ export class GraflareAPI extends WorkerEntrypoint<Bindings> {
   async listContactPoints(orgId: string) {
     const rows = await this.db.select().from(contactPoints).where(eq(contactPoints.orgId, orgId));
     return rows.map(r => {
-      const settings = r.settings;
-      if (typeof settings === 'object' && settings !== null && settings['type'] === 'webhook' && typeof settings['password'] === 'string' && settings['password'].length > 0) {
-        return { ...r, settings: { ...settings, password: '******' } };
+      const {settings} = r;
+      if (typeof settings === 'object' && settings?.['type'] === 'webhook' && typeof settings['password'] === 'string' && settings['password'].length > 0) {
+        return Object.assign(r, { settings: {
+	...settings,
+	password: '******'
+} });
       }
       return r;
     });
@@ -880,8 +883,8 @@ export class GraflareAPI extends WorkerEntrypoint<Bindings> {
       .limit(1);
     const row = rows[0] ?? null;
     if (row === null) return null;
-    const settings = row.settings;
-    if (typeof settings === 'object' && settings !== null && settings['type'] === 'webhook' && typeof settings['password'] === 'string' && settings['password'].length > 0) {
+    const {settings} = row;
+    if (typeof settings === 'object' && settings?.['type'] === 'webhook' && typeof settings['password'] === 'string' && settings['password'].length > 0) {
       return { ...row, settings: { ...settings, password: '******' } };
     }
     return row;
@@ -892,7 +895,7 @@ export class GraflareAPI extends WorkerEntrypoint<Bindings> {
     const id = crypto.randomUUID();
     const now = new Date();
 
-    let settings: Record<string, unknown> = parsed.settings;
+    let {settings} = parsed;
     if (parsed.settings.type === 'webhook' && parsed.settings.password.length > 0) {
       settings = { ...parsed.settings, password: await encryptCredentials(parsed.settings.password, this.env.ENCRYPTION_KEY) };
     }
@@ -919,7 +922,7 @@ export class GraflareAPI extends WorkerEntrypoint<Bindings> {
     if (parsed.name !== undefined) setData['name'] = parsed.name;
     if (parsed.type !== undefined) setData['type'] = parsed.type;
     if (parsed.settings !== undefined) {
-      let settings: Record<string, unknown> = parsed.settings;
+      let {settings} = parsed;
       if (parsed.settings.type === 'webhook' && parsed.settings.password.length > 0) {
         settings = { ...parsed.settings, password: await encryptCredentials(parsed.settings.password, this.env.ENCRYPTION_KEY) };
       }

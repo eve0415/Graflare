@@ -41,7 +41,7 @@ export function buildWebhookPayload(
     annotations: a.annotations,
     startsAt: a.activeAt !== null ? new Date(a.activeAt).toISOString() : '',
     endsAt: a.resolvedAt !== null && a.resolvedAt !== undefined ? new Date(a.resolvedAt).toISOString() : '',
-    values: { value: parseFloat(a.value) || 0 },
+    values: { value: Number.parseFloat(a.value) || 0 },
     generatorURL: a.generatorURL,
     fingerprint: a.fingerprint,
   }));

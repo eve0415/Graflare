@@ -9,10 +9,10 @@ export interface EvaluationResult {
 }
 
 function reduce(values: number[], reducer: ConditionReducer): number {
-  if (values.length === 0) return NaN;
+  if (values.length === 0) return Number.NaN;
   switch (reducer) {
     case 'last':
-      return values[values.length - 1];
+      return values.at(-1);
     case 'avg':
       return values.reduce((a, b) => a + b, 0) / values.length;
     case 'min':
@@ -64,11 +64,11 @@ export function evaluateCondition(
     for (const item of data.result) {
       if (typeof item !== 'object' || item === null) continue;
       if (!('metric' in item) || !('value' in item)) continue;
-      const metric = item.metric;
-      const value = item.value;
+      const {metric} = item;
+      const {value} = item;
       if (typeof metric !== 'object' || metric === null) continue;
       if (!Array.isArray(value) || value.length < 2) continue;
-      const numVal = parseFloat(String(value[1]));
+      const numVal = Number.parseFloat(String(value[1]));
       const labels = metric;
       results.push({
         labelsHash: hashLabels(labels),
@@ -82,14 +82,14 @@ export function evaluateCondition(
     for (const item of data.result) {
       if (typeof item !== 'object' || item === null) continue;
       if (!('metric' in item) || !('values' in item)) continue;
-      const metric = item.metric;
-      const values = item.values;
+      const {metric} = item;
+      const {values} = item;
       if (typeof metric !== 'object' || metric === null) continue;
       if (!Array.isArray(values)) continue;
       const numValues = values
         .map((v: unknown) => {
-          if (!Array.isArray(v) || v.length < 2) return NaN;
-          return parseFloat(String(v[1]));
+          if (!Array.isArray(v) || v.length < 2) return Number.NaN;
+          return Number.parseFloat(String(v[1]));
         })
         .filter((n: number) => !Number.isNaN(n));
       const reduced = reduce(numValues, reducer);

@@ -39,7 +39,7 @@ interface Env {
 export class AlertRuleDO extends DurableObject<Env> {
   constructor(ctx: DurableObjectState, env: Env) {
     super(ctx, env);
-    this.ctx.blockConcurrencyWhile(async () => {
+    void this.ctx.blockConcurrencyWhile(() => {
       this.ctx.storage.sql.exec(`
         CREATE TABLE IF NOT EXISTS _sql_schema_migrations (
           id INTEGER PRIMARY KEY,
@@ -152,14 +152,14 @@ export class AlertRuleDO extends DurableObject<Env> {
         return;
       }
 
-      const data = response.data;
+      const {data} = response;
       if (typeof data !== 'object' || data === null || !('resultType' in data)) {
         await this.handleNoData(config, now);
         await this.ctx.storage.setAlarm(now + config.evalIntervalS * 1000);
         return;
       }
 
-      const queryData = data as PrometheusQueryData;
+      const queryData = data;
       const results = evaluateCondition(queryData, config.condition.reducer, config.condition.operator, config.condition.threshold);
 
       if (results.length === 0) {

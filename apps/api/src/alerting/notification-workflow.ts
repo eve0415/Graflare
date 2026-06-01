@@ -110,7 +110,7 @@ export class NotificationWorkflow extends WorkflowEntrypoint<Env, NotificationWo
       await step.sleep('group-wait', `${policy.groupWaitS} seconds`);
     }
 
-    const alerts = await step.do<Array<{ labelsHash: string; labels: Record<string, string>; state: string; value: string; activeAt: number | null }>>(
+    const alerts = await step.do<{ labelsHash: string; labels: Record<string, string>; state: string; value: string; activeAt: number | null }[]>(
       'drain-alerts',
       async () => {
         const rows = await this.env.DB.prepare(
@@ -209,7 +209,7 @@ export class NotificationWorkflow extends WorkflowEntrypoint<Env, NotificationWo
           const payload = buildWebhookPayload(payloadAlerts, contactPoint.name, params.externalURL);
 
           let url = '';
-          if (typeof contactPoint.settings['url'] === 'string') url = contactPoint.settings['url'];
+          if (typeof contactPoint.settings['url'] === 'string') ({ url } = contactPoint.settings);
           const method = typeof contactPoint.settings['method'] === 'string' ? contactPoint.settings['method'] : 'POST';
 
           const headers: Record<string, string> = { 'Content-Type': 'application/json' };
@@ -225,7 +225,7 @@ export class NotificationWorkflow extends WorkflowEntrypoint<Env, NotificationWo
             throw new Error(`Webhook delivery failed: ${res.status}`);
           }
         } else if (contactPoint.type === 'email') {
-          const addresses = contactPoint.settings['addresses'];
+          const {addresses} = contactPoint.settings;
           if (!Array.isArray(addresses) || addresses.length === 0) return;
 
           const emailAlerts = filteredAlerts.map(a => ({

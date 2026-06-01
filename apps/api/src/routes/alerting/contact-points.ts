@@ -35,7 +35,7 @@ app.get('/', async c => {
   const orgId = c.get('orgId');
 
   const rows = await db.select().from(contactPoints).where(eq(contactPoints.orgId, orgId));
-  return c.json(rows.map(r => ({ ...r, settings: redactSettings(r.settings) })));
+  return c.json(rows.map(r => (Object.assign(r, { settings: redactSettings(r.settings) }))));
 });
 
 app.get('/:id', sValidator('param', contactPointIdParamSchema, onValidationError), async c => {

@@ -78,7 +78,7 @@ describe('contact-point routes', () => {
     expect(res.status).toBe(201);
     const body: unknown = await res.json();
     if (typeof body !== 'object' || body === null || !('settings' in body)) throw new Error('bad shape');
-    const settings = body.settings;
+    const {settings} = body;
     if (typeof settings !== 'object' || settings === null) throw new Error('bad settings');
     expect(settings).toHaveProperty('password', '******');
 
@@ -107,7 +107,7 @@ describe('contact-point routes', () => {
     expect(res.status).toBe(200);
     const body: unknown = await res.json();
     if (!Array.isArray(body) || body.length === 0) throw new Error('expected array');
-    const settings = body[0].settings;
+    const {settings} = body[0];
     expect(settings.password).toBe('******');
   });
 

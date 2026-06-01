@@ -14,7 +14,7 @@ const matrixData = (metric: Record<string, string>, values: number[]): Prometheu
   result: [{ metric, values: values.map((v, i) => [1000 + i, String(v)]) }],
 });
 
-const multiVectorData = (series: Array<{ metric: Record<string, string>; value: number }>): PrometheusQueryData => ({
+const multiVectorData = (series: { metric: Record<string, string>; value: number }[]): PrometheusQueryData => ({
   resultType: 'vector',
   result: series.map(s => ({ metric: s.metric, value: [1000, String(s.value)] })),
 });
@@ -133,7 +133,7 @@ describe('evaluateCondition', () => {
     });
 
     it('handles NaN value', () => {
-      const results = evaluateCondition(vectorData({ job: 'api' }, NaN), 'last', 'gt', 0);
+      const results = evaluateCondition(vectorData({ job: 'api' }, Number.NaN), 'last', 'gt', 0);
       expect(results[0].firing).toBe(false);
       expect(Number.isNaN(results[0].value)).toBe(true);
     });
