@@ -14,7 +14,7 @@ Object.defineProperty(globalThis, 'matchMedia', {
   })),
 });
 
-vi.mock('./lib/api', () => ({
+vi.mock('../src/lib/api', () => ({
   listDatasources: () => Promise.resolve([]),
   getDatasource: () => Promise.resolve(null),
   createDatasource: () =>
@@ -56,7 +56,7 @@ vi.mock('react-grid-layout', () => ({
 
 vi.mock('react-grid-layout/css/styles.css', () => ({}));
 
-vi.mock('./lib/query-options', () => ({
+vi.mock('../src/lib/query-options', () => ({
   dashboardsQueryOptions: () => ({ queryKey: ['dashboards'], queryFn: () => Promise.resolve([]) }),
   dashboardQueryOptions: () => ({ queryKey: ['dashboard'], queryFn: () => Promise.resolve(null) }),
   dashboardVersionsQueryOptions: () => ({ queryKey: ['versions'], queryFn: () => Promise.resolve([]) }),

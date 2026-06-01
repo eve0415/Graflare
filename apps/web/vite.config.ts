@@ -12,7 +12,11 @@ export default defineConfig({
   plugins: [
     cloudflare({ viteEnvironment: { name: 'ssr' } }),
     tailwindcss(),
-    tanstackStart(),
+    tanstackStart({
+      router: {
+        routeFileIgnorePattern: '\\.test\\.',
+      },
+    }),
     react(),
     babel({
       presets: [reactCompilerPreset()],
