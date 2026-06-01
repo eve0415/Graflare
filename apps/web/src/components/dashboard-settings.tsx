@@ -12,6 +12,8 @@ import { dashboardVersionsQueryOptions } from '../lib/query-options';
 import { QueryBoundary } from './query-boundary';
 import { VersionHistorySkeleton } from './skeletons/version-history-skeleton';
 
+const versionHistoryFallback = <VersionHistorySkeleton />;
+
 interface DashboardSettingsProps {
   open: boolean;
   onClose: () => void;
@@ -110,7 +112,7 @@ export const DashboardSettings = ({ open, onClose, dashboardId, title, descripti
         )}
 
         {tab === 'versions' && (
-          <QueryBoundary pendingFallback={<VersionHistorySkeleton />}>
+          <QueryBoundary pendingFallback={versionHistoryFallback}>
             <VersionHistory dashboardId={dashboardId} onRestore={onRestore} onClose={onClose} />
           </QueryBoundary>
         )}
@@ -125,7 +127,7 @@ const VersionHistory = ({
   onClose,
 }: {
   dashboardId: string;
-  onRestore?: () => void;
+  onRestore?: (() => void) | undefined;
   onClose: () => void;
 }) => {
   const { data: versions } = useSuspenseQuery(dashboardVersionsQueryOptions(dashboardId));

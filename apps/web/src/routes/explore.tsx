@@ -15,6 +15,7 @@ interface TimeRange {
 }
 
 const defaultRange: TimeRange = { from: 'now-1h', to: 'now' };
+const explorePaneFallback = <ExplorePaneSkeleton />;
 
 const ExplorePage = () => {
   const [timeRange, setTimeRange] = useState<TimeRange>(defaultRange);
@@ -43,12 +44,12 @@ const ExplorePage = () => {
       </div>
 
       <div className={split ? 'grid grid-cols-2 gap-4' : ''}>
-        <QueryBoundary pendingFallback={<ExplorePaneSkeleton />}>
+        <QueryBoundary pendingFallback={explorePaneFallback}>
           <ExplorePane timeRange={timeRange} label='Explore pane 1' />
         </QueryBoundary>
 
         {split && (
-          <QueryBoundary pendingFallback={<ExplorePaneSkeleton />}>
+          <QueryBoundary pendingFallback={explorePaneFallback}>
             <ExplorePane timeRange={timeRange} label='Explore pane 2' />
           </QueryBoundary>
         )}
