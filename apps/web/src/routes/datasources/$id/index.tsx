@@ -3,6 +3,7 @@ import { useSuspenseQuery } from '@tanstack/react-query';
 import { createFileRoute } from '@tanstack/react-router';
 import { useMemo } from 'react';
 
+import { DatasourceEditSkeleton } from '../../../components/skeletons/datasource-edit-skeleton';
 import { DatasourceForm } from '../-components/datasource-form';
 import { datasourceQueryOptions } from '../../../lib/query-options';
 
@@ -34,5 +35,6 @@ const EditDatasourcePage = () => {
 
 export const Route = createFileRoute('/datasources/$id/')({
   loader: ({ params, context }) => context.queryClient.ensureQueryData(datasourceQueryOptions(params.id)),
+  pendingComponent: DatasourceEditSkeleton,
   component: EditDatasourcePage,
 });

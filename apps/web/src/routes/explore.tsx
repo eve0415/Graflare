@@ -2,9 +2,11 @@ import { Button } from '@graflare/ui/components/button';
 import { Separator } from '@graflare/ui/components/separator';
 import { createFileRoute } from '@tanstack/react-router';
 import { Columns2 } from 'lucide-react';
-import { Suspense, useCallback, useMemo, useState } from 'react';
+import { useCallback, useState } from 'react';
 
 import { ExplorePane } from '../components/explore-pane';
+import { QueryBoundary } from '../components/query-boundary';
+import { ExplorePaneSkeleton } from '../components/skeletons/explore-pane-skeleton';
 import { TimeRangePicker } from '../components/time-range-picker';
 
 interface TimeRange {
@@ -21,8 +23,6 @@ const ExplorePage = () => {
   const toggleSplit = useCallback(() => {
     setSplit(s => !s);
   }, []);
-
-  const paneFallback = useMemo(() => <div className='text-muted-foreground'>Loading...</div>, []);
 
   return (
     <div className='space-y-4'>
@@ -43,14 +43,14 @@ const ExplorePage = () => {
       </div>
 
       <div className={split ? 'grid grid-cols-2 gap-4' : ''}>
-        <Suspense fallback={paneFallback}>
+        <QueryBoundary pendingFallback={<ExplorePaneSkeleton />}>
           <ExplorePane timeRange={timeRange} label='Explore pane 1' />
-        </Suspense>
+        </QueryBoundary>
 
         {split && (
-          <Suspense fallback={paneFallback}>
+          <QueryBoundary pendingFallback={<ExplorePaneSkeleton />}>
             <ExplorePane timeRange={timeRange} label='Explore pane 2' />
-          </Suspense>
+          </QueryBoundary>
         )}
       </div>
     </div>

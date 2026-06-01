@@ -2,16 +2,17 @@ import type { QueryClient } from '@tanstack/react-query';
 
 import { Separator } from '@graflare/ui/components/separator';
 import { SidebarInset, SidebarProvider, SidebarTrigger } from '@graflare/ui/components/sidebar';
+import { Skeleton } from '@graflare/ui/components/skeleton';
 import rootCss from './__root.css?url';
 import { HeadContent, Outlet, Scripts, createRootRouteWithContext } from '@tanstack/react-router';
 import { TanStackRouterDevtools } from '@tanstack/react-router-devtools';
-import { Suspense } from 'react';
 
 import { AppSidebar } from '../components/app-sidebar';
+import { QueryBoundary } from '../components/query-boundary';
 import { ThemeProvider } from '../components/theme-provider';
 
 const bodyStyle = { fontFamily: 'Geist, sans-serif' };
-const fallback = <div className='text-muted-foreground p-4'>Loading...</div>;
+const rootFallback = <Skeleton className='h-64 w-full rounded-lg' />;
 
 const RootComponent = () => (
   <html lang='en'>
@@ -29,9 +30,9 @@ const RootComponent = () => (
               <span className='text-sm font-semibold'>Graflare</span>
             </header>
             <main className='flex-1 p-6'>
-              <Suspense fallback={fallback}>
+              <QueryBoundary pendingFallback={rootFallback}>
                 <Outlet />
-              </Suspense>
+              </QueryBoundary>
             </main>
           </SidebarInset>
         </SidebarProvider>

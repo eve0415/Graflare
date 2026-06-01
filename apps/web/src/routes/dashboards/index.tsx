@@ -6,6 +6,7 @@ import { Link, createFileRoute } from '@tanstack/react-router';
 import { Plus, Search } from 'lucide-react';
 import { useCallback, useMemo, useState } from 'react';
 
+import { DashboardListSkeleton } from '../../components/skeletons/dashboard-list-skeleton';
 import { dashboardsQueryOptions } from '../../lib/query-options';
 
 const DashboardListPage = () => {
@@ -95,5 +96,6 @@ const DashboardCard = ({ dashboard: d }: { dashboard: { id: string; title: strin
 
 export const Route = createFileRoute('/dashboards/')({
   loader: ({ context }) => context.queryClient.ensureQueryData(dashboardsQueryOptions()),
+  pendingComponent: DashboardListSkeleton,
   component: DashboardListPage,
 });
