@@ -11,6 +11,7 @@
     "generate": "pnpm --filter './apps/*' generate"
   },
   "devDependencies": {
+    "@tanstack/intent": "0.0.41",
     "@typescript/native-preview": "7.0.0-dev.20260527.1",
     "eslint-plugin-react-hooks": "7.1.1",
     "localflare": "0.5.0",
