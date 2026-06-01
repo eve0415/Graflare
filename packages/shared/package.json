@@ -20,6 +20,10 @@
     "./variables/*": {
       "import": "./src/variables/*.ts",
       "types": "./src/variables/*.ts"
+    },
+    "./alerting/*": {
+      "import": "./src/alerting/*.ts",
+      "types": "./src/alerting/*.ts"
     }
   },
   "scripts": {
