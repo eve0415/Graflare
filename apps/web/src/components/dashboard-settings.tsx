@@ -3,12 +3,14 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@graflare/ui/c
 import { Input } from '@graflare/ui/components/input';
 import { Label } from '@graflare/ui/components/label';
 import { Separator } from '@graflare/ui/components/separator';
-import { Skeleton } from '@graflare/ui/components/skeleton';
-import { useQuery } from '@tanstack/react-query';
+import { useSuspenseQuery } from '@tanstack/react-query';
 import { History, RotateCcw } from 'lucide-react';
 import { useCallback, useState } from 'react';
 
-import { listDashboardVersions, restoreDashboardVersion } from '../lib/api';
+import { restoreDashboardVersion } from '../lib/api';
+import { dashboardVersionsQueryOptions } from '../lib/query-options';
+import { QueryBoundary } from './query-boundary';
+import { VersionHistorySkeleton } from './skeletons/version-history-skeleton';
 
 interface DashboardSettingsProps {
   open: boolean;
@@ -108,7 +110,9 @@ export const DashboardSettings = ({ open, onClose, dashboardId, title, descripti
         )}
 
         {tab === 'versions' && (
-          <VersionHistory dashboardId={dashboardId} onRestore={onRestore} onClose={onClose} />
+          <QueryBoundary pendingFallback={<VersionHistorySkeleton />}>
+            <VersionHistory dashboardId={dashboardId} onRestore={onRestore} onClose={onClose} />
+          </QueryBoundary>
         )}
       </DialogContent>
     </Dialog>
@@ -124,10 +128,7 @@ const VersionHistory = ({
   onRestore?: () => void;
   onClose: () => void;
 }) => {
-  const { data: versions, isLoading } = useQuery({
-    queryKey: ['dashboard-versions', dashboardId],
-    queryFn: () => listDashboardVersions({ data: dashboardId }),
-  });
+  const { data: versions } = useSuspenseQuery(dashboardVersionsQueryOptions(dashboardId));
 
   const [restoring, setRestoring] = useState<number | null>(null);
 
@@ -145,17 +146,7 @@ const VersionHistory = ({
     void run();
   }, [dashboardId, onRestore, onClose]);
 
-  if (isLoading) {
-    return (
-      <div className='space-y-2'>
-        <Skeleton className='h-12 w-full' />
-        <Skeleton className='h-12 w-full' />
-        <Skeleton className='h-12 w-full' />
-      </div>
-    );
-  }
-
-  if (versions === undefined || versions.length === 0) {
+  if (versions.length === 0) {
     return <p className='text-muted-foreground py-4 text-center text-sm'>No version history available.</p>;
   }
 
