@@ -49,6 +49,7 @@
     "lucide-react": "1.17.0",
     "react": "19.2.6",
     "react-dom": "19.2.6",
+    "react-error-boundary": "6.1.2",
     "react-grid-layout": "2.2.3",
     "tailwindcss": "4.3.0",
     "uplot": "1.6.32",
