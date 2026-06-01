@@ -9,18 +9,37 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
+import { Route as AlertingRouteRouteImport } from './routes/alerting/route'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as ImportIndexRouteImport } from './routes/import/index'
 import { Route as ExploreIndexRouteImport } from './routes/explore/index'
 import { Route as DatasourcesIndexRouteImport } from './routes/datasources/index'
 import { Route as DashboardsIndexRouteImport } from './routes/dashboards/index'
+import { Route as AlertingIndexRouteImport } from './routes/alerting/index'
 import { Route as DatasourcesNewRouteImport } from './routes/datasources/new'
 import { Route as DatasourcesIdRouteImport } from './routes/datasources/$id'
 import { Route as DashboardsNewRouteImport } from './routes/dashboards/new'
+import { Route as AlertingNotificationsRouteRouteImport } from './routes/alerting/notifications/route'
 import { Route as DatasourcesIdIndexRouteImport } from './routes/datasources/$id/index'
 import { Route as DashboardsIdIndexRouteImport } from './routes/dashboards/$id/index'
+import { Route as AlertingSilencesIndexRouteImport } from './routes/alerting/silences/index'
+import { Route as AlertingRulesIndexRouteImport } from './routes/alerting/rules/index'
+import { Route as AlertingNotificationsIndexRouteImport } from './routes/alerting/notifications/index'
+import { Route as AlertingMuteTimingsIndexRouteImport } from './routes/alerting/mute-timings/index'
+import { Route as AlertingAlertsIndexRouteImport } from './routes/alerting/alerts/index'
 import { Route as DatasourcesIdTestRouteImport } from './routes/datasources/$id/test'
+import { Route as AlertingSilencesNewRouteImport } from './routes/alerting/silences/new'
+import { Route as AlertingRulesNewRouteImport } from './routes/alerting/rules/new'
+import { Route as AlertingMuteTimingsNewRouteImport } from './routes/alerting/mute-timings/new'
+import { Route as AlertingNotificationsPoliciesIndexRouteImport } from './routes/alerting/notifications/policies/index'
+import { Route as AlertingNotificationsContactPointsIndexRouteImport } from './routes/alerting/notifications/contact-points/index'
+import { Route as AlertingNotificationsContactPointsNewRouteImport } from './routes/alerting/notifications/contact-points/new'
 
+const AlertingRouteRoute = AlertingRouteRouteImport.update({
+  id: '/alerting',
+  path: '/alerting',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
@@ -46,6 +65,11 @@ const DashboardsIndexRoute = DashboardsIndexRouteImport.update({
   path: '/dashboards/',
   getParentRoute: () => rootRouteImport,
 } as any)
+const AlertingIndexRoute = AlertingIndexRouteImport.update({
+  id: '/',
+  path: '/',
+  getParentRoute: () => AlertingRouteRoute,
+} as any)
 const DatasourcesNewRoute = DatasourcesNewRouteImport.update({
   id: '/datasources/new',
   path: '/datasources/new',
@@ -61,6 +85,12 @@ const DashboardsNewRoute = DashboardsNewRouteImport.update({
   path: '/dashboards/new',
   getParentRoute: () => rootRouteImport,
 } as any)
+const AlertingNotificationsRouteRoute =
+  AlertingNotificationsRouteRouteImport.update({
+    id: '/notifications',
+    path: '/notifications',
+    getParentRoute: () => AlertingRouteRoute,
+  } as any)
 const DatasourcesIdIndexRoute = DatasourcesIdIndexRouteImport.update({
   id: '/',
   path: '/',
@@ -71,94 +101,235 @@ const DashboardsIdIndexRoute = DashboardsIdIndexRouteImport.update({
   path: '/dashboards/$id/',
   getParentRoute: () => rootRouteImport,
 } as any)
+const AlertingSilencesIndexRoute = AlertingSilencesIndexRouteImport.update({
+  id: '/silences/',
+  path: '/silences/',
+  getParentRoute: () => AlertingRouteRoute,
+} as any)
+const AlertingRulesIndexRoute = AlertingRulesIndexRouteImport.update({
+  id: '/rules/',
+  path: '/rules/',
+  getParentRoute: () => AlertingRouteRoute,
+} as any)
+const AlertingNotificationsIndexRoute =
+  AlertingNotificationsIndexRouteImport.update({
+    id: '/',
+    path: '/',
+    getParentRoute: () => AlertingNotificationsRouteRoute,
+  } as any)
+const AlertingMuteTimingsIndexRoute =
+  AlertingMuteTimingsIndexRouteImport.update({
+    id: '/mute-timings/',
+    path: '/mute-timings/',
+    getParentRoute: () => AlertingRouteRoute,
+  } as any)
+const AlertingAlertsIndexRoute = AlertingAlertsIndexRouteImport.update({
+  id: '/alerts/',
+  path: '/alerts/',
+  getParentRoute: () => AlertingRouteRoute,
+} as any)
 const DatasourcesIdTestRoute = DatasourcesIdTestRouteImport.update({
   id: '/test',
   path: '/test',
   getParentRoute: () => DatasourcesIdRoute,
 } as any)
+const AlertingSilencesNewRoute = AlertingSilencesNewRouteImport.update({
+  id: '/silences/new',
+  path: '/silences/new',
+  getParentRoute: () => AlertingRouteRoute,
+} as any)
+const AlertingRulesNewRoute = AlertingRulesNewRouteImport.update({
+  id: '/rules/new',
+  path: '/rules/new',
+  getParentRoute: () => AlertingRouteRoute,
+} as any)
+const AlertingMuteTimingsNewRoute = AlertingMuteTimingsNewRouteImport.update({
+  id: '/mute-timings/new',
+  path: '/mute-timings/new',
+  getParentRoute: () => AlertingRouteRoute,
+} as any)
+const AlertingNotificationsPoliciesIndexRoute =
+  AlertingNotificationsPoliciesIndexRouteImport.update({
+    id: '/policies/',
+    path: '/policies/',
+    getParentRoute: () => AlertingNotificationsRouteRoute,
+  } as any)
+const AlertingNotificationsContactPointsIndexRoute =
+  AlertingNotificationsContactPointsIndexRouteImport.update({
+    id: '/contact-points/',
+    path: '/contact-points/',
+    getParentRoute: () => AlertingNotificationsRouteRoute,
+  } as any)
+const AlertingNotificationsContactPointsNewRoute =
+  AlertingNotificationsContactPointsNewRouteImport.update({
+    id: '/contact-points/new',
+    path: '/contact-points/new',
+    getParentRoute: () => AlertingNotificationsRouteRoute,
+  } as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/alerting': typeof AlertingRouteRouteWithChildren
+  '/alerting/notifications': typeof AlertingNotificationsRouteRouteWithChildren
   '/dashboards/new': typeof DashboardsNewRoute
   '/datasources/$id': typeof DatasourcesIdRouteWithChildren
   '/datasources/new': typeof DatasourcesNewRoute
+  '/alerting/': typeof AlertingIndexRoute
   '/dashboards/': typeof DashboardsIndexRoute
   '/datasources/': typeof DatasourcesIndexRoute
   '/explore/': typeof ExploreIndexRoute
   '/import/': typeof ImportIndexRoute
+  '/alerting/mute-timings/new': typeof AlertingMuteTimingsNewRoute
+  '/alerting/rules/new': typeof AlertingRulesNewRoute
+  '/alerting/silences/new': typeof AlertingSilencesNewRoute
   '/datasources/$id/test': typeof DatasourcesIdTestRoute
+  '/alerting/alerts/': typeof AlertingAlertsIndexRoute
+  '/alerting/mute-timings/': typeof AlertingMuteTimingsIndexRoute
+  '/alerting/notifications/': typeof AlertingNotificationsIndexRoute
+  '/alerting/rules/': typeof AlertingRulesIndexRoute
+  '/alerting/silences/': typeof AlertingSilencesIndexRoute
   '/dashboards/$id/': typeof DashboardsIdIndexRoute
   '/datasources/$id/': typeof DatasourcesIdIndexRoute
+  '/alerting/notifications/contact-points/new': typeof AlertingNotificationsContactPointsNewRoute
+  '/alerting/notifications/contact-points/': typeof AlertingNotificationsContactPointsIndexRoute
+  '/alerting/notifications/policies/': typeof AlertingNotificationsPoliciesIndexRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/dashboards/new': typeof DashboardsNewRoute
   '/datasources/new': typeof DatasourcesNewRoute
+  '/alerting': typeof AlertingIndexRoute
   '/dashboards': typeof DashboardsIndexRoute
   '/datasources': typeof DatasourcesIndexRoute
   '/explore': typeof ExploreIndexRoute
   '/import': typeof ImportIndexRoute
+  '/alerting/mute-timings/new': typeof AlertingMuteTimingsNewRoute
+  '/alerting/rules/new': typeof AlertingRulesNewRoute
+  '/alerting/silences/new': typeof AlertingSilencesNewRoute
   '/datasources/$id/test': typeof DatasourcesIdTestRoute
+  '/alerting/alerts': typeof AlertingAlertsIndexRoute
+  '/alerting/mute-timings': typeof AlertingMuteTimingsIndexRoute
+  '/alerting/notifications': typeof AlertingNotificationsIndexRoute
+  '/alerting/rules': typeof AlertingRulesIndexRoute
+  '/alerting/silences': typeof AlertingSilencesIndexRoute
   '/dashboards/$id': typeof DashboardsIdIndexRoute
   '/datasources/$id': typeof DatasourcesIdIndexRoute
+  '/alerting/notifications/contact-points/new': typeof AlertingNotificationsContactPointsNewRoute
+  '/alerting/notifications/contact-points': typeof AlertingNotificationsContactPointsIndexRoute
+  '/alerting/notifications/policies': typeof AlertingNotificationsPoliciesIndexRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
+  '/alerting': typeof AlertingRouteRouteWithChildren
+  '/alerting/notifications': typeof AlertingNotificationsRouteRouteWithChildren
   '/dashboards/new': typeof DashboardsNewRoute
   '/datasources/$id': typeof DatasourcesIdRouteWithChildren
   '/datasources/new': typeof DatasourcesNewRoute
+  '/alerting/': typeof AlertingIndexRoute
   '/dashboards/': typeof DashboardsIndexRoute
   '/datasources/': typeof DatasourcesIndexRoute
   '/explore/': typeof ExploreIndexRoute
   '/import/': typeof ImportIndexRoute
+  '/alerting/mute-timings/new': typeof AlertingMuteTimingsNewRoute
+  '/alerting/rules/new': typeof AlertingRulesNewRoute
+  '/alerting/silences/new': typeof AlertingSilencesNewRoute
   '/datasources/$id/test': typeof DatasourcesIdTestRoute
+  '/alerting/alerts/': typeof AlertingAlertsIndexRoute
+  '/alerting/mute-timings/': typeof AlertingMuteTimingsIndexRoute
+  '/alerting/notifications/': typeof AlertingNotificationsIndexRoute
+  '/alerting/rules/': typeof AlertingRulesIndexRoute
+  '/alerting/silences/': typeof AlertingSilencesIndexRoute
   '/dashboards/$id/': typeof DashboardsIdIndexRoute
   '/datasources/$id/': typeof DatasourcesIdIndexRoute
+  '/alerting/notifications/contact-points/new': typeof AlertingNotificationsContactPointsNewRoute
+  '/alerting/notifications/contact-points/': typeof AlertingNotificationsContactPointsIndexRoute
+  '/alerting/notifications/policies/': typeof AlertingNotificationsPoliciesIndexRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths:
     | '/'
+    | '/alerting'
+    | '/alerting/notifications'
     | '/dashboards/new'
     | '/datasources/$id'
     | '/datasources/new'
+    | '/alerting/'
     | '/dashboards/'
     | '/datasources/'
     | '/explore/'
     | '/import/'
+    | '/alerting/mute-timings/new'
+    | '/alerting/rules/new'
+    | '/alerting/silences/new'
     | '/datasources/$id/test'
+    | '/alerting/alerts/'
+    | '/alerting/mute-timings/'
+    | '/alerting/notifications/'
+    | '/alerting/rules/'
+    | '/alerting/silences/'
     | '/dashboards/$id/'
     | '/datasources/$id/'
+    | '/alerting/notifications/contact-points/new'
+    | '/alerting/notifications/contact-points/'
+    | '/alerting/notifications/policies/'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
     | '/dashboards/new'
     | '/datasources/new'
+    | '/alerting'
     | '/dashboards'
     | '/datasources'
     | '/explore'
     | '/import'
+    | '/alerting/mute-timings/new'
+    | '/alerting/rules/new'
+    | '/alerting/silences/new'
     | '/datasources/$id/test'
+    | '/alerting/alerts'
+    | '/alerting/mute-timings'
+    | '/alerting/notifications'
+    | '/alerting/rules'
+    | '/alerting/silences'
     | '/dashboards/$id'
     | '/datasources/$id'
+    | '/alerting/notifications/contact-points/new'
+    | '/alerting/notifications/contact-points'
+    | '/alerting/notifications/policies'
   id:
     | '__root__'
     | '/'
+    | '/alerting'
+    | '/alerting/notifications'
     | '/dashboards/new'
     | '/datasources/$id'
     | '/datasources/new'
+    | '/alerting/'
     | '/dashboards/'
     | '/datasources/'
     | '/explore/'
     | '/import/'
+    | '/alerting/mute-timings/new'
+    | '/alerting/rules/new'
+    | '/alerting/silences/new'
     | '/datasources/$id/test'
+    | '/alerting/alerts/'
+    | '/alerting/mute-timings/'
+    | '/alerting/notifications/'
+    | '/alerting/rules/'
+    | '/alerting/silences/'
     | '/dashboards/$id/'
     | '/datasources/$id/'
+    | '/alerting/notifications/contact-points/new'
+    | '/alerting/notifications/contact-points/'
+    | '/alerting/notifications/policies/'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
+  AlertingRouteRoute: typeof AlertingRouteRouteWithChildren
   DashboardsNewRoute: typeof DashboardsNewRoute
   DatasourcesIdRoute: typeof DatasourcesIdRouteWithChildren
   DatasourcesNewRoute: typeof DatasourcesNewRoute
@@ -171,6 +342,13 @@ export interface RootRouteChildren {
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
+    '/alerting': {
+      id: '/alerting'
+      path: '/alerting'
+      fullPath: '/alerting'
+      preLoaderRoute: typeof AlertingRouteRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/': {
       id: '/'
       path: '/'
@@ -206,6 +384,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof DashboardsIndexRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/alerting/': {
+      id: '/alerting/'
+      path: '/'
+      fullPath: '/alerting/'
+      preLoaderRoute: typeof AlertingIndexRouteImport
+      parentRoute: typeof AlertingRouteRoute
+    }
     '/datasources/new': {
       id: '/datasources/new'
       path: '/datasources/new'
@@ -227,6 +412,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof DashboardsNewRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/alerting/notifications': {
+      id: '/alerting/notifications'
+      path: '/notifications'
+      fullPath: '/alerting/notifications'
+      preLoaderRoute: typeof AlertingNotificationsRouteRouteImport
+      parentRoute: typeof AlertingRouteRoute
+    }
     '/datasources/$id/': {
       id: '/datasources/$id/'
       path: '/'
@@ -241,6 +433,41 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof DashboardsIdIndexRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/alerting/silences/': {
+      id: '/alerting/silences/'
+      path: '/silences'
+      fullPath: '/alerting/silences/'
+      preLoaderRoute: typeof AlertingSilencesIndexRouteImport
+      parentRoute: typeof AlertingRouteRoute
+    }
+    '/alerting/rules/': {
+      id: '/alerting/rules/'
+      path: '/rules'
+      fullPath: '/alerting/rules/'
+      preLoaderRoute: typeof AlertingRulesIndexRouteImport
+      parentRoute: typeof AlertingRouteRoute
+    }
+    '/alerting/notifications/': {
+      id: '/alerting/notifications/'
+      path: '/'
+      fullPath: '/alerting/notifications/'
+      preLoaderRoute: typeof AlertingNotificationsIndexRouteImport
+      parentRoute: typeof AlertingNotificationsRouteRoute
+    }
+    '/alerting/mute-timings/': {
+      id: '/alerting/mute-timings/'
+      path: '/mute-timings'
+      fullPath: '/alerting/mute-timings/'
+      preLoaderRoute: typeof AlertingMuteTimingsIndexRouteImport
+      parentRoute: typeof AlertingRouteRoute
+    }
+    '/alerting/alerts/': {
+      id: '/alerting/alerts/'
+      path: '/alerts'
+      fullPath: '/alerting/alerts/'
+      preLoaderRoute: typeof AlertingAlertsIndexRouteImport
+      parentRoute: typeof AlertingRouteRoute
+    }
     '/datasources/$id/test': {
       id: '/datasources/$id/test'
       path: '/test'
@@ -248,8 +475,101 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof DatasourcesIdTestRouteImport
       parentRoute: typeof DatasourcesIdRoute
     }
+    '/alerting/silences/new': {
+      id: '/alerting/silences/new'
+      path: '/silences/new'
+      fullPath: '/alerting/silences/new'
+      preLoaderRoute: typeof AlertingSilencesNewRouteImport
+      parentRoute: typeof AlertingRouteRoute
+    }
+    '/alerting/rules/new': {
+      id: '/alerting/rules/new'
+      path: '/rules/new'
+      fullPath: '/alerting/rules/new'
+      preLoaderRoute: typeof AlertingRulesNewRouteImport
+      parentRoute: typeof AlertingRouteRoute
+    }
+    '/alerting/mute-timings/new': {
+      id: '/alerting/mute-timings/new'
+      path: '/mute-timings/new'
+      fullPath: '/alerting/mute-timings/new'
+      preLoaderRoute: typeof AlertingMuteTimingsNewRouteImport
+      parentRoute: typeof AlertingRouteRoute
+    }
+    '/alerting/notifications/policies/': {
+      id: '/alerting/notifications/policies/'
+      path: '/policies'
+      fullPath: '/alerting/notifications/policies/'
+      preLoaderRoute: typeof AlertingNotificationsPoliciesIndexRouteImport
+      parentRoute: typeof AlertingNotificationsRouteRoute
+    }
+    '/alerting/notifications/contact-points/': {
+      id: '/alerting/notifications/contact-points/'
+      path: '/contact-points'
+      fullPath: '/alerting/notifications/contact-points/'
+      preLoaderRoute: typeof AlertingNotificationsContactPointsIndexRouteImport
+      parentRoute: typeof AlertingNotificationsRouteRoute
+    }
+    '/alerting/notifications/contact-points/new': {
+      id: '/alerting/notifications/contact-points/new'
+      path: '/contact-points/new'
+      fullPath: '/alerting/notifications/contact-points/new'
+      preLoaderRoute: typeof AlertingNotificationsContactPointsNewRouteImport
+      parentRoute: typeof AlertingNotificationsRouteRoute
+    }
   }
 }
+
+interface AlertingNotificationsRouteRouteChildren {
+  AlertingNotificationsIndexRoute: typeof AlertingNotificationsIndexRoute
+  AlertingNotificationsContactPointsNewRoute: typeof AlertingNotificationsContactPointsNewRoute
+  AlertingNotificationsContactPointsIndexRoute: typeof AlertingNotificationsContactPointsIndexRoute
+  AlertingNotificationsPoliciesIndexRoute: typeof AlertingNotificationsPoliciesIndexRoute
+}
+
+const AlertingNotificationsRouteRouteChildren: AlertingNotificationsRouteRouteChildren =
+  {
+    AlertingNotificationsIndexRoute: AlertingNotificationsIndexRoute,
+    AlertingNotificationsContactPointsNewRoute:
+      AlertingNotificationsContactPointsNewRoute,
+    AlertingNotificationsContactPointsIndexRoute:
+      AlertingNotificationsContactPointsIndexRoute,
+    AlertingNotificationsPoliciesIndexRoute:
+      AlertingNotificationsPoliciesIndexRoute,
+  }
+
+const AlertingNotificationsRouteRouteWithChildren =
+  AlertingNotificationsRouteRoute._addFileChildren(
+    AlertingNotificationsRouteRouteChildren,
+  )
+
+interface AlertingRouteRouteChildren {
+  AlertingNotificationsRouteRoute: typeof AlertingNotificationsRouteRouteWithChildren
+  AlertingIndexRoute: typeof AlertingIndexRoute
+  AlertingMuteTimingsNewRoute: typeof AlertingMuteTimingsNewRoute
+  AlertingRulesNewRoute: typeof AlertingRulesNewRoute
+  AlertingSilencesNewRoute: typeof AlertingSilencesNewRoute
+  AlertingAlertsIndexRoute: typeof AlertingAlertsIndexRoute
+  AlertingMuteTimingsIndexRoute: typeof AlertingMuteTimingsIndexRoute
+  AlertingRulesIndexRoute: typeof AlertingRulesIndexRoute
+  AlertingSilencesIndexRoute: typeof AlertingSilencesIndexRoute
+}
+
+const AlertingRouteRouteChildren: AlertingRouteRouteChildren = {
+  AlertingNotificationsRouteRoute: AlertingNotificationsRouteRouteWithChildren,
+  AlertingIndexRoute: AlertingIndexRoute,
+  AlertingMuteTimingsNewRoute: AlertingMuteTimingsNewRoute,
+  AlertingRulesNewRoute: AlertingRulesNewRoute,
+  AlertingSilencesNewRoute: AlertingSilencesNewRoute,
+  AlertingAlertsIndexRoute: AlertingAlertsIndexRoute,
+  AlertingMuteTimingsIndexRoute: AlertingMuteTimingsIndexRoute,
+  AlertingRulesIndexRoute: AlertingRulesIndexRoute,
+  AlertingSilencesIndexRoute: AlertingSilencesIndexRoute,
+}
+
+const AlertingRouteRouteWithChildren = AlertingRouteRoute._addFileChildren(
+  AlertingRouteRouteChildren,
+)
 
 interface DatasourcesIdRouteChildren {
   DatasourcesIdTestRoute: typeof DatasourcesIdTestRoute
@@ -267,6 +587,7 @@ const DatasourcesIdRouteWithChildren = DatasourcesIdRoute._addFileChildren(
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  AlertingRouteRoute: AlertingRouteRouteWithChildren,
   DashboardsNewRoute: DashboardsNewRoute,
   DatasourcesIdRoute: DatasourcesIdRouteWithChildren,
   DatasourcesNewRoute: DatasourcesNewRoute,
