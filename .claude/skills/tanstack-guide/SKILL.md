@@ -79,14 +79,15 @@ These are project patterns not covered by Intent or any rule file.
 
 | Concern | Location |
 |---------|----------|
-| Server functions (RPC bridge) | `apps/web/src/lib/api.ts` — single file, all server fns |
-| Query option factories | `apps/web/src/lib/query-options.ts` — all `queryOptions()` calls |
-| Custom hooks | `apps/web/src/hooks/` (e.g. `use-variables.ts`) |
-| Panel data hook | `apps/web/src/components/panels/use-panel-data.ts` |
+| Server functions (RPC bridge) | `routes/<feature>/-api.ts` — colocated per feature; `lib/proxy.ts` for cross-feature `proxyQuery` |
+| Query option factories | `routes/<feature>/-queries.ts` — colocated per feature |
+| Feature components | `routes/<feature>/-components/` — colocated with route files |
+| Shared/root components | `routes/-root/` — used by `__root.tsx` or across multiple features |
+| Panel data hook | `routes/dashboards/-components/panels/use-panel-data.ts` |
 
 ### Query options factory pattern
 
-Every data-fetching need gets a `queryOptions()` factory in `query-options.ts`:
+Every data-fetching need gets a `queryOptions()` factory in the feature's `-queries.ts`:
 
 ```ts
 export const dashboardQueryOptions = (id: string) =>
@@ -165,8 +166,8 @@ export const Route = createFileRoute('/dashboards/')({
 
 ### Skeleton convention
 
-Skeleton components live in `apps/web/src/components/skeletons/`. Each matches the layout
-shape of the page it represents using `<Skeleton>` from `@graflare/ui/components/skeleton`.
+Skeleton components are colocated in each feature's `-components/` directory. Each matches the
+layout shape of the page it represents using `<Skeleton>` from `@graflare/ui/components/skeleton`.
 
 ### Mutation pending states
 
@@ -232,9 +233,10 @@ navigate({ to: '/datasources' })
 
 ### Route structure
 
-File-based. `-` prefix for colocated non-route directories (e.g. `datasources/-components/`).
-`$param` for dynamic segments. Layout routes render `<Outlet/>` with index content in
-`$param/index.tsx`.
+File-based. `-` prefix for colocated non-route files and directories (e.g. `-api.ts`,
+`-queries.ts`, `-components/`). `$param` for dynamic segments. Layout routes render
+`<Outlet/>` with index content in `$param/index.tsx`. `.test.` files are excluded via
+`routeFileIgnorePattern` in vite config.
 
 ## Table & Virtual
 

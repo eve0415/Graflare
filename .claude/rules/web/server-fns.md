@@ -1,11 +1,15 @@
 ---
 paths:
-  - 'apps/web/src/lib/api.ts'
+  - 'apps/web/src/routes/**/-api.ts'
+  - 'apps/web/src/lib/proxy.ts'
 ---
 
-# Server functions / RPC bridge (apps/web/src/lib/api.ts)
+# Server functions / RPC bridge
 
-This file bridges TanStack `createServerFn` handlers to the API Worker over the service binding.
+Server functions are colocated with their feature routes:
+- `routes/dashboards/-api.ts` — dashboard + folder CRUD
+- `routes/datasources/-api.ts` — datasource CRUD + test connection
+- `lib/proxy.ts` — `proxyQuery` (cross-feature, used by explore + panels + datasource test)
 
 - The validator method is **`.inputValidator()`**, not `.validator()`.
 - Reach Cloudflare bindings via `import { env } from 'cloudflare:workers'` — NOT off `context`.
@@ -18,6 +22,5 @@ This file bridges TanStack `createServerFn` handlers to the API Worker over the 
   `createServerFn`'s serialization check rejects. Return a plain object instead: re-`parse`
   through the zod schema (e.g. `prometheusResponseSchema.parse(result)`) or rebuild the object
   field by field — spreading does NOT drop the brand.
-- In jsdom tests this module is mocked wholesale (`vi.mock('./lib/api', …)` in
-  `src/test-setup.ts`) so the real `cloudflare:workers` import never loads. Keep the mock's return
-  shapes contract-accurate.
+- In jsdom tests these modules are mocked wholesale in `tests/setup.ts` so the real
+  `cloudflare:workers` import never loads. Keep the mock's return shapes contract-accurate.
