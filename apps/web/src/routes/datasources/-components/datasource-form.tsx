@@ -7,7 +7,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { useNavigate } from '@tanstack/react-router';
 import { useCallback, useState } from 'react';
 
-import { createDatasource, testConnection, updateDatasource } from '../-api';
+import { createDatasource, testConnectionInline, updateDatasource } from '../-api';
 
 type DatasourceType = 'prometheus' | 'sql';
 type DatasourceDialect = 'sqlite' | 'postgres';
@@ -106,11 +106,20 @@ export const DatasourceForm = ({ mode, initialData }: Props) => {
   );
 
   const handleTest = useCallback(async () => {
-    if (form.id === undefined) return;
     setTesting(true);
     setTestResult(null);
     try {
-      const result = await testConnection({ data: form.id });
+      const credentials =
+        form.authType === 'basic' ? { username: form.username, password: form.password } : form.authType === 'bearer' ? { token: form.token } : undefined;
+      const result = await testConnectionInline({
+        data: {
+          type: form.type,
+          url: form.url,
+          authType: form.authType,
+          credentials,
+          queryTimeoutMs: form.queryTimeoutMs,
+        },
+      });
       setTestResult(result);
     } catch (error) {
       setTestResult({
@@ -120,7 +129,7 @@ export const DatasourceForm = ({ mode, initialData }: Props) => {
     } finally {
       setTesting(false);
     }
-  }, [form.id]);
+  }, [form]);
 
   const handleNameChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
     const { value } = e.target;
@@ -229,7 +238,9 @@ export const DatasourceForm = ({ mode, initialData }: Props) => {
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value='sqlite'>SQLite / D1</SelectItem>
-                  <SelectItem value='postgres' disabled>PostgreSQL (coming soon)</SelectItem>
+                  <SelectItem value='postgres' disabled>
+                    PostgreSQL (coming soon)
+                  </SelectItem>
                 </SelectContent>
               </Select>
             </div>
@@ -286,18 +297,16 @@ export const DatasourceForm = ({ mode, initialData }: Props) => {
             <Input id='timeout' type='number' min={1000} max={120000} step={1000} value={form.queryTimeoutMs} onChange={handleTimeoutChange} />
           </div>
 
-          {mode === 'edit' && (
-            <div className='flex items-center gap-3'>
-              <Button type='button' variant='outline' size='sm' onClick={handleTestClick} disabled={testing}>
-                {testing ? 'Testing...' : 'Test Connection'}
-              </Button>
-              {testResult !== null && (
-                <span className={`text-sm ${testResult.success ? 'text-green-600' : 'text-destructive'}`}>
-                  {testResult.success ? `Connected (${testResult.latencyMs}ms)` : testResult.error}
-                </span>
-              )}
-            </div>
-          )}
+          <div className='flex items-center gap-3'>
+            <Button type='button' variant='outline' size='sm' onClick={handleTestClick} disabled={testing}>
+              {testing ? 'Testing...' : 'Test Connection'}
+            </Button>
+            {testResult !== null && (
+              <span className={`text-sm ${testResult.success ? 'text-green-600' : 'text-destructive'}`}>
+                {testResult.success ? `Connected (${testResult.latencyMs}ms)` : testResult.error}
+              </span>
+            )}
+          </div>
         </CardContent>
         <CardFooter className='flex gap-2'>
           <Button type='submit' disabled={saving}>
