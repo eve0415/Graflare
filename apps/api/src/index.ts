@@ -1,27 +1,27 @@
-import type { CreateAlertRuleGroup, UpdateAlertRuleGroup } from '@graflare/shared/schemas/alert-rule-group';
-import type { CreateAlertRule, UpdateAlertRule } from '@graflare/shared/schemas/alert-rule';
+import type { AlertRuleDO } from './alerting/alert-rule-do';
 import type { AlertInstanceListQuery, UpsertAlertInstance } from '@graflare/shared/schemas/alert-instance';
-import type { CreateContactPoint, UpdateContactPoint } from '@graflare/shared/schemas/contact-point';
-import type { CreateNotificationPolicy, UpdateNotificationPolicy } from '@graflare/shared/schemas/notification-policy';
-import type { CreateSilence, UpdateSilence } from '@graflare/shared/schemas/silence';
-import type { CreateMuteTiming, UpdateMuteTiming } from '@graflare/shared/schemas/mute-timing';
+import type { CreateAlertRule, UpdateAlertRule } from '@graflare/shared/schemas/alert-rule';
+import type { CreateAlertRuleGroup, UpdateAlertRuleGroup } from '@graflare/shared/schemas/alert-rule-group';
 import type { AnnotationListQuery, CreateAnnotation } from '@graflare/shared/schemas/annotation';
+import type { CreateContactPoint, UpdateContactPoint } from '@graflare/shared/schemas/contact-point';
 import type { CreateDashboard, DashboardListQuery, ImportDashboard, UpdateDashboard } from '@graflare/shared/schemas/dashboard';
-import type { CreateDatasource, UpdateDatasource } from '@graflare/shared/schemas/datasource';
+import type { CreateDatasource, TestConnectionInline, UpdateDatasource } from '@graflare/shared/schemas/datasource';
 import type { CreateFolder, UpdateFolder } from '@graflare/shared/schemas/folder';
+import type { CreateMuteTiming, UpdateMuteTiming } from '@graflare/shared/schemas/mute-timing';
+import type { CreateNotificationPolicy, UpdateNotificationPolicy } from '@graflare/shared/schemas/notification-policy';
 import type { PrometheusResponse } from '@graflare/shared/schemas/prometheus';
+import type { CreateSilence, UpdateSilence } from '@graflare/shared/schemas/silence';
 import type { SqlFormat, SqlResponse } from '@graflare/shared/schemas/sql';
+import type { DurableObjectNamespace } from 'cloudflare:workers';
 
-import { createAlertRuleGroupSchema, updateAlertRuleGroupSchema } from '@graflare/shared/schemas/alert-rule-group';
-import { createAlertRuleSchema, updateAlertRuleSchema } from '@graflare/shared/schemas/alert-rule';
+import { detectFormat, importDashboard as importDashboardFn } from '@graflare/shared/import';
 import { alertInstanceListQuerySchema, upsertAlertInstanceSchema } from '@graflare/shared/schemas/alert-instance';
-import { createContactPointSchema, updateContactPointSchema } from '@graflare/shared/schemas/contact-point';
-import { createNotificationPolicySchema, updateNotificationPolicySchema } from '@graflare/shared/schemas/notification-policy';
-import { createSilenceSchema, updateSilenceSchema } from '@graflare/shared/schemas/silence';
-import { createMuteTimingSchema, updateMuteTimingSchema } from '@graflare/shared/schemas/mute-timing';
+import { createAlertRuleSchema, updateAlertRuleSchema } from '@graflare/shared/schemas/alert-rule';
+import { createAlertRuleGroupSchema, updateAlertRuleGroupSchema } from '@graflare/shared/schemas/alert-rule-group';
 import { annotationListQuerySchema, createAnnotationSchema } from '@graflare/shared/schemas/annotation';
+import { createContactPointSchema, updateContactPointSchema } from '@graflare/shared/schemas/contact-point';
 import { createDashboardSchema, importDashboardSchema, updateDashboardSchema } from '@graflare/shared/schemas/dashboard';
-import { createDatasourceSchema, datasourceCredentialsSchema, updateDatasourceSchema } from '@graflare/shared/schemas/datasource';
+import { createDatasourceSchema, datasourceCredentialsSchema, testConnectionInlineSchema, updateDatasourceSchema } from '@graflare/shared/schemas/datasource';
 import { createFolderSchema, updateFolderSchema } from '@graflare/shared/schemas/folder';
 import {
   alertRuleGroupIdSchema,
@@ -35,16 +35,14 @@ import {
   notificationPolicyIdSchema,
   silenceIdSchema,
 } from '@graflare/shared/schemas/ids';
-import { detectFormat, importDashboard as importDashboardFn } from '@graflare/shared/import';
+import { createMuteTimingSchema, updateMuteTimingSchema } from '@graflare/shared/schemas/mute-timing';
+import { createNotificationPolicySchema, updateNotificationPolicySchema } from '@graflare/shared/schemas/notification-policy';
 import { prometheusResponseSchema } from '@graflare/shared/schemas/prometheus';
+import { createSilenceSchema, updateSilenceSchema } from '@graflare/shared/schemas/silence';
 import { expandSqlMacros } from '@graflare/shared/sql/macros';
 import { WorkerEntrypoint } from 'cloudflare:workers';
 import { and, desc, eq, gte, like, lte } from 'drizzle-orm';
 import { Hono } from 'hono';
-
-import type { DurableObjectNamespace } from 'cloudflare:workers';
-
-import type { AlertRuleDO } from './alerting/alert-rule-do';
 
 import { decryptCredentials, encryptCredentials } from './crypto/credentials';
 import { createDb } from './db';
@@ -77,8 +75,9 @@ import { dashboardVersionRoutes } from './routes/dashboards/dashboard-versions';
 import { dashboardRoutes } from './routes/dashboards/dashboards';
 import { datasourceRoutes } from './routes/datasources/datasources';
 import { datasourceTestRoutes } from './routes/datasources/datasources-test';
-import { folderRoutes } from './routes/folders/folders';
 import { proxyRoutes } from './routes/datasources/proxy';
+import { folderRoutes } from './routes/folders/folders';
+import { SqlClient } from './sql/client';
 import { createSqlClient } from './sql/factory';
 
 interface Bindings {
@@ -196,19 +195,24 @@ export class GraflareAPI extends WorkerEntrypoint<Bindings> {
     const id = crypto.randomUUID();
     const now = new Date();
 
-    let encryptedCreds: string | null = null;
-    if (credentials) {
-      encryptedCreds = await encryptCredentials(JSON.stringify(credentials), this.env.ENCRYPTION_KEY);
-    }
+    try {
+      let encryptedCreds: string | null = null;
+      if (credentials) {
+        encryptedCreds = await encryptCredentials(JSON.stringify(credentials), this.env.ENCRYPTION_KEY);
+      }
 
-    await this.db.insert(datasources).values({
-      id,
-      orgId,
-      ...rest,
-      credentials: encryptedCreds,
-      createdAt: now,
-      updatedAt: now,
-    });
+      await this.db.insert(datasources).values({
+        id,
+        orgId,
+        ...rest,
+        credentials: encryptedCreds,
+        createdAt: now,
+        updatedAt: now,
+      });
+    } catch (error) {
+      console.error('createDatasource failed:', error);
+      throw new Error('Failed to create datasource', { cause: error });
+    }
 
     return { id, orgId, ...rest, createdAt: now, updatedAt: now };
   }
@@ -219,26 +223,36 @@ export class GraflareAPI extends WorkerEntrypoint<Bindings> {
     const { credentials, ...rest } = parsed;
     const now = new Date();
 
-    let encryptedCreds: string | undefined;
-    if (credentials) {
-      encryptedCreds = await encryptCredentials(JSON.stringify(credentials), this.env.ENCRYPTION_KEY);
-    }
+    try {
+      let encryptedCreds: string | undefined;
+      if (credentials) {
+        encryptedCreds = await encryptCredentials(JSON.stringify(credentials), this.env.ENCRYPTION_KEY);
+      }
 
-    await this.db
-      .update(datasources)
-      .set({
-        ...rest,
-        ...(encryptedCreds !== undefined && { credentials: encryptedCreds }),
-        updatedAt: now,
-      })
-      .where(and(eq(datasources.id, id), eq(datasources.orgId, orgId)));
+      await this.db
+        .update(datasources)
+        .set({
+          ...rest,
+          ...(encryptedCreds !== undefined && { credentials: encryptedCreds }),
+          updatedAt: now,
+        })
+        .where(and(eq(datasources.id, id), eq(datasources.orgId, orgId)));
+    } catch (error) {
+      console.error('updateDatasource failed:', error);
+      throw new Error('Failed to update datasource', { cause: error });
+    }
 
     return this.getDatasource(orgId, id);
   }
 
   async deleteDatasource(orgId: string, id: string): Promise<void> {
     datasourceIdSchema.parse(id);
-    await this.db.delete(datasources).where(and(eq(datasources.id, id), eq(datasources.orgId, orgId)));
+    try {
+      await this.db.delete(datasources).where(and(eq(datasources.id, id), eq(datasources.orgId, orgId)));
+    } catch (error) {
+      console.error('deleteDatasource failed:', error);
+      throw new Error('Failed to delete datasource', { cause: error });
+    }
   }
 
   async testConnection(orgId: string, id: string): Promise<{ success: boolean; latencyMs: number; error?: string }> {
@@ -278,6 +292,45 @@ export class GraflareAPI extends WorkerEntrypoint<Bindings> {
       const res = await fetch(`${ds.url}/api/v1/labels?limit=1`, {
         headers,
         signal: AbortSignal.timeout(ds.queryTimeoutMs),
+      });
+
+      const latencyMs = Date.now() - start;
+      if (!res.ok) {
+        return { success: false, latencyMs, error: `Upstream returned ${String(res.status)}` };
+      }
+      return { success: true, latencyMs };
+    } catch (error) {
+      const latencyMs = Date.now() - start;
+      const message = error instanceof Error ? error.message : 'Connection failed';
+      return { success: false, latencyMs, error: message };
+    }
+  }
+
+  async testConnectionInline(input: TestConnectionInline): Promise<{ success: boolean; latencyMs: number; error?: string }> {
+    const parsed = testConnectionInlineSchema.parse(input);
+
+    if (parsed.type === 'sql') {
+      const auth =
+        parsed.authType !== 'none' && parsed.credentials !== undefined ? { type: parsed.authType, credentials: parsed.credentials } : { type: 'none' as const };
+      const client = new SqlClient(parsed.url, auth, parsed.queryTimeoutMs);
+      return client.testConnection();
+    }
+
+    const start = Date.now();
+
+    try {
+      const headers: Record<string, string> = {};
+      if (parsed.credentials !== undefined) {
+        if (parsed.authType === 'basic' && parsed.credentials.username !== undefined && parsed.credentials.password !== undefined) {
+          headers['Authorization'] = `Basic ${btoa(`${parsed.credentials.username}:${parsed.credentials.password}`)}`;
+        } else if (parsed.authType === 'bearer' && parsed.credentials.token !== undefined) {
+          headers['Authorization'] = `Bearer ${parsed.credentials.token}`;
+        }
+      }
+
+      const res = await fetch(`${parsed.url}/api/v1/labels?limit=1`, {
+        headers,
+        signal: AbortSignal.timeout(parsed.queryTimeoutMs),
       });
 
       const latencyMs = Date.now() - start;
@@ -350,13 +403,7 @@ export class GraflareAPI extends WorkerEntrypoint<Bindings> {
 
   // --- SQL RPC ---
 
-  async sqlQuery(
-    orgId: string,
-    datasourceId: string,
-    rawSql: string,
-    _format: SqlFormat,
-    timeRange?: { from: string; to: string },
-  ): Promise<SqlResponse> {
+  async sqlQuery(orgId: string, datasourceId: string, rawSql: string, _format: SqlFormat, timeRange?: { from: string; to: string }): Promise<SqlResponse> {
     datasourceIdSchema.parse(datasourceId);
 
     const rows = await this.db
@@ -406,15 +453,20 @@ export class GraflareAPI extends WorkerEntrypoint<Bindings> {
       .replaceAll(/[^a-z0-9]+/g, '-')
       .replaceAll(/^-|-$/g, '');
 
-    await this.db.insert(folders).values({
-      id,
-      orgId,
-      parentId: parsed.parentId ?? null,
-      title: parsed.title,
-      slug,
-      createdAt: now,
-      updatedAt: now,
-    });
+    try {
+      await this.db.insert(folders).values({
+        id,
+        orgId,
+        parentId: parsed.parentId ?? null,
+        title: parsed.title,
+        slug,
+        createdAt: now,
+        updatedAt: now,
+      });
+    } catch (error) {
+      console.error('createFolder failed:', error);
+      throw new Error('Failed to create folder', { cause: error });
+    }
 
     return { id, orgId, parentId: parsed.parentId ?? null, title: parsed.title, slug, createdAt: now, updatedAt: now };
   }
@@ -434,16 +486,17 @@ export class GraflareAPI extends WorkerEntrypoint<Bindings> {
     }
     if (parsed.parentId !== undefined) setData['parentId'] = parsed.parentId;
 
-    await this.db
-      .update(folders)
-      .set(setData)
-      .where(and(eq(folders.id, id), eq(folders.orgId, orgId)));
+    try {
+      await this.db
+        .update(folders)
+        .set(setData)
+        .where(and(eq(folders.id, id), eq(folders.orgId, orgId)));
+    } catch (error) {
+      console.error('updateFolder failed:', error);
+      throw new Error('Failed to update folder', { cause: error });
+    }
 
-    const rows = await this.db
-      .select()
-      .from(folders)
-      .where(eq(folders.id, id))
-      .limit(1);
+    const rows = await this.db.select().from(folders).where(eq(folders.id, id)).limit(1);
     return rows[0] ?? null;
   }
 
@@ -457,20 +510,19 @@ export class GraflareAPI extends WorkerEntrypoint<Bindings> {
 
     const [found] = existing;
     if (found !== undefined) {
-      const { parentId: parentFolderId } = found;
-      await this.db
-        .update(folders)
-        .set({ parentId: parentFolderId })
-        .where(and(eq(folders.parentId, id), eq(folders.orgId, orgId)));
-      await this.db
-        .update(dashboards)
-        .set({ folderId: parentFolderId })
-        .where(eq(dashboards.folderId, id));
-      await this.db
-        .update(alertRuleGroups)
-        .set({ folderId: parentFolderId })
-        .where(eq(alertRuleGroups.folderId, id));
-      await this.db.delete(folders).where(eq(folders.id, id));
+      try {
+        const { parentId: parentFolderId } = found;
+        await this.db
+          .update(folders)
+          .set({ parentId: parentFolderId })
+          .where(and(eq(folders.parentId, id), eq(folders.orgId, orgId)));
+        await this.db.update(dashboards).set({ folderId: parentFolderId }).where(eq(dashboards.folderId, id));
+        await this.db.update(alertRuleGroups).set({ folderId: parentFolderId }).where(eq(alertRuleGroups.folderId, id));
+        await this.db.delete(folders).where(eq(folders.id, id));
+      } catch (error) {
+        console.error('deleteFolder failed:', error);
+        throw new Error('Failed to delete folder', { cause: error });
+      }
     }
   }
 
@@ -499,7 +551,7 @@ export class GraflareAPI extends WorkerEntrypoint<Bindings> {
       .where(and(...conditions));
 
     if (opts?.tag !== undefined) {
-      const {tag} = opts;
+      const { tag } = opts;
       rows = rows.filter(r => r.tags.includes(tag));
     }
 
@@ -525,32 +577,37 @@ export class GraflareAPI extends WorkerEntrypoint<Bindings> {
       .replaceAll(/[^a-z0-9]+/g, '-')
       .replaceAll(/^-|-$/g, '');
 
-    await this.db.insert(dashboards).values({
-      id,
-      orgId,
-      folderId: parsed.folderId ?? null,
-      title: parsed.title,
-      slug,
-      description: parsed.description ?? '',
-      tags: parsed.tags ?? [],
-      panels: parsed.panels ?? [],
-      variables: parsed.variables ?? [],
-      timeRange: parsed.timeRange ?? { from: 'now-1h', to: 'now', refresh: null },
-      version: 1,
-      createdAt: now,
-      updatedAt: now,
-    });
+    try {
+      await this.db.insert(dashboards).values({
+        id,
+        orgId,
+        folderId: parsed.folderId ?? null,
+        title: parsed.title,
+        slug,
+        description: parsed.description ?? '',
+        tags: parsed.tags ?? [],
+        panels: parsed.panels ?? [],
+        variables: parsed.variables ?? [],
+        timeRange: parsed.timeRange ?? { from: 'now-1h', to: 'now', refresh: null },
+        version: 1,
+        createdAt: now,
+        updatedAt: now,
+      });
 
-    const versionId = crypto.randomUUID();
-    await this.db.insert(dashboardVersions).values({
-      id: versionId,
-      dashboardId: id,
-      version: 1,
-      data: JSON.stringify({ ...parsed, id, orgId, slug, version: 1 }),
-      message: 'Initial version',
-      createdBy: userEmail,
-      createdAt: now,
-    });
+      const versionId = crypto.randomUUID();
+      await this.db.insert(dashboardVersions).values({
+        id: versionId,
+        dashboardId: id,
+        version: 1,
+        data: JSON.stringify({ ...parsed, id, orgId, slug, version: 1 }),
+        message: 'Initial version',
+        createdBy: userEmail,
+        createdAt: now,
+      });
+    } catch (error) {
+      console.error('createDashboard failed:', error);
+      throw new Error('Failed to create dashboard', { cause: error });
+    }
 
     return this.getDashboard(orgId, id);
   }
@@ -587,27 +644,37 @@ export class GraflareAPI extends WorkerEntrypoint<Bindings> {
     if (updates.variables !== undefined) setData['variables'] = updates.variables;
     if (updates.timeRange !== undefined) setData['timeRange'] = updates.timeRange;
 
-    await this.db.update(dashboards).set(setData).where(eq(dashboards.id, id));
+    try {
+      await this.db.update(dashboards).set(setData).where(eq(dashboards.id, id));
 
-    const updated = await this.db.select().from(dashboards).where(eq(dashboards.id, id)).limit(1);
+      const updated = await this.db.select().from(dashboards).where(eq(dashboards.id, id)).limit(1);
 
-    const versionId = crypto.randomUUID();
-    await this.db.insert(dashboardVersions).values({
-      id: versionId,
-      dashboardId: id,
-      version: newVersion,
-      data: JSON.stringify(updated[0]),
-      message: message ?? '',
-      createdBy: userEmail,
-      createdAt: now,
-    });
+      const versionId = crypto.randomUUID();
+      await this.db.insert(dashboardVersions).values({
+        id: versionId,
+        dashboardId: id,
+        version: newVersion,
+        data: JSON.stringify(updated[0]),
+        message: message ?? '',
+        createdBy: userEmail,
+        createdAt: now,
+      });
 
-    return updated[0] ?? null;
+      return updated[0] ?? null;
+    } catch (error) {
+      console.error('updateDashboard failed:', error);
+      throw new Error('Failed to update dashboard', { cause: error });
+    }
   }
 
   async deleteDashboard(orgId: string, id: string): Promise<void> {
     dashboardIdSchema.parse(id);
-    await this.db.delete(dashboards).where(and(eq(dashboards.id, id), eq(dashboards.orgId, orgId)));
+    try {
+      await this.db.delete(dashboards).where(and(eq(dashboards.id, id), eq(dashboards.orgId, orgId)));
+    } catch (error) {
+      console.error('deleteDashboard failed:', error);
+      throw new Error('Failed to delete dashboard', { cause: error });
+    }
   }
 
   // --- Dashboard Version RPC ---
@@ -696,22 +763,27 @@ export class GraflareAPI extends WorkerEntrypoint<Bindings> {
     }
     if ('folderId' in snapshot) restoreFields['folderId'] = snapshot.folderId;
 
-    await this.db.update(dashboards).set(restoreFields).where(eq(dashboards.id, dashboardId));
+    try {
+      await this.db.update(dashboards).set(restoreFields).where(eq(dashboards.id, dashboardId));
 
-    const updated = await this.db.select().from(dashboards).where(eq(dashboards.id, dashboardId)).limit(1);
+      const updated = await this.db.select().from(dashboards).where(eq(dashboards.id, dashboardId)).limit(1);
 
-    const versionId = crypto.randomUUID();
-    await this.db.insert(dashboardVersions).values({
-      id: versionId,
-      dashboardId,
-      version: newVersion,
-      data: JSON.stringify(updated[0]),
-      message: `Restored from version ${version}`,
-      createdBy: userEmail,
-      createdAt: now,
-    });
+      const versionId = crypto.randomUUID();
+      await this.db.insert(dashboardVersions).values({
+        id: versionId,
+        dashboardId,
+        version: newVersion,
+        data: JSON.stringify(updated[0]),
+        message: `Restored from version ${version}`,
+        createdBy: userEmail,
+        createdAt: now,
+      });
 
-    return updated[0] ?? null;
+      return updated[0] ?? null;
+    } catch (error) {
+      console.error('restoreDashboardVersion failed:', error);
+      throw new Error('Failed to restore dashboard version', { cause: error });
+    }
   }
 
   async importDashboard(orgId: string, input: ImportDashboard, userEmail = '') {
@@ -758,15 +830,20 @@ export class GraflareAPI extends WorkerEntrypoint<Bindings> {
     const id = crypto.randomUUID();
     const now = new Date();
 
-    await this.db.insert(alertRuleGroups).values({
-      id,
-      orgId,
-      folderId: parsed.folderId ?? null,
-      name: parsed.name,
-      evalIntervalS: parsed.evalIntervalS ?? 60,
-      createdAt: now,
-      updatedAt: now,
-    });
+    try {
+      await this.db.insert(alertRuleGroups).values({
+        id,
+        orgId,
+        folderId: parsed.folderId ?? null,
+        name: parsed.name,
+        evalIntervalS: parsed.evalIntervalS ?? 60,
+        createdAt: now,
+        updatedAt: now,
+      });
+    } catch (error) {
+      console.error('createAlertRuleGroup failed:', error);
+      throw new Error('Failed to create alert rule group', { cause: error });
+    }
 
     return { id, orgId, folderId: parsed.folderId ?? null, name: parsed.name, evalIntervalS: parsed.evalIntervalS ?? 60, createdAt: now, updatedAt: now };
   }
@@ -781,17 +858,27 @@ export class GraflareAPI extends WorkerEntrypoint<Bindings> {
     if (parsed.folderId !== undefined) setData['folderId'] = parsed.folderId;
     if (parsed.evalIntervalS !== undefined) setData['evalIntervalS'] = parsed.evalIntervalS;
 
-    await this.db
-      .update(alertRuleGroups)
-      .set(setData)
-      .where(and(eq(alertRuleGroups.id, id), eq(alertRuleGroups.orgId, orgId)));
+    try {
+      await this.db
+        .update(alertRuleGroups)
+        .set(setData)
+        .where(and(eq(alertRuleGroups.id, id), eq(alertRuleGroups.orgId, orgId)));
+    } catch (error) {
+      console.error('updateAlertRuleGroup failed:', error);
+      throw new Error('Failed to update alert rule group', { cause: error });
+    }
 
     return this.getAlertRuleGroup(orgId, id);
   }
 
   async deleteAlertRuleGroup(orgId: string, id: string): Promise<void> {
     alertRuleGroupIdSchema.parse(id);
-    await this.db.delete(alertRuleGroups).where(and(eq(alertRuleGroups.id, id), eq(alertRuleGroups.orgId, orgId)));
+    try {
+      await this.db.delete(alertRuleGroups).where(and(eq(alertRuleGroups.id, id), eq(alertRuleGroups.orgId, orgId)));
+    } catch (error) {
+      console.error('deleteAlertRuleGroup failed:', error);
+      throw new Error('Failed to delete alert rule group', { cause: error });
+    }
   }
 
   // --- Alert Rule RPC ---
@@ -815,40 +902,45 @@ export class GraflareAPI extends WorkerEntrypoint<Bindings> {
     const id = crypto.randomUUID();
     const now = new Date();
 
-    await this.db.insert(alertRules).values({
-      id,
-      orgId,
-      groupId: parsed.groupId,
-      title: parsed.title,
-      queries: parsed.queries,
-      condition: parsed.condition,
-      labels: parsed.labels ?? {},
-      annotations: parsed.annotations ?? {},
-      forDurationS: parsed.forDurationS ?? 0,
-      noDataState: parsed.noDataState ?? 'Alerting',
-      execErrState: parsed.execErrState ?? 'Alerting',
-      isPaused: parsed.isPaused ?? false,
-      createdAt: now,
-      updatedAt: now,
-    });
+    try {
+      await this.db.insert(alertRules).values({
+        id,
+        orgId,
+        groupId: parsed.groupId,
+        title: parsed.title,
+        queries: parsed.queries,
+        condition: parsed.condition,
+        labels: parsed.labels ?? {},
+        annotations: parsed.annotations ?? {},
+        forDurationS: parsed.forDurationS ?? 0,
+        noDataState: parsed.noDataState ?? 'Alerting',
+        execErrState: parsed.execErrState ?? 'Alerting',
+        isPaused: parsed.isPaused ?? false,
+        createdAt: now,
+        updatedAt: now,
+      });
 
-    if (!(parsed.isPaused ?? false)) {
-      const group = await this.getAlertRuleGroup(orgId, parsed.groupId);
-      if (group !== null) {
-        const stub = this.env.ALERT_RULE.getByName(id);
-        await stub.init({
-          orgId,
-          ruleId: id,
-          queries: parsed.queries,
-          condition: parsed.condition,
-          evalIntervalS: group.evalIntervalS,
-          forDurationS: parsed.forDurationS ?? 0,
-          noDataState: parsed.noDataState ?? 'Alerting',
-          execErrState: parsed.execErrState ?? 'Alerting',
-          labels: parsed.labels ?? {},
-          annotations: parsed.annotations ?? {},
-        });
+      if (!(parsed.isPaused ?? false)) {
+        const group = await this.getAlertRuleGroup(orgId, parsed.groupId);
+        if (group !== null) {
+          const stub = this.env.ALERT_RULE.getByName(id);
+          await stub.init({
+            orgId,
+            ruleId: id,
+            queries: parsed.queries,
+            condition: parsed.condition,
+            evalIntervalS: group.evalIntervalS,
+            forDurationS: parsed.forDurationS ?? 0,
+            noDataState: parsed.noDataState ?? 'Alerting',
+            execErrState: parsed.execErrState ?? 'Alerting',
+            labels: parsed.labels ?? {},
+            annotations: parsed.annotations ?? {},
+          });
+        }
       }
+    } catch (error) {
+      console.error('createAlertRule failed:', error);
+      throw new Error('Failed to create alert rule', { cause: error });
     }
 
     return this.getAlertRule(orgId, id);
@@ -871,19 +963,29 @@ export class GraflareAPI extends WorkerEntrypoint<Bindings> {
     if (parsed.execErrState !== undefined) setData['execErrState'] = parsed.execErrState;
     if (parsed.isPaused !== undefined) setData['isPaused'] = parsed.isPaused;
 
-    await this.db
-      .update(alertRules)
-      .set(setData)
-      .where(and(eq(alertRules.id, id), eq(alertRules.orgId, orgId)));
+    try {
+      await this.db
+        .update(alertRules)
+        .set(setData)
+        .where(and(eq(alertRules.id, id), eq(alertRules.orgId, orgId)));
+    } catch (error) {
+      console.error('updateAlertRule failed:', error);
+      throw new Error('Failed to update alert rule', { cause: error });
+    }
 
     return this.getAlertRule(orgId, id);
   }
 
   async deleteAlertRule(orgId: string, id: string): Promise<void> {
     alertRuleIdSchema.parse(id);
-    const stub = this.env.ALERT_RULE.getByName(id);
-    await stub.stop();
-    await this.db.delete(alertRules).where(and(eq(alertRules.id, id), eq(alertRules.orgId, orgId)));
+    try {
+      const stub = this.env.ALERT_RULE.getByName(id);
+      await stub.stop();
+      await this.db.delete(alertRules).where(and(eq(alertRules.id, id), eq(alertRules.orgId, orgId)));
+    } catch (error) {
+      console.error('deleteAlertRule failed:', error);
+      throw new Error('Failed to delete alert rule', { cause: error });
+    }
   }
 
   // --- Alert Instance RPC ---
@@ -894,41 +996,49 @@ export class GraflareAPI extends WorkerEntrypoint<Bindings> {
     if (parsed?.ruleId !== undefined) conditions.push(eq(alertInstances.ruleId, parsed.ruleId));
     if (parsed?.state !== undefined) conditions.push(eq(alertInstances.state, parsed.state));
 
-    return this.db.select().from(alertInstances).where(and(...conditions));
+    return this.db
+      .select()
+      .from(alertInstances)
+      .where(and(...conditions));
   }
 
   async upsertAlertInstances(orgId: string, instances: UpsertAlertInstance[]) {
     for (const inst of instances) {
       const parsed = upsertAlertInstanceSchema.parse(inst);
-      const existing = await this.db
-        .select({ id: alertInstances.id })
-        .from(alertInstances)
-        .where(and(eq(alertInstances.ruleId, parsed.ruleId), eq(alertInstances.labelsHash, parsed.labelsHash)))
-        .limit(1);
+      try {
+        const existing = await this.db
+          .select({ id: alertInstances.id })
+          .from(alertInstances)
+          .where(and(eq(alertInstances.ruleId, parsed.ruleId), eq(alertInstances.labelsHash, parsed.labelsHash)))
+          .limit(1);
 
-      if (existing.length > 0) {
-        await this.db
-          .update(alertInstances)
-          .set({
+        if (existing.length > 0) {
+          await this.db
+            .update(alertInstances)
+            .set({
+              labels: parsed.labels ?? {},
+              state: parsed.state,
+              value: parsed.value,
+              activeAt: parsed.activeAt !== null ? new Date(parsed.activeAt) : null,
+              lastEvalAt: new Date(parsed.lastEvalAt),
+            })
+            .where(eq(alertInstances.id, existing[0].id));
+        } else {
+          await this.db.insert(alertInstances).values({
+            id: crypto.randomUUID(),
+            orgId,
+            ruleId: parsed.ruleId,
+            labelsHash: parsed.labelsHash,
             labels: parsed.labels ?? {},
             state: parsed.state,
             value: parsed.value,
             activeAt: parsed.activeAt !== null ? new Date(parsed.activeAt) : null,
             lastEvalAt: new Date(parsed.lastEvalAt),
-          })
-          .where(eq(alertInstances.id, existing[0].id));
-      } else {
-        await this.db.insert(alertInstances).values({
-          id: crypto.randomUUID(),
-          orgId,
-          ruleId: parsed.ruleId,
-          labelsHash: parsed.labelsHash,
-          labels: parsed.labels ?? {},
-          state: parsed.state,
-          value: parsed.value,
-          activeAt: parsed.activeAt !== null ? new Date(parsed.activeAt) : null,
-          lastEvalAt: new Date(parsed.lastEvalAt),
-        });
+          });
+        }
+      } catch (error) {
+        console.error('upsertAlertInstances failed:', error);
+        throw new Error('Failed to upsert alert instance', { cause: error });
       }
     }
   }
@@ -938,12 +1048,14 @@ export class GraflareAPI extends WorkerEntrypoint<Bindings> {
   async listContactPoints(orgId: string) {
     const rows = await this.db.select().from(contactPoints).where(eq(contactPoints.orgId, orgId));
     return rows.map(r => {
-      const {settings} = r;
+      const { settings } = r;
       if (typeof settings === 'object' && settings?.['type'] === 'webhook' && typeof settings['password'] === 'string' && settings['password'].length > 0) {
-        return Object.assign(r, { settings: {
-	...settings,
-	password: '******'
-} });
+        return Object.assign(r, {
+          settings: {
+            ...settings,
+            password: '******',
+          },
+        });
       }
       return r;
     });
@@ -958,7 +1070,7 @@ export class GraflareAPI extends WorkerEntrypoint<Bindings> {
       .limit(1);
     const row = rows[0] ?? null;
     if (row === null) return null;
-    const {settings} = row;
+    const { settings } = row;
     if (typeof settings === 'object' && settings?.['type'] === 'webhook' && typeof settings['password'] === 'string' && settings['password'].length > 0) {
       return { ...row, settings: { ...settings, password: '******' } };
     }
@@ -970,20 +1082,25 @@ export class GraflareAPI extends WorkerEntrypoint<Bindings> {
     const id = crypto.randomUUID();
     const now = new Date();
 
-    let {settings} = parsed;
-    if (parsed.settings.type === 'webhook' && parsed.settings.password.length > 0) {
-      settings = { ...parsed.settings, password: await encryptCredentials(parsed.settings.password, this.env.ENCRYPTION_KEY) };
-    }
+    try {
+      let { settings } = parsed;
+      if (parsed.settings.type === 'webhook' && parsed.settings.password.length > 0) {
+        settings = { ...parsed.settings, password: await encryptCredentials(parsed.settings.password, this.env.ENCRYPTION_KEY) };
+      }
 
-    await this.db.insert(contactPoints).values({
-      id,
-      orgId,
-      name: parsed.name,
-      type: parsed.type,
-      settings,
-      createdAt: now,
-      updatedAt: now,
-    });
+      await this.db.insert(contactPoints).values({
+        id,
+        orgId,
+        name: parsed.name,
+        type: parsed.type,
+        settings,
+        createdAt: now,
+        updatedAt: now,
+      });
+    } catch (error) {
+      console.error('createContactPoint failed:', error);
+      throw new Error('Failed to create contact point', { cause: error });
+    }
 
     return this.getContactPoint(orgId, id);
   }
@@ -996,25 +1113,36 @@ export class GraflareAPI extends WorkerEntrypoint<Bindings> {
     const setData: Record<string, unknown> = { updatedAt: now };
     if (parsed.name !== undefined) setData['name'] = parsed.name;
     if (parsed.type !== undefined) setData['type'] = parsed.type;
-    if (parsed.settings !== undefined) {
-      let {settings} = parsed;
-      if (parsed.settings.type === 'webhook' && parsed.settings.password.length > 0) {
-        settings = { ...parsed.settings, password: await encryptCredentials(parsed.settings.password, this.env.ENCRYPTION_KEY) };
-      }
-      setData['settings'] = settings;
-    }
 
-    await this.db
-      .update(contactPoints)
-      .set(setData)
-      .where(and(eq(contactPoints.id, id), eq(contactPoints.orgId, orgId)));
+    try {
+      if (parsed.settings !== undefined) {
+        let { settings } = parsed;
+        if (parsed.settings.type === 'webhook' && parsed.settings.password.length > 0) {
+          settings = { ...parsed.settings, password: await encryptCredentials(parsed.settings.password, this.env.ENCRYPTION_KEY) };
+        }
+        setData['settings'] = settings;
+      }
+
+      await this.db
+        .update(contactPoints)
+        .set(setData)
+        .where(and(eq(contactPoints.id, id), eq(contactPoints.orgId, orgId)));
+    } catch (error) {
+      console.error('updateContactPoint failed:', error);
+      throw new Error('Failed to update contact point', { cause: error });
+    }
 
     return this.getContactPoint(orgId, id);
   }
 
   async deleteContactPoint(orgId: string, id: string): Promise<void> {
     contactPointIdSchema.parse(id);
-    await this.db.delete(contactPoints).where(and(eq(contactPoints.id, id), eq(contactPoints.orgId, orgId)));
+    try {
+      await this.db.delete(contactPoints).where(and(eq(contactPoints.id, id), eq(contactPoints.orgId, orgId)));
+    } catch (error) {
+      console.error('deleteContactPoint failed:', error);
+      throw new Error('Failed to delete contact point', { cause: error });
+    }
   }
 
   // --- Notification Policy RPC ---
@@ -1028,21 +1156,26 @@ export class GraflareAPI extends WorkerEntrypoint<Bindings> {
     const id = crypto.randomUUID();
     const now = new Date();
 
-    await this.db.insert(notificationPolicies).values({
-      id,
-      orgId,
-      parentId: parsed.parentId ?? null,
-      contactPointId: parsed.contactPointId ?? null,
-      groupBy: parsed.groupBy ?? ['alertname'],
-      matchers: parsed.matchers ?? [],
-      muteTimingIds: parsed.muteTimingIds ?? [],
-      groupWaitS: parsed.groupWaitS ?? 30,
-      groupIntervalS: parsed.groupIntervalS ?? 300,
-      repeatIntervalS: parsed.repeatIntervalS ?? 14400,
-      continueMatching: parsed.continueMatching ?? false,
-      createdAt: now,
-      updatedAt: now,
-    });
+    try {
+      await this.db.insert(notificationPolicies).values({
+        id,
+        orgId,
+        parentId: parsed.parentId ?? null,
+        contactPointId: parsed.contactPointId ?? null,
+        groupBy: parsed.groupBy ?? ['alertname'],
+        matchers: parsed.matchers ?? [],
+        muteTimingIds: parsed.muteTimingIds ?? [],
+        groupWaitS: parsed.groupWaitS ?? 30,
+        groupIntervalS: parsed.groupIntervalS ?? 300,
+        repeatIntervalS: parsed.repeatIntervalS ?? 14400,
+        continueMatching: parsed.continueMatching ?? false,
+        createdAt: now,
+        updatedAt: now,
+      });
+    } catch (error) {
+      console.error('createNotificationPolicy failed:', error);
+      throw new Error('Failed to create notification policy', { cause: error });
+    }
 
     const rows = await this.db.select().from(notificationPolicies).where(eq(notificationPolicies.id, id)).limit(1);
     return rows[0] ?? null;
@@ -1064,10 +1197,15 @@ export class GraflareAPI extends WorkerEntrypoint<Bindings> {
     if (parsed.repeatIntervalS !== undefined) setData['repeatIntervalS'] = parsed.repeatIntervalS;
     if (parsed.continueMatching !== undefined) setData['continueMatching'] = parsed.continueMatching;
 
-    await this.db
-      .update(notificationPolicies)
-      .set(setData)
-      .where(and(eq(notificationPolicies.id, id), eq(notificationPolicies.orgId, orgId)));
+    try {
+      await this.db
+        .update(notificationPolicies)
+        .set(setData)
+        .where(and(eq(notificationPolicies.id, id), eq(notificationPolicies.orgId, orgId)));
+    } catch (error) {
+      console.error('updateNotificationPolicy failed:', error);
+      throw new Error('Failed to update notification policy', { cause: error });
+    }
 
     const rows = await this.db.select().from(notificationPolicies).where(eq(notificationPolicies.id, id)).limit(1);
     return rows[0] ?? null;
@@ -1075,7 +1213,12 @@ export class GraflareAPI extends WorkerEntrypoint<Bindings> {
 
   async deleteNotificationPolicy(orgId: string, id: string): Promise<void> {
     notificationPolicyIdSchema.parse(id);
-    await this.db.delete(notificationPolicies).where(and(eq(notificationPolicies.id, id), eq(notificationPolicies.orgId, orgId)));
+    try {
+      await this.db.delete(notificationPolicies).where(and(eq(notificationPolicies.id, id), eq(notificationPolicies.orgId, orgId)));
+    } catch (error) {
+      console.error('deleteNotificationPolicy failed:', error);
+      throw new Error('Failed to delete notification policy', { cause: error });
+    }
   }
 
   // --- Silence RPC ---
@@ -1099,17 +1242,22 @@ export class GraflareAPI extends WorkerEntrypoint<Bindings> {
     const id = crypto.randomUUID();
     const now = new Date();
 
-    await this.db.insert(silences).values({
-      id,
-      orgId,
-      matchers: parsed.matchers,
-      startsAt: new Date(parsed.startsAt),
-      endsAt: new Date(parsed.endsAt),
-      comment: parsed.comment ?? '',
-      createdBy: parsed.createdBy ?? '',
-      createdAt: now,
-      updatedAt: now,
-    });
+    try {
+      await this.db.insert(silences).values({
+        id,
+        orgId,
+        matchers: parsed.matchers,
+        startsAt: new Date(parsed.startsAt),
+        endsAt: new Date(parsed.endsAt),
+        comment: parsed.comment ?? '',
+        createdBy: parsed.createdBy ?? '',
+        createdAt: now,
+        updatedAt: now,
+      });
+    } catch (error) {
+      console.error('createSilence failed:', error);
+      throw new Error('Failed to create silence', { cause: error });
+    }
 
     return this.getSilence(orgId, id);
   }
@@ -1126,17 +1274,27 @@ export class GraflareAPI extends WorkerEntrypoint<Bindings> {
     if (parsed.comment !== undefined) setData['comment'] = parsed.comment;
     if (parsed.createdBy !== undefined) setData['createdBy'] = parsed.createdBy;
 
-    await this.db
-      .update(silences)
-      .set(setData)
-      .where(and(eq(silences.id, id), eq(silences.orgId, orgId)));
+    try {
+      await this.db
+        .update(silences)
+        .set(setData)
+        .where(and(eq(silences.id, id), eq(silences.orgId, orgId)));
+    } catch (error) {
+      console.error('updateSilence failed:', error);
+      throw new Error('Failed to update silence', { cause: error });
+    }
 
     return this.getSilence(orgId, id);
   }
 
   async deleteSilence(orgId: string, id: string): Promise<void> {
     silenceIdSchema.parse(id);
-    await this.db.delete(silences).where(and(eq(silences.id, id), eq(silences.orgId, orgId)));
+    try {
+      await this.db.delete(silences).where(and(eq(silences.id, id), eq(silences.orgId, orgId)));
+    } catch (error) {
+      console.error('deleteSilence failed:', error);
+      throw new Error('Failed to delete silence', { cause: error });
+    }
   }
 
   // --- Mute Timing RPC ---
@@ -1160,14 +1318,19 @@ export class GraflareAPI extends WorkerEntrypoint<Bindings> {
     const id = crypto.randomUUID();
     const now = new Date();
 
-    await this.db.insert(muteTimings).values({
-      id,
-      orgId,
-      name: parsed.name,
-      intervals: parsed.intervals ?? [],
-      createdAt: now,
-      updatedAt: now,
-    });
+    try {
+      await this.db.insert(muteTimings).values({
+        id,
+        orgId,
+        name: parsed.name,
+        intervals: parsed.intervals ?? [],
+        createdAt: now,
+        updatedAt: now,
+      });
+    } catch (error) {
+      console.error('createMuteTiming failed:', error);
+      throw new Error('Failed to create mute timing', { cause: error });
+    }
 
     return this.getMuteTiming(orgId, id);
   }
@@ -1181,17 +1344,27 @@ export class GraflareAPI extends WorkerEntrypoint<Bindings> {
     if (parsed.name !== undefined) setData['name'] = parsed.name;
     if (parsed.intervals !== undefined) setData['intervals'] = parsed.intervals;
 
-    await this.db
-      .update(muteTimings)
-      .set(setData)
-      .where(and(eq(muteTimings.id, id), eq(muteTimings.orgId, orgId)));
+    try {
+      await this.db
+        .update(muteTimings)
+        .set(setData)
+        .where(and(eq(muteTimings.id, id), eq(muteTimings.orgId, orgId)));
+    } catch (error) {
+      console.error('updateMuteTiming failed:', error);
+      throw new Error('Failed to update mute timing', { cause: error });
+    }
 
     return this.getMuteTiming(orgId, id);
   }
 
   async deleteMuteTiming(orgId: string, id: string): Promise<void> {
     muteTimingIdSchema.parse(id);
-    await this.db.delete(muteTimings).where(and(eq(muteTimings.id, id), eq(muteTimings.orgId, orgId)));
+    try {
+      await this.db.delete(muteTimings).where(and(eq(muteTimings.id, id), eq(muteTimings.orgId, orgId)));
+    } catch (error) {
+      console.error('deleteMuteTiming failed:', error);
+      throw new Error('Failed to delete mute timing', { cause: error });
+    }
   }
 
   // --- Annotation RPC ---
@@ -1205,7 +1378,10 @@ export class GraflareAPI extends WorkerEntrypoint<Bindings> {
     if (parsed?.from !== undefined) conditions.push(gte(annotations.time, new Date(parsed.from)));
     if (parsed?.to !== undefined) conditions.push(lte(annotations.time, new Date(parsed.to)));
 
-    let rows = await this.db.select().from(annotations).where(and(...conditions));
+    let rows = await this.db
+      .select()
+      .from(annotations)
+      .where(and(...conditions));
 
     if (parsed?.tag !== undefined) {
       const { tag } = parsed;
@@ -1220,20 +1396,25 @@ export class GraflareAPI extends WorkerEntrypoint<Bindings> {
     const id = crypto.randomUUID();
     const now = new Date();
 
-    await this.db.insert(annotations).values({
-      id,
-      orgId,
-      dashboardId: parsed.dashboardId,
-      panelId: parsed.panelId,
-      alertRuleId: parsed.alertRuleId,
-      time: new Date(parsed.time),
-      timeEnd: parsed.timeEnd !== undefined ? new Date(parsed.timeEnd) : undefined,
-      text: parsed.text,
-      tags: parsed.tags ?? [],
-      prevState: parsed.prevState,
-      newState: parsed.newState,
-      createdAt: now,
-    });
+    try {
+      await this.db.insert(annotations).values({
+        id,
+        orgId,
+        dashboardId: parsed.dashboardId,
+        panelId: parsed.panelId,
+        alertRuleId: parsed.alertRuleId,
+        time: new Date(parsed.time),
+        timeEnd: parsed.timeEnd !== undefined ? new Date(parsed.timeEnd) : undefined,
+        text: parsed.text,
+        tags: parsed.tags ?? [],
+        prevState: parsed.prevState,
+        newState: parsed.newState,
+        createdAt: now,
+      });
+    } catch (error) {
+      console.error('createAnnotation failed:', error);
+      throw new Error('Failed to create annotation', { cause: error });
+    }
 
     const rows = await this.db.select().from(annotations).where(eq(annotations.id, id)).limit(1);
     return rows[0] ?? null;
@@ -1241,7 +1422,12 @@ export class GraflareAPI extends WorkerEntrypoint<Bindings> {
 
   async deleteAnnotation(orgId: string, id: string): Promise<void> {
     annotationIdSchema.parse(id);
-    await this.db.delete(annotations).where(and(eq(annotations.id, id), eq(annotations.orgId, orgId)));
+    try {
+      await this.db.delete(annotations).where(and(eq(annotations.id, id), eq(annotations.orgId, orgId)));
+    } catch (error) {
+      console.error('deleteAnnotation failed:', error);
+      throw new Error('Failed to delete annotation', { cause: error });
+    }
   }
 }
 
