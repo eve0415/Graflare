@@ -24,9 +24,18 @@ export const TablePanel = ({ panel, timeRange, refetchInterval }: TablePanelProp
   const tableData = useMemo(() => {
     if (data === null || data === undefined) return { columns: [], rows: [] };
 
+    for (const res of data) {
+      if ('columns' in res && 'rows' in res && !('status' in res)) {
+        return {
+          columns: res.columns.map((c) => c.name),
+          rows: res.rows.map((row) => row.map((v) => (v === null ? '' : String(v)))),
+        };
+      }
+    }
+
     const allResults: { metric: Record<string, string>; values?: [number, string][]; value?: [number, string] }[] = [];
     for (const res of data) {
-      if (res.status === 'success' && res.data !== undefined && 'result' in res.data && Array.isArray(res.data.result)) {
+      if ('status' in res && res.status === 'success' && res.data !== undefined && 'result' in res.data && Array.isArray(res.data.result)) {
         for (const r of res.data.result) {
           if (typeof r === 'object' && r !== null && 'metric' in r) {
             allResults.push(r);

@@ -44,6 +44,7 @@ export const GaugePanel = ({ panel, timeRange, refetchInterval }: GaugePanelProp
     if (data === null || data === undefined) return null;
 
     for (const res of data) {
+      if (!('status' in res)) continue;
       if (res.status !== 'success' || res.data === undefined || !('result' in res.data)) continue;
       const results = res.data.result;
       if (!Array.isArray(results) || results.length === 0) continue;

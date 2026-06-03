@@ -30,6 +30,7 @@ export const TimeSeriesPanel = ({ panel, timeRange, refetchInterval, width, heig
 
     const allResults: { metric: Record<string, string>; values?: [number, string][] }[] = [];
     for (const res of data) {
+      if (!('status' in res)) continue;
       if (res.status === 'success' && res.data !== undefined && 'result' in res.data && Array.isArray(res.data.result)) {
         for (const r of res.data.result) {
           if (typeof r === 'object' && r !== null && 'metric' in r) {
