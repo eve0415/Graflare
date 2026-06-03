@@ -1,0 +1,144 @@
+import type { DatasourceDialect } from '#schemas/datasource';
+
+const COLUMN_RE = /^[a-zA-Z_][a-zA-Z0-9_]*$/;
+const INTERVAL_RE = /^(\d+)([smhdw])$/;
+
+const INTERVAL_MULTIPLIERS: Record<string, number> = {
+	s: 1,
+	m: 60,
+	h: 3600,
+	d: 86400,
+	w: 604800,
+};
+
+export interface MacroResult {
+	sql: string;
+	params: (string | number)[];
+}
+
+const validateColumn = (name: string | undefined): string => {
+	if (name === undefined || name.trim().length === 0) {
+		throw new Error('Invalid column name: column name is required');
+	}
+	const trimmed = name.trim();
+	if (!COLUMN_RE.test(trimmed)) {
+		throw new Error(`Invalid column name: ${trimmed}`);
+	}
+	return trimmed;
+};
+
+const parseInterval = (interval: string): number => {
+	const trimmed = interval.trim().replaceAll(/^'|'$/g, '');
+	const match = INTERVAL_RE.exec(trimmed);
+	if (match === null) {
+		throw new Error(`Invalid interval: ${trimmed}`);
+	}
+	const [, amount, unit] = match;
+	if (amount === undefined || unit === undefined) {
+		throw new Error(`Invalid interval: ${trimmed}`);
+	}
+	const multiplier = INTERVAL_MULTIPLIERS[unit];
+	if (multiplier === undefined) {
+		throw new Error(`Invalid interval unit: ${unit}`);
+	}
+	return Number(amount) * multiplier;
+};
+
+export interface TimeRange {
+	from: number;
+	to: number;
+}
+
+type MacroHandler = (
+	args: string[],
+	dialect: DatasourceDialect,
+	timeRange: TimeRange,
+	params: (string | number)[],
+) => string;
+
+const macroTime: MacroHandler = (args) => {
+	const col = validateColumn(args[0]);
+	return `${col} AS "time"`;
+};
+
+const macroTimeFilter: MacroHandler = (args, _dialect, timeRange, params) => {
+	const col = validateColumn(args[0]);
+	params.push(timeRange.from, timeRange.to);
+	return `${col} >= ? AND ${col} <= ?`;
+};
+
+const macroTimeFrom: MacroHandler = (_args, _dialect, timeRange, params) => {
+	params.push(timeRange.from);
+	return '?';
+};
+
+const macroTimeTo: MacroHandler = (_args, _dialect, timeRange, params) => {
+	params.push(timeRange.to);
+	return '?';
+};
+
+const macroTimeGroup: MacroHandler = (args, dialect, _timeRange, params) => {
+	const col = validateColumn(args[0]);
+	const [, intervalArg] = args;
+	if (intervalArg === undefined) {
+		throw new Error('Invalid interval: interval argument is required');
+	}
+	const seconds = parseInterval(intervalArg);
+	if (dialect === 'postgres') {
+		params.push(seconds, seconds);
+		return `(EXTRACT(EPOCH FROM ${col})::integer / ?) * ?`;
+	}
+	params.push(seconds, seconds);
+	return `(${col} / ?) * ?`;
+};
+
+const macroUnixEpochFilter: MacroHandler = (args, _dialect, timeRange, params) => {
+	const col = validateColumn(args[0]);
+	params.push(timeRange.from, timeRange.to);
+	return `${col} >= ? AND ${col} <= ?`;
+};
+
+const macroUnixEpochFrom: MacroHandler = (_args, _dialect, timeRange, params) => {
+	params.push(timeRange.from);
+	return '?';
+};
+
+const macroUnixEpochTo: MacroHandler = (_args, _dialect, timeRange, params) => {
+	params.push(timeRange.to);
+	return '?';
+};
+
+const MACROS: Record<string, MacroHandler> = {
+	$__time: macroTime,
+	$__timeFilter: macroTimeFilter,
+	$__timeFrom: macroTimeFrom,
+	$__timeTo: macroTimeTo,
+	$__timeGroup: macroTimeGroup,
+	$__unixEpochFilter: macroUnixEpochFilter,
+	$__unixEpochFrom: macroUnixEpochFrom,
+	$__unixEpochTo: macroUnixEpochTo,
+};
+
+const MACRO_RE = /\$__(\w+)\(([^)]*)\)/g;
+
+export const expandSqlMacros = (
+	sql: string,
+	dialect: DatasourceDialect,
+	timeRange: TimeRange,
+): MacroResult => {
+	const params: (string | number)[] = [];
+
+	const expanded = sql.replace(MACRO_RE, (match, macroName: string, argsStr: string) => {
+		const name = `$__${macroName}`;
+		const handler = MACROS[name];
+		if (handler === undefined) {
+			return match;
+		}
+		const args = argsStr.length > 0
+			? argsStr.split(',').map((a) => a.trim())
+			: [];
+		return handler(args, dialect, timeRange, params);
+	});
+
+	return { sql: expanded, params };
+};
