@@ -5,8 +5,11 @@ import { datasourceIdSchema } from './ids';
 export const datasourceAuthType = z.enum(['none', 'basic', 'bearer']);
 export type DatasourceAuthType = z.infer<typeof datasourceAuthType>;
 
-export const datasourceType = z.enum(['prometheus']);
+export const datasourceType = z.enum(['prometheus', 'sql']);
 export type DatasourceType = z.infer<typeof datasourceType>;
+
+export const datasourceDialect = z.enum(['sqlite', 'postgres']);
+export type DatasourceDialect = z.infer<typeof datasourceDialect>;
 
 export const datasourceCredentialsSchema = z.object({
   username: z.optional(z.string().check(z.maxLength(256))),
@@ -24,6 +27,7 @@ export const datasourceSchema = z.object({
   orgId: z.string(),
   name: z.string().check(z.minLength(1), z.maxLength(255)),
   type: datasourceType,
+  dialect: z.optional(datasourceDialect),
   url: z.url().check(z.maxLength(2048)),
   authType: datasourceAuthType,
   queryTimeoutMs: z._default(z.int().check(z.minimum(1000), z.maximum(120000)), 30000),
