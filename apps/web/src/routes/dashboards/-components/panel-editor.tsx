@@ -179,7 +179,7 @@ const QueryRow = ({
         </Button>
       </div>
       <Input
-        placeholder='PromQL expression'
+        placeholder='Query expression'
         value={query.expr}
         onChange={handleExprChange}
         className='font-mono text-sm'

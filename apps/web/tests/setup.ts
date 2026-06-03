@@ -38,6 +38,7 @@ vi.mock('../src/routes/datasources/-api', () => ({
       orgId: 'test-org',
       name: 'Test',
       type: 'prometheus',
+      dialect: null,
       url: 'https://example.com',
       authType: 'none',
       queryTimeoutMs: 30000,
@@ -51,6 +52,10 @@ vi.mock('../src/routes/datasources/-api', () => ({
 
 vi.mock('../src/lib/proxy', () => ({
   proxyQuery: () => Promise.resolve({ status: 'success' }),
+}));
+
+vi.mock('../src/lib/sql-proxy', () => ({
+  sqlQuery: () => Promise.resolve({ columns: [], rows: [] }),
 }));
 
 const MockGrid = ({ children }: { children: React.ReactNode }) => children;
