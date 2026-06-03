@@ -8,7 +8,8 @@
     "lint": "oxlint --report-unused-disable-directives --fix --fix-suggestions --fix-dangerously && oxfmt",
     "dev": "pnpm --parallel --filter './apps/*' dev",
     "clean": "pnpm --filter './apps/*' --filter './packages/*' clean",
-    "generate": "pnpm --filter './apps/*' generate"
+    "generate": "pnpm --filter './apps/*' generate",
+    "deploy": "pnpm --filter './apps/*' deploy"
   },
   "devDependencies": {
     "@tanstack/intent": "0.0.41",

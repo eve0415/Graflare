@@ -14,7 +14,8 @@
     "build": "vite build",
     "test": "vitest run",
     "generate": "wrangler types -c wrangler.json -c ../api/wrangler.json",
-    "clean": "rm -rf dist .output .vinxi"
+    "clean": "rm -rf dist .output .vinxi",
+    "deploy": "wrangler deploy"
   },
   "devDependencies": {
     "@cloudflare/vite-plugin": "1.39.1",
