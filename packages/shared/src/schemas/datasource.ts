@@ -21,9 +21,6 @@ export type DatasourceCredentials = z.infer<typeof datasourceCredentialsSchema>;
 
 export const datasourceSchema = z.object({
   id: z.uuid(),
-  // Org IDs are org-<32hex>; a transitional 'default' value also exists on the
-  // RPC path. Kept permissive (omitted from create/update; never parsed against
-  // a full row at runtime), so a plain string is the honest type here.
   orgId: z.string(),
   name: z.string().check(z.minLength(1), z.maxLength(255)),
   type: datasourceType,
