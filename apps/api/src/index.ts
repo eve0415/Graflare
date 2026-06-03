@@ -10,6 +10,7 @@ import type { CreateDashboard, DashboardListQuery, ImportDashboard, UpdateDashbo
 import type { CreateDatasource, UpdateDatasource } from '@graflare/shared/schemas/datasource';
 import type { CreateFolder, UpdateFolder } from '@graflare/shared/schemas/folder';
 import type { PrometheusResponse } from '@graflare/shared/schemas/prometheus';
+import type { SqlFormat, SqlResponse } from '@graflare/shared/schemas/sql';
 
 import { createAlertRuleGroupSchema, updateAlertRuleGroupSchema } from '@graflare/shared/schemas/alert-rule-group';
 import { createAlertRuleSchema, updateAlertRuleSchema } from '@graflare/shared/schemas/alert-rule';
@@ -36,6 +37,7 @@ import {
 } from '@graflare/shared/schemas/ids';
 import { detectFormat, importDashboard as importDashboardFn } from '@graflare/shared/import';
 import { prometheusResponseSchema } from '@graflare/shared/schemas/prometheus';
+import { expandSqlMacros } from '@graflare/shared/sql/macros';
 import { WorkerEntrypoint } from 'cloudflare:workers';
 import { and, desc, eq, gte, like, lte } from 'drizzle-orm';
 import { Hono } from 'hono';
@@ -77,6 +79,7 @@ import { datasourceRoutes } from './routes/datasources/datasources';
 import { datasourceTestRoutes } from './routes/datasources/datasources-test';
 import { folderRoutes } from './routes/folders/folders';
 import { proxyRoutes } from './routes/datasources/proxy';
+import { createSqlClient } from './sql/factory';
 
 interface Bindings {
   DB: D1Database;
@@ -95,6 +98,25 @@ export interface AppEnv {
     orgId: string;
   };
 }
+
+const TIME_MULTIPLIERS: Record<string, number> = { s: 1, m: 60, h: 3600, d: 86400, w: 604800 };
+
+const resolveTimeValue = (expr: string): number => {
+  if (expr === 'now') return Math.floor(Date.now() / 1000);
+  const match = /^now-(\d+)([smhdw])$/.exec(expr);
+  if (match !== null) {
+    const [, amount, unit] = match;
+    if (amount !== undefined && unit !== undefined) {
+      const multiplier = TIME_MULTIPLIERS[unit];
+      if (multiplier !== undefined) {
+        return Math.floor(Date.now() / 1000) - Number(amount) * multiplier;
+      }
+    }
+  }
+  const parsed = Number(expr);
+  if (!Number.isNaN(parsed)) return parsed;
+  return Math.floor(Date.now() / 1000);
+};
 
 const app = new Hono<AppEnv>();
 
@@ -136,6 +158,7 @@ export class GraflareAPI extends WorkerEntrypoint<Bindings> {
         orgId: datasources.orgId,
         name: datasources.name,
         type: datasources.type,
+        dialect: datasources.dialect,
         url: datasources.url,
         authType: datasources.authType,
         queryTimeoutMs: datasources.queryTimeoutMs,
@@ -154,6 +177,7 @@ export class GraflareAPI extends WorkerEntrypoint<Bindings> {
         orgId: datasources.orgId,
         name: datasources.name,
         type: datasources.type,
+        dialect: datasources.dialect,
         url: datasources.url,
         authType: datasources.authType,
         queryTimeoutMs: datasources.queryTimeoutMs,
@@ -230,6 +254,14 @@ export class GraflareAPI extends WorkerEntrypoint<Bindings> {
       return { success: false, latencyMs: 0, error: 'Not found' };
     }
 
+    if (ds.type === 'sql') {
+      const client = await createSqlClient(this.env.DB, this.env.ENCRYPTION_KEY, orgId, id);
+      if (client === null) {
+        return { success: false, latencyMs: 0, error: 'Not found' };
+      }
+      return client.testConnection();
+    }
+
     const start = Date.now();
 
     try {
@@ -250,7 +282,7 @@ export class GraflareAPI extends WorkerEntrypoint<Bindings> {
 
       const latencyMs = Date.now() - start;
       if (!res.ok) {
-        return { success: false, latencyMs, error: `Upstream returned ${res.status}` };
+        return { success: false, latencyMs, error: `Upstream returned ${String(res.status)}` };
       }
       return { success: true, latencyMs };
     } catch (error) {
@@ -314,6 +346,49 @@ export class GraflareAPI extends WorkerEntrypoint<Bindings> {
       const message = error instanceof Error ? error.message : 'Query failed';
       return { status: 'error', errorType: 'timeout', error: message };
     }
+  }
+
+  // --- SQL RPC ---
+
+  async sqlQuery(
+    orgId: string,
+    datasourceId: string,
+    rawSql: string,
+    _format: SqlFormat,
+    timeRange?: { from: string; to: string },
+  ): Promise<SqlResponse> {
+    datasourceIdSchema.parse(datasourceId);
+
+    const rows = await this.db
+      .select()
+      .from(datasources)
+      .where(and(eq(datasources.id, datasourceId), eq(datasources.orgId, orgId)))
+      .limit(1);
+
+    const [ds] = rows;
+    if (ds === undefined) {
+      return { columns: [], rows: [], error: 'Data source not found' };
+    }
+
+    if (ds.type !== 'sql') {
+      return { columns: [], rows: [], error: 'Data source is not a SQL type' };
+    }
+
+    const dialect = ds.dialect === 'postgres' ? 'postgres' : 'sqlite';
+
+    const resolvedTimeRange = {
+      from: timeRange ? resolveTimeValue(timeRange.from) : Math.floor(Date.now() / 1000) - 3600,
+      to: timeRange ? resolveTimeValue(timeRange.to) : Math.floor(Date.now() / 1000),
+    };
+
+    const { sql: expandedSql, params } = expandSqlMacros(rawSql, dialect, resolvedTimeRange);
+
+    const client = await createSqlClient(this.env.DB, this.env.ENCRYPTION_KEY, orgId, datasourceId);
+    if (client === null) {
+      return { columns: [], rows: [], error: 'Data source not found' };
+    }
+
+    return client.query(expandedSql, params);
   }
 
   // --- Folder RPC ---
