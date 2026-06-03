@@ -1,4 +1,4 @@
-import { createDatasourceSchema, updateDatasourceInputSchema as updateDatasourceInput } from '@graflare/shared/schemas/datasource';
+import { createDatasourceSchema, testConnectionInlineSchema, updateDatasourceInputSchema as updateDatasourceInput } from '@graflare/shared/schemas/datasource';
 import { datasourceIdSchema } from '@graflare/shared/schemas/ids';
 import { createServerFn } from '@tanstack/react-start';
 import { env } from 'cloudflare:workers';
@@ -93,6 +93,18 @@ export const testConnection = createServerFn({ method: 'POST' })
   .inputValidator(datasourceIdSchema)
   .handler(async ({ data: id }) => {
     const result = await env.API.testConnection('default', id);
+    const plain: TestConnectionResult = {
+      success: result.success,
+      latencyMs: result.latencyMs,
+      ...(result.error !== undefined && { error: result.error }),
+    };
+    return plain;
+  });
+
+export const testConnectionInline = createServerFn({ method: 'POST' })
+  .inputValidator(testConnectionInlineSchema)
+  .handler(async ({ data }) => {
+    const result = await env.API.testConnectionInline(data);
     const plain: TestConnectionResult = {
       success: result.success,
       latencyMs: result.latencyMs,
