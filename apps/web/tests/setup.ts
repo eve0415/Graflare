@@ -48,6 +48,7 @@ vi.mock('../src/routes/datasources/-api', () => ({
   updateDatasource: () => Promise.resolve(null),
   deleteDatasource: () => Promise.resolve(),
   testConnection: () => Promise.resolve({ success: true, latencyMs: 0 }),
+  testConnectionInline: () => Promise.resolve({ success: true, latencyMs: 0 }),
 }));
 
 vi.mock('../src/lib/proxy', () => ({
