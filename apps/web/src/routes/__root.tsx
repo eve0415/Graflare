@@ -3,13 +3,13 @@ import type { QueryClient } from '@tanstack/react-query';
 import { Separator } from '@graflare/ui/components/separator';
 import { SidebarInset, SidebarProvider, SidebarTrigger } from '@graflare/ui/components/sidebar';
 import { Skeleton } from '@graflare/ui/components/skeleton';
-import rootCss from './__root.css?url';
 import { HeadContent, Outlet, Scripts, createRootRouteWithContext } from '@tanstack/react-router';
 import { TanStackRouterDevtools } from '@tanstack/react-router-devtools';
 
 import { AppSidebar } from './-root/app-sidebar';
 import { QueryBoundary } from './-root/query-boundary';
 import { ThemeProvider } from './-root/theme-provider';
+import rootCss from './__root.css?url';
 
 const bodyStyle = { fontFamily: 'Geist, sans-serif' };
 const rootFallback = <Skeleton className='h-64 w-full rounded-lg' />;
@@ -47,6 +47,11 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
   head: () => ({
     meta: [{ charSet: 'utf8' }, { name: 'viewport', content: 'width=device-width, initial-scale=1' }, { title: 'Graflare' }],
     links: [
+      { rel: 'icon', href: '/favicon.ico', sizes: 'any' },
+      { rel: 'icon', type: 'image/png', sizes: '16x16', href: '/favicon-16x16.png' },
+      { rel: 'icon', type: 'image/png', sizes: '32x32', href: '/favicon-32x32.png' },
+      { rel: 'apple-touch-icon', sizes: '180x180', href: '/apple-touch-icon.png' },
+      { rel: 'manifest', href: '/site.webmanifest' },
       { rel: 'stylesheet', href: rootCss },
       {
         rel: 'stylesheet',
