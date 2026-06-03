@@ -8,8 +8,9 @@ export type PanelType = z.infer<typeof panelTypeSchema>;
 
 export const panelQuerySchema = z.object({
   refId: z.string().check(z.minLength(1), z.maxLength(8)),
-  expr: z.string().check(z.maxLength(8192)),
+  expr: z.string().check(z.maxLength(65536)),
   legendFormat: z._default(z.string().check(z.maxLength(512)), ''),
+  format: z._default(z.enum(['time_series', 'table']), 'time_series'),
 });
 
 export type PanelQuery = z.infer<typeof panelQuerySchema>;
