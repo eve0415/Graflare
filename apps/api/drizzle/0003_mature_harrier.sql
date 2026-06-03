@@ -1,0 +1,1 @@
+ALTER TABLE `datasources` ADD `dialect` text;

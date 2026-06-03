@@ -14,6 +14,7 @@ export const datasources = sqliteTable('datasources', {
     .references(() => organizations.id),
   name: text('name').notNull(),
   type: text('type').notNull(),
+  dialect: text('dialect'),
   url: text('url').notNull(),
   authType: text('auth_type').notNull().default('none'),
   credentials: text('credentials'),
