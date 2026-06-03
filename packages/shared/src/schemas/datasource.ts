@@ -55,3 +55,13 @@ export const updateDatasourceInputSchema = z.object({
 });
 
 export type UpdateDatasourceInput = z.infer<typeof updateDatasourceInputSchema>;
+
+export const testConnectionInlineSchema = z.object({
+  type: datasourceType,
+  url: z.url().check(z.maxLength(2048)),
+  authType: datasourceAuthType,
+  credentials: z.optional(datasourceCredentialsSchema),
+  queryTimeoutMs: z._default(z.int().check(z.minimum(1000), z.maximum(120000)), 30000),
+});
+
+export type TestConnectionInline = z.infer<typeof testConnectionInlineSchema>;

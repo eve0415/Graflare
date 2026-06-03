@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { createDatasourceSchema, datasourceSchema, updateDatasourceSchema } from './datasource';
+import { createDatasourceSchema, datasourceSchema, testConnectionInlineSchema, updateDatasourceSchema } from './datasource';
 
 const validDatasource = {
   id: '550e8400-e29b-41d4-a716-446655440000',
@@ -135,6 +135,45 @@ describe('updateDatasourceSchema', () => {
 
   it('rejects invalid URL in partial update', () => {
     const result = updateDatasourceSchema.safeParse({ url: 'not-a-url' });
+    expect(result.success).toBe(false);
+  });
+});
+
+describe('testConnectionInlineSchema', () => {
+  it('accepts valid prometheus input', () => {
+    const result = testConnectionInlineSchema.safeParse({
+      type: 'prometheus',
+      url: 'https://prom.example.com',
+      authType: 'bearer',
+      credentials: { token: 'secret' },
+    });
+    expect(result.success).toBe(true);
+  });
+
+  it('accepts valid sql input without credentials', () => {
+    const result = testConnectionInlineSchema.safeParse({
+      type: 'sql',
+      url: 'https://bridge.example.com',
+      authType: 'none',
+    });
+    expect(result.success).toBe(true);
+  });
+
+  it('applies default queryTimeoutMs', () => {
+    const parsed = testConnectionInlineSchema.parse({
+      type: 'prometheus',
+      url: 'https://prom.example.com',
+      authType: 'none',
+    });
+    expect(parsed.queryTimeoutMs).toBe(30000);
+  });
+
+  it('rejects invalid URL', () => {
+    const result = testConnectionInlineSchema.safeParse({
+      type: 'prometheus',
+      url: 'not-a-url',
+      authType: 'none',
+    });
     expect(result.success).toBe(false);
   });
 });
