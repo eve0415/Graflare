@@ -24,6 +24,10 @@
     "./alerting/*": {
       "import": "./src/alerting/*.ts",
       "types": "./src/alerting/*.ts"
+    },
+    "./sql/*": {
+      "import": "./src/sql/*.ts",
+      "types": "./src/sql/*.ts"
     }
   },
   "scripts": {
