@@ -1,7 +1,7 @@
 import type { AppEnv } from '../index';
 import type { Context, MiddlewareHandler } from 'hono';
 
-interface AccessJwtPayload {
+export interface AccessJwtPayload {
   email: string;
   name?: string;
   sub: string;
@@ -135,7 +135,7 @@ const decodeJwtPayload = (token: string): { header: JwtHeader; payload: AccessJw
   return { header, payload };
 };
 
-const verifyJwt = async (token: string, teamDomain: string, expectedAud?: string): Promise<AccessJwtPayload> => {
+export const verifyJwt = async (token: string, teamDomain: string, expectedAud?: string): Promise<AccessJwtPayload> => {
   const { header, payload } = decodeJwtPayload(token);
 
   if (payload.exp < Date.now() / 1000) {
