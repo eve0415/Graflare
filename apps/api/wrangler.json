@@ -2,7 +2,7 @@
   "$schema": "node_modules/wrangler/config-schema.json",
   "name": "graflare-api",
   "main": "src/index.ts",
-  "compatibility_date": "2026-05-27",
+  "compatibility_date": "2026-06-03",
   "compatibility_flags": ["nodejs_compat"],
   "d1_databases": [
     {

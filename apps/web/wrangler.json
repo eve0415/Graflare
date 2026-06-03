@@ -1,7 +1,7 @@
 {
   "$schema": "node_modules/wrangler/config-schema.json",
   "name": "graflare-web",
-  "compatibility_date": "2026-05-27",
+  "compatibility_date": "2026-06-03",
   "compatibility_flags": ["nodejs_compat"],
   "main": "@tanstack/react-start/server-entry",
   "services": [
