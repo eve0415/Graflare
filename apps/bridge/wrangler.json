@@ -8,7 +8,7 @@
     {
       "binding": "DB",
       "database_name": "graflare-bridge",
-      "database_id": "placeholder-create-via-wrangler",
+      "database_id": "b90bc139-d044-49f5-ac85-1ac9809065ab",
       "migrations_dir": "drizzle"
     }
   ],
