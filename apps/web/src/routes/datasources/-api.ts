@@ -8,6 +8,7 @@ export interface DatasourceRow {
   orgId: string;
   name: string;
   type: string;
+  dialect: string | null;
   url: string;
   authType: string;
   queryTimeoutMs: number;
@@ -26,6 +27,7 @@ const toDatasourceRow = (ds: {
   orgId: string;
   name: string;
   type: string;
+  dialect: string | null;
   url: string;
   authType: string;
   queryTimeoutMs: number;
@@ -36,6 +38,7 @@ const toDatasourceRow = (ds: {
   orgId: ds.orgId,
   name: ds.name,
   type: ds.type,
+  dialect: ds.dialect,
   url: ds.url,
   authType: ds.authType,
   queryTimeoutMs: ds.queryTimeoutMs,
@@ -64,6 +67,7 @@ export const createDatasource = createServerFn({ method: 'POST' })
       orgId: ds.orgId,
       name: ds.name,
       type: ds.type,
+      dialect: ds.dialect ?? null,
       url: ds.url,
       authType: ds.authType,
       queryTimeoutMs: ds.queryTimeoutMs,

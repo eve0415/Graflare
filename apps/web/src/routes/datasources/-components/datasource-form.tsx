@@ -9,13 +9,15 @@ import { useCallback, useState } from 'react';
 
 import { createDatasource, testConnection, updateDatasource } from '../-api';
 
-type DatasourceType = 'prometheus';
+type DatasourceType = 'prometheus' | 'sql';
+type DatasourceDialect = 'sqlite' | 'postgres';
 type AuthType = 'none' | 'basic' | 'bearer';
 
 interface DatasourceFormData {
   id?: string;
   name: string;
   type: DatasourceType;
+  dialect?: DatasourceDialect;
   url: string;
   authType: AuthType;
   queryTimeoutMs: number;
@@ -37,7 +39,7 @@ interface TestResult {
 
 const isAuthType = (value: string): value is AuthType => value === 'none' || value === 'basic' || value === 'bearer';
 
-const isDatasourceType = (value: string): value is DatasourceType => value === 'prometheus';
+const isDatasourceType = (value: string): value is DatasourceType => value === 'prometheus' || value === 'sql';
 
 export const DatasourceForm = ({ mode, initialData }: Props) => {
   const navigate = useNavigate();
@@ -70,6 +72,7 @@ export const DatasourceForm = ({ mode, initialData }: Props) => {
             data: {
               name: form.name,
               type: form.type,
+              dialect: form.dialect,
               url: form.url,
               authType: form.authType,
               queryTimeoutMs: form.queryTimeoutMs,
@@ -83,6 +86,7 @@ export const DatasourceForm = ({ mode, initialData }: Props) => {
               data: {
                 name: form.name,
                 type: form.type,
+                dialect: form.dialect,
                 url: form.url,
                 authType: form.authType,
                 queryTimeoutMs: form.queryTimeoutMs,
@@ -125,7 +129,17 @@ export const DatasourceForm = ({ mode, initialData }: Props) => {
 
   const handleTypeChange = useCallback((value: string | null) => {
     if (value !== null && isDatasourceType(value)) {
-      setForm(prev => ({ ...prev, type: value }));
+      if (value === 'sql') {
+        setForm(prev => ({ ...prev, type: value, dialect: prev.dialect ?? 'sqlite', authType: 'bearer' }));
+      } else {
+        setForm(prev => ({ ...prev, type: value, dialect: undefined }));
+      }
+    }
+  }, []);
+
+  const handleDialectChange = useCallback((value: string | null) => {
+    if (value === 'sqlite' || value === 'postgres') {
+      setForm(prev => ({ ...prev, dialect: value }));
     }
   }, []);
 
@@ -201,13 +215,36 @@ export const DatasourceForm = ({ mode, initialData }: Props) => {
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value='prometheus'>Prometheus</SelectItem>
+                <SelectItem value='sql'>SQL</SelectItem>
               </SelectContent>
             </Select>
           </div>
 
+          {form.type === 'sql' && (
+            <div className='space-y-2'>
+              <Label htmlFor='dialect'>Dialect</Label>
+              <Select value={form.dialect ?? 'sqlite'} onValueChange={handleDialectChange}>
+                <SelectTrigger id='dialect'>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value='sqlite'>SQLite / D1</SelectItem>
+                  <SelectItem value='postgres' disabled>PostgreSQL (coming soon)</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          )}
+
           <div className='space-y-2'>
-            <Label htmlFor='url'>URL</Label>
-            <Input id='url' type='url' value={form.url} onChange={handleUrlChange} placeholder='https://prometheus.example.com' required />
+            <Label htmlFor='url'>{form.type === 'sql' ? 'SQL Endpoint URL' : 'URL'}</Label>
+            <Input
+              id='url'
+              type='url'
+              value={form.url}
+              onChange={handleUrlChange}
+              placeholder={form.type === 'sql' ? 'https://bridge.example.com' : 'https://prometheus.example.com'}
+              required
+            />
           </div>
 
           <div className='space-y-2'>
