@@ -58,10 +58,11 @@ import {
   folders,
   muteTimings,
   notificationPolicies,
+  organizations,
   silences,
 } from './db/schema';
-import { accessMiddleware } from './middleware/access';
-import { orgMiddleware } from './middleware/org';
+import { accessMiddleware, verifyJwt } from './middleware/access';
+import { emailToOrgId, orgMiddleware } from './middleware/org';
 import { alertInstanceRoutes } from './routes/alerting/alert-instances';
 import { alertRuleGroupRoutes } from './routes/alerting/alert-rule-groups';
 import { alertRuleRoutes } from './routes/alerting/alert-rules';
@@ -85,6 +86,7 @@ interface Bindings {
   ENCRYPTION_KEY: string;
   ACCESS_TEAM_DOMAIN: string;
   ACCESS_AUD: string;
+  DEV_AUTH_EMAIL?: string;
   ALERT_RULE: DurableObjectNamespace<AlertRuleDO>;
   NOTIFICATION_WORKFLOW: Workflow;
   EMAIL: SendEmail;
@@ -146,11 +148,26 @@ export class GraflareAPI extends WorkerEntrypoint<Bindings> {
     return createDb(this.env.DB);
   }
 
+  private async resolveAuth(jwt: string): Promise<{ orgId: string; email: string }> {
+    let email: string;
+    if (this.env.DEV_AUTH_EMAIL) {
+      email = this.env.DEV_AUTH_EMAIL;
+    } else {
+      ({ email } = await verifyJwt(jwt, this.env.ACCESS_TEAM_DOMAIN, this.env.ACCESS_AUD));
+    }
+    const orgId = await emailToOrgId(email);
+    await this.db.insert(organizations).values({ id: orgId, name: email, createdAt: new Date(), updatedAt: new Date() }).onConflictDoNothing();
+    return { orgId, email };
+  }
+
   health(): Promise<{ status: string }> {
     return Promise.resolve({ status: 'ok' });
   }
 
-  async listDatasources(orgId: string) {
+  // --- Datasource RPC ---
+
+  async listDatasources(jwt: string) {
+    const { orgId } = await this.resolveAuth(jwt);
     return this.db
       .select({
         id: datasources.id,
@@ -168,7 +185,7 @@ export class GraflareAPI extends WorkerEntrypoint<Bindings> {
       .where(eq(datasources.orgId, orgId));
   }
 
-  async getDatasource(orgId: string, id: string) {
+  private async getDatasourceCore(orgId: string, id: string) {
     datasourceIdSchema.parse(id);
     const rows = await this.db
       .select({
@@ -189,7 +206,13 @@ export class GraflareAPI extends WorkerEntrypoint<Bindings> {
     return rows[0] ?? null;
   }
 
-  async createDatasource(orgId: string, input: CreateDatasource) {
+  async getDatasource(jwt: string, id: string) {
+    const { orgId } = await this.resolveAuth(jwt);
+    return this.getDatasourceCore(orgId, id);
+  }
+
+  async createDatasource(jwt: string, input: CreateDatasource) {
+    const { orgId } = await this.resolveAuth(jwt);
     const parsed = createDatasourceSchema.parse(input);
     const { credentials, ...rest } = parsed;
     const id = crypto.randomUUID();
@@ -217,7 +240,8 @@ export class GraflareAPI extends WorkerEntrypoint<Bindings> {
     return { id, orgId, ...rest, createdAt: now, updatedAt: now };
   }
 
-  async updateDatasource(orgId: string, id: string, input: UpdateDatasource) {
+  async updateDatasource(jwt: string, id: string, input: UpdateDatasource) {
+    const { orgId } = await this.resolveAuth(jwt);
     datasourceIdSchema.parse(id);
     const parsed = updateDatasourceSchema.parse(input);
     const { credentials, ...rest } = parsed;
@@ -242,10 +266,11 @@ export class GraflareAPI extends WorkerEntrypoint<Bindings> {
       throw new Error('Failed to update datasource', { cause: error });
     }
 
-    return this.getDatasource(orgId, id);
+    return this.getDatasourceCore(orgId, id);
   }
 
-  async deleteDatasource(orgId: string, id: string): Promise<void> {
+  async deleteDatasource(jwt: string, id: string): Promise<void> {
+    const { orgId } = await this.resolveAuth(jwt);
     datasourceIdSchema.parse(id);
     try {
       await this.db.delete(datasources).where(and(eq(datasources.id, id), eq(datasources.orgId, orgId)));
@@ -255,7 +280,8 @@ export class GraflareAPI extends WorkerEntrypoint<Bindings> {
     }
   }
 
-  async testConnection(orgId: string, id: string): Promise<{ success: boolean; latencyMs: number; error?: string }> {
+  async testConnection(jwt: string, id: string): Promise<{ success: boolean; latencyMs: number; error?: string }> {
+    const { orgId } = await this.resolveAuth(jwt);
     datasourceIdSchema.parse(id);
     const rows = await this.db
       .select()
@@ -306,7 +332,11 @@ export class GraflareAPI extends WorkerEntrypoint<Bindings> {
     }
   }
 
-  async testConnectionInline(input: TestConnectionInline): Promise<{ success: boolean; latencyMs: number; error?: string }> {
+  async testConnectionInline(jwt: string, input: TestConnectionInline): Promise<{ success: boolean; latencyMs: number; error?: string }> {
+    if (!this.env.DEV_AUTH_EMAIL) {
+      await verifyJwt(jwt, this.env.ACCESS_TEAM_DOMAIN, this.env.ACCESS_AUD);
+    }
+
     const parsed = testConnectionInlineSchema.parse(input);
 
     if (parsed.type === 'sql') {
@@ -347,7 +377,8 @@ export class GraflareAPI extends WorkerEntrypoint<Bindings> {
 
   private static ALLOWED_ENDPOINTS = new Set(['/api/v1/query', '/api/v1/query_range', '/api/v1/labels', '/api/v1/series']);
 
-  async proxyQuery(orgId: string, datasourceId: string, endpoint: string, params: Record<string, string>): Promise<PrometheusResponse> {
+  async proxyQuery(jwt: string, datasourceId: string, endpoint: string, params: Record<string, string>): Promise<PrometheusResponse> {
+    const { orgId } = await this.resolveAuth(jwt);
     datasourceIdSchema.parse(datasourceId);
     if (!GraflareAPI.ALLOWED_ENDPOINTS.has(endpoint) && !endpoint.startsWith('/api/v1/label/')) {
       return { status: 'error', errorType: 'bad_request', error: 'Invalid endpoint' };
@@ -403,7 +434,8 @@ export class GraflareAPI extends WorkerEntrypoint<Bindings> {
 
   // --- SQL RPC ---
 
-  async sqlQuery(orgId: string, datasourceId: string, rawSql: string, _format: SqlFormat, timeRange?: { from: string; to: string }): Promise<SqlResponse> {
+  async sqlQuery(jwt: string, datasourceId: string, rawSql: string, _format: SqlFormat, timeRange?: { from: string; to: string }): Promise<SqlResponse> {
+    const { orgId } = await this.resolveAuth(jwt);
     datasourceIdSchema.parse(datasourceId);
 
     const rows = await this.db
@@ -440,11 +472,13 @@ export class GraflareAPI extends WorkerEntrypoint<Bindings> {
 
   // --- Folder RPC ---
 
-  async listFolders(orgId: string) {
+  async listFolders(jwt: string) {
+    const { orgId } = await this.resolveAuth(jwt);
     return this.db.select().from(folders).where(eq(folders.orgId, orgId));
   }
 
-  async createFolder(orgId: string, input: CreateFolder) {
+  async createFolder(jwt: string, input: CreateFolder) {
+    const { orgId } = await this.resolveAuth(jwt);
     const parsed = createFolderSchema.parse(input);
     const id = crypto.randomUUID();
     const now = new Date();
@@ -471,7 +505,8 @@ export class GraflareAPI extends WorkerEntrypoint<Bindings> {
     return { id, orgId, parentId: parsed.parentId ?? null, title: parsed.title, slug, createdAt: now, updatedAt: now };
   }
 
-  async updateFolder(orgId: string, id: string, input: UpdateFolder) {
+  async updateFolder(jwt: string, id: string, input: UpdateFolder) {
+    const { orgId } = await this.resolveAuth(jwt);
     folderIdSchema.parse(id);
     const parsed = updateFolderSchema.parse(input);
     const now = new Date();
@@ -500,7 +535,8 @@ export class GraflareAPI extends WorkerEntrypoint<Bindings> {
     return rows[0] ?? null;
   }
 
-  async deleteFolder(orgId: string, id: string): Promise<void> {
+  async deleteFolder(jwt: string, id: string): Promise<void> {
+    const { orgId } = await this.resolveAuth(jwt);
     folderIdSchema.parse(id);
     const existing = await this.db
       .select()
@@ -528,7 +564,8 @@ export class GraflareAPI extends WorkerEntrypoint<Bindings> {
 
   // --- Dashboard RPC ---
 
-  async listDashboards(orgId: string, opts?: DashboardListQuery) {
+  async listDashboards(jwt: string, opts?: DashboardListQuery) {
+    const { orgId } = await this.resolveAuth(jwt);
     const conditions = [eq(dashboards.orgId, orgId)];
 
     if (opts?.folderId !== undefined) conditions.push(eq(dashboards.folderId, opts.folderId));
@@ -558,7 +595,7 @@ export class GraflareAPI extends WorkerEntrypoint<Bindings> {
     return rows;
   }
 
-  async getDashboard(orgId: string, id: string) {
+  private async getDashboardCore(orgId: string, id: string) {
     dashboardIdSchema.parse(id);
     const rows = await this.db
       .select()
@@ -568,7 +605,12 @@ export class GraflareAPI extends WorkerEntrypoint<Bindings> {
     return rows[0] ?? null;
   }
 
-  async createDashboard(orgId: string, input: CreateDashboard, userEmail = '') {
+  async getDashboard(jwt: string, id: string) {
+    const { orgId } = await this.resolveAuth(jwt);
+    return this.getDashboardCore(orgId, id);
+  }
+
+  private async createDashboardCore(orgId: string, input: CreateDashboard, email: string) {
     const parsed = createDashboardSchema.parse(input);
     const id = crypto.randomUUID();
     const now = new Date();
@@ -601,7 +643,7 @@ export class GraflareAPI extends WorkerEntrypoint<Bindings> {
         version: 1,
         data: JSON.stringify({ ...parsed, id, orgId, slug, version: 1 }),
         message: 'Initial version',
-        createdBy: userEmail,
+        createdBy: email,
         createdAt: now,
       });
     } catch (error) {
@@ -609,10 +651,16 @@ export class GraflareAPI extends WorkerEntrypoint<Bindings> {
       throw new Error('Failed to create dashboard', { cause: error });
     }
 
-    return this.getDashboard(orgId, id);
+    return this.getDashboardCore(orgId, id);
   }
 
-  async updateDashboard(orgId: string, id: string, input: UpdateDashboard, userEmail = '') {
+  async createDashboard(jwt: string, input: CreateDashboard) {
+    const { orgId, email } = await this.resolveAuth(jwt);
+    return this.createDashboardCore(orgId, input, email);
+  }
+
+  async updateDashboard(jwt: string, id: string, input: UpdateDashboard) {
+    const { orgId, email } = await this.resolveAuth(jwt);
     dashboardIdSchema.parse(id);
     const parsed = updateDashboardSchema.parse(input);
 
@@ -656,7 +704,7 @@ export class GraflareAPI extends WorkerEntrypoint<Bindings> {
         version: newVersion,
         data: JSON.stringify(updated[0]),
         message: message ?? '',
-        createdBy: userEmail,
+        createdBy: email,
         createdAt: now,
       });
 
@@ -667,7 +715,8 @@ export class GraflareAPI extends WorkerEntrypoint<Bindings> {
     }
   }
 
-  async deleteDashboard(orgId: string, id: string): Promise<void> {
+  async deleteDashboard(jwt: string, id: string): Promise<void> {
+    const { orgId } = await this.resolveAuth(jwt);
     dashboardIdSchema.parse(id);
     try {
       await this.db.delete(dashboards).where(and(eq(dashboards.id, id), eq(dashboards.orgId, orgId)));
@@ -679,7 +728,8 @@ export class GraflareAPI extends WorkerEntrypoint<Bindings> {
 
   // --- Dashboard Version RPC ---
 
-  async listDashboardVersions(orgId: string, dashboardId: string) {
+  async listDashboardVersions(jwt: string, dashboardId: string) {
+    const { orgId } = await this.resolveAuth(jwt);
     dashboardIdSchema.parse(dashboardId);
     const dashboard = await this.db
       .select({ id: dashboards.id })
@@ -703,7 +753,8 @@ export class GraflareAPI extends WorkerEntrypoint<Bindings> {
       .orderBy(desc(dashboardVersions.version));
   }
 
-  async getDashboardVersion(orgId: string, dashboardId: string, version: number) {
+  async getDashboardVersion(jwt: string, dashboardId: string, version: number) {
+    const { orgId } = await this.resolveAuth(jwt);
     dashboardIdSchema.parse(dashboardId);
     const dashboard = await this.db
       .select({ id: dashboards.id })
@@ -722,7 +773,8 @@ export class GraflareAPI extends WorkerEntrypoint<Bindings> {
     return rows[0] ?? null;
   }
 
-  async restoreDashboardVersion(orgId: string, dashboardId: string, version: number, userEmail = '') {
+  async restoreDashboardVersion(jwt: string, dashboardId: string, version: number) {
+    const { orgId, email } = await this.resolveAuth(jwt);
     dashboardIdSchema.parse(dashboardId);
 
     const existing = await this.db
@@ -775,7 +827,7 @@ export class GraflareAPI extends WorkerEntrypoint<Bindings> {
         version: newVersion,
         data: JSON.stringify(updated[0]),
         message: `Restored from version ${version}`,
-        createdBy: userEmail,
+        createdBy: email,
         createdAt: now,
       });
 
@@ -786,13 +838,14 @@ export class GraflareAPI extends WorkerEntrypoint<Bindings> {
     }
   }
 
-  async importDashboard(orgId: string, input: ImportDashboard, userEmail = '') {
+  async importDashboard(jwt: string, input: ImportDashboard) {
+    const { orgId, email } = await this.resolveAuth(jwt);
     const parsed = importDashboardSchema.parse(input);
 
     const format = parsed.format ?? detectFormat(parsed.json);
     const { dashboard: imported, warnings } = importDashboardFn(parsed.json, format);
 
-    const dashboard = await this.createDashboard(
+    const dashboard = await this.createDashboardCore(
       orgId,
       {
         title: imported.title,
@@ -803,7 +856,7 @@ export class GraflareAPI extends WorkerEntrypoint<Bindings> {
         variables: imported.variables,
         timeRange: imported.timeRange,
       },
-      userEmail,
+      email,
     );
 
     return { dashboard, warnings };
@@ -811,11 +864,12 @@ export class GraflareAPI extends WorkerEntrypoint<Bindings> {
 
   // --- Alert Rule Group RPC ---
 
-  async listAlertRuleGroups(orgId: string) {
+  async listAlertRuleGroups(jwt: string) {
+    const { orgId } = await this.resolveAuth(jwt);
     return this.db.select().from(alertRuleGroups).where(eq(alertRuleGroups.orgId, orgId));
   }
 
-  async getAlertRuleGroup(orgId: string, id: string) {
+  private async getAlertRuleGroupCore(orgId: string, id: string) {
     alertRuleGroupIdSchema.parse(id);
     const rows = await this.db
       .select()
@@ -825,7 +879,13 @@ export class GraflareAPI extends WorkerEntrypoint<Bindings> {
     return rows[0] ?? null;
   }
 
-  async createAlertRuleGroup(orgId: string, input: CreateAlertRuleGroup) {
+  async getAlertRuleGroup(jwt: string, id: string) {
+    const { orgId } = await this.resolveAuth(jwt);
+    return this.getAlertRuleGroupCore(orgId, id);
+  }
+
+  async createAlertRuleGroup(jwt: string, input: CreateAlertRuleGroup) {
+    const { orgId } = await this.resolveAuth(jwt);
     const parsed = createAlertRuleGroupSchema.parse(input);
     const id = crypto.randomUUID();
     const now = new Date();
@@ -848,7 +908,8 @@ export class GraflareAPI extends WorkerEntrypoint<Bindings> {
     return { id, orgId, folderId: parsed.folderId ?? null, name: parsed.name, evalIntervalS: parsed.evalIntervalS ?? 60, createdAt: now, updatedAt: now };
   }
 
-  async updateAlertRuleGroup(orgId: string, id: string, input: UpdateAlertRuleGroup) {
+  async updateAlertRuleGroup(jwt: string, id: string, input: UpdateAlertRuleGroup) {
+    const { orgId } = await this.resolveAuth(jwt);
     alertRuleGroupIdSchema.parse(id);
     const parsed = updateAlertRuleGroupSchema.parse(input);
     const now = new Date();
@@ -868,10 +929,11 @@ export class GraflareAPI extends WorkerEntrypoint<Bindings> {
       throw new Error('Failed to update alert rule group', { cause: error });
     }
 
-    return this.getAlertRuleGroup(orgId, id);
+    return this.getAlertRuleGroupCore(orgId, id);
   }
 
-  async deleteAlertRuleGroup(orgId: string, id: string): Promise<void> {
+  async deleteAlertRuleGroup(jwt: string, id: string): Promise<void> {
+    const { orgId } = await this.resolveAuth(jwt);
     alertRuleGroupIdSchema.parse(id);
     try {
       await this.db.delete(alertRuleGroups).where(and(eq(alertRuleGroups.id, id), eq(alertRuleGroups.orgId, orgId)));
@@ -883,11 +945,12 @@ export class GraflareAPI extends WorkerEntrypoint<Bindings> {
 
   // --- Alert Rule RPC ---
 
-  async listAlertRules(orgId: string) {
+  async listAlertRules(jwt: string) {
+    const { orgId } = await this.resolveAuth(jwt);
     return this.db.select().from(alertRules).where(eq(alertRules.orgId, orgId));
   }
 
-  async getAlertRule(orgId: string, id: string) {
+  private async getAlertRuleCore(orgId: string, id: string) {
     alertRuleIdSchema.parse(id);
     const rows = await this.db
       .select()
@@ -897,7 +960,13 @@ export class GraflareAPI extends WorkerEntrypoint<Bindings> {
     return rows[0] ?? null;
   }
 
-  async createAlertRule(orgId: string, input: CreateAlertRule) {
+  async getAlertRule(jwt: string, id: string) {
+    const { orgId } = await this.resolveAuth(jwt);
+    return this.getAlertRuleCore(orgId, id);
+  }
+
+  async createAlertRule(jwt: string, input: CreateAlertRule) {
+    const { orgId } = await this.resolveAuth(jwt);
     const parsed = createAlertRuleSchema.parse(input);
     const id = crypto.randomUUID();
     const now = new Date();
@@ -921,7 +990,7 @@ export class GraflareAPI extends WorkerEntrypoint<Bindings> {
       });
 
       if (!(parsed.isPaused ?? false)) {
-        const group = await this.getAlertRuleGroup(orgId, parsed.groupId);
+        const group = await this.getAlertRuleGroupCore(orgId, parsed.groupId);
         if (group !== null) {
           const stub = this.env.ALERT_RULE.getByName(id);
           await stub.init({
@@ -943,10 +1012,11 @@ export class GraflareAPI extends WorkerEntrypoint<Bindings> {
       throw new Error('Failed to create alert rule', { cause: error });
     }
 
-    return this.getAlertRule(orgId, id);
+    return this.getAlertRuleCore(orgId, id);
   }
 
-  async updateAlertRule(orgId: string, id: string, input: UpdateAlertRule) {
+  async updateAlertRule(jwt: string, id: string, input: UpdateAlertRule) {
+    const { orgId } = await this.resolveAuth(jwt);
     alertRuleIdSchema.parse(id);
     const parsed = updateAlertRuleSchema.parse(input);
     const now = new Date();
@@ -973,10 +1043,11 @@ export class GraflareAPI extends WorkerEntrypoint<Bindings> {
       throw new Error('Failed to update alert rule', { cause: error });
     }
 
-    return this.getAlertRule(orgId, id);
+    return this.getAlertRuleCore(orgId, id);
   }
 
-  async deleteAlertRule(orgId: string, id: string): Promise<void> {
+  async deleteAlertRule(jwt: string, id: string): Promise<void> {
+    const { orgId } = await this.resolveAuth(jwt);
     alertRuleIdSchema.parse(id);
     try {
       const stub = this.env.ALERT_RULE.getByName(id);
@@ -990,7 +1061,8 @@ export class GraflareAPI extends WorkerEntrypoint<Bindings> {
 
   // --- Alert Instance RPC ---
 
-  async listAlertInstances(orgId: string, opts?: AlertInstanceListQuery) {
+  async listAlertInstances(jwt: string, opts?: AlertInstanceListQuery) {
+    const { orgId } = await this.resolveAuth(jwt);
     const parsed = opts ? alertInstanceListQuerySchema.parse(opts) : undefined;
     const conditions = [eq(alertInstances.orgId, orgId)];
     if (parsed?.ruleId !== undefined) conditions.push(eq(alertInstances.ruleId, parsed.ruleId));
@@ -1002,7 +1074,8 @@ export class GraflareAPI extends WorkerEntrypoint<Bindings> {
       .where(and(...conditions));
   }
 
-  async upsertAlertInstances(orgId: string, instances: UpsertAlertInstance[]) {
+  async upsertAlertInstances(jwt: string, instances: UpsertAlertInstance[]) {
+    const { orgId } = await this.resolveAuth(jwt);
     for (const inst of instances) {
       const parsed = upsertAlertInstanceSchema.parse(inst);
       try {
@@ -1045,7 +1118,8 @@ export class GraflareAPI extends WorkerEntrypoint<Bindings> {
 
   // --- Contact Point RPC ---
 
-  async listContactPoints(orgId: string) {
+  async listContactPoints(jwt: string) {
+    const { orgId } = await this.resolveAuth(jwt);
     const rows = await this.db.select().from(contactPoints).where(eq(contactPoints.orgId, orgId));
     return rows.map(r => {
       const { settings } = r;
@@ -1061,7 +1135,7 @@ export class GraflareAPI extends WorkerEntrypoint<Bindings> {
     });
   }
 
-  async getContactPoint(orgId: string, id: string) {
+  private async getContactPointCore(orgId: string, id: string) {
     contactPointIdSchema.parse(id);
     const rows = await this.db
       .select()
@@ -1077,7 +1151,13 @@ export class GraflareAPI extends WorkerEntrypoint<Bindings> {
     return row;
   }
 
-  async createContactPoint(orgId: string, input: CreateContactPoint) {
+  async getContactPoint(jwt: string, id: string) {
+    const { orgId } = await this.resolveAuth(jwt);
+    return this.getContactPointCore(orgId, id);
+  }
+
+  async createContactPoint(jwt: string, input: CreateContactPoint) {
+    const { orgId } = await this.resolveAuth(jwt);
     const parsed = createContactPointSchema.parse(input);
     const id = crypto.randomUUID();
     const now = new Date();
@@ -1102,10 +1182,11 @@ export class GraflareAPI extends WorkerEntrypoint<Bindings> {
       throw new Error('Failed to create contact point', { cause: error });
     }
 
-    return this.getContactPoint(orgId, id);
+    return this.getContactPointCore(orgId, id);
   }
 
-  async updateContactPoint(orgId: string, id: string, input: UpdateContactPoint) {
+  async updateContactPoint(jwt: string, id: string, input: UpdateContactPoint) {
+    const { orgId } = await this.resolveAuth(jwt);
     contactPointIdSchema.parse(id);
     const parsed = updateContactPointSchema.parse(input);
     const now = new Date();
@@ -1132,10 +1213,11 @@ export class GraflareAPI extends WorkerEntrypoint<Bindings> {
       throw new Error('Failed to update contact point', { cause: error });
     }
 
-    return this.getContactPoint(orgId, id);
+    return this.getContactPointCore(orgId, id);
   }
 
-  async deleteContactPoint(orgId: string, id: string): Promise<void> {
+  async deleteContactPoint(jwt: string, id: string): Promise<void> {
+    const { orgId } = await this.resolveAuth(jwt);
     contactPointIdSchema.parse(id);
     try {
       await this.db.delete(contactPoints).where(and(eq(contactPoints.id, id), eq(contactPoints.orgId, orgId)));
@@ -1147,11 +1229,13 @@ export class GraflareAPI extends WorkerEntrypoint<Bindings> {
 
   // --- Notification Policy RPC ---
 
-  async listNotificationPolicies(orgId: string) {
+  async listNotificationPolicies(jwt: string) {
+    const { orgId } = await this.resolveAuth(jwt);
     return this.db.select().from(notificationPolicies).where(eq(notificationPolicies.orgId, orgId));
   }
 
-  async createNotificationPolicy(orgId: string, input: CreateNotificationPolicy) {
+  async createNotificationPolicy(jwt: string, input: CreateNotificationPolicy) {
+    const { orgId } = await this.resolveAuth(jwt);
     const parsed = createNotificationPolicySchema.parse(input);
     const id = crypto.randomUUID();
     const now = new Date();
@@ -1181,7 +1265,8 @@ export class GraflareAPI extends WorkerEntrypoint<Bindings> {
     return rows[0] ?? null;
   }
 
-  async updateNotificationPolicy(orgId: string, id: string, input: UpdateNotificationPolicy) {
+  async updateNotificationPolicy(jwt: string, id: string, input: UpdateNotificationPolicy) {
+    const { orgId } = await this.resolveAuth(jwt);
     notificationPolicyIdSchema.parse(id);
     const parsed = updateNotificationPolicySchema.parse(input);
     const now = new Date();
@@ -1211,7 +1296,8 @@ export class GraflareAPI extends WorkerEntrypoint<Bindings> {
     return rows[0] ?? null;
   }
 
-  async deleteNotificationPolicy(orgId: string, id: string): Promise<void> {
+  async deleteNotificationPolicy(jwt: string, id: string): Promise<void> {
+    const { orgId } = await this.resolveAuth(jwt);
     notificationPolicyIdSchema.parse(id);
     try {
       await this.db.delete(notificationPolicies).where(and(eq(notificationPolicies.id, id), eq(notificationPolicies.orgId, orgId)));
@@ -1223,11 +1309,12 @@ export class GraflareAPI extends WorkerEntrypoint<Bindings> {
 
   // --- Silence RPC ---
 
-  async listSilences(orgId: string) {
+  async listSilences(jwt: string) {
+    const { orgId } = await this.resolveAuth(jwt);
     return this.db.select().from(silences).where(eq(silences.orgId, orgId));
   }
 
-  async getSilence(orgId: string, id: string) {
+  private async getSilenceCore(orgId: string, id: string) {
     silenceIdSchema.parse(id);
     const rows = await this.db
       .select()
@@ -1237,7 +1324,13 @@ export class GraflareAPI extends WorkerEntrypoint<Bindings> {
     return rows[0] ?? null;
   }
 
-  async createSilence(orgId: string, input: CreateSilence) {
+  async getSilence(jwt: string, id: string) {
+    const { orgId } = await this.resolveAuth(jwt);
+    return this.getSilenceCore(orgId, id);
+  }
+
+  async createSilence(jwt: string, input: CreateSilence) {
+    const { orgId } = await this.resolveAuth(jwt);
     const parsed = createSilenceSchema.parse(input);
     const id = crypto.randomUUID();
     const now = new Date();
@@ -1259,10 +1352,11 @@ export class GraflareAPI extends WorkerEntrypoint<Bindings> {
       throw new Error('Failed to create silence', { cause: error });
     }
 
-    return this.getSilence(orgId, id);
+    return this.getSilenceCore(orgId, id);
   }
 
-  async updateSilence(orgId: string, id: string, input: UpdateSilence) {
+  async updateSilence(jwt: string, id: string, input: UpdateSilence) {
+    const { orgId } = await this.resolveAuth(jwt);
     silenceIdSchema.parse(id);
     const parsed = updateSilenceSchema.parse(input);
     const now = new Date();
@@ -1284,10 +1378,11 @@ export class GraflareAPI extends WorkerEntrypoint<Bindings> {
       throw new Error('Failed to update silence', { cause: error });
     }
 
-    return this.getSilence(orgId, id);
+    return this.getSilenceCore(orgId, id);
   }
 
-  async deleteSilence(orgId: string, id: string): Promise<void> {
+  async deleteSilence(jwt: string, id: string): Promise<void> {
+    const { orgId } = await this.resolveAuth(jwt);
     silenceIdSchema.parse(id);
     try {
       await this.db.delete(silences).where(and(eq(silences.id, id), eq(silences.orgId, orgId)));
@@ -1299,11 +1394,12 @@ export class GraflareAPI extends WorkerEntrypoint<Bindings> {
 
   // --- Mute Timing RPC ---
 
-  async listMuteTimings(orgId: string) {
+  async listMuteTimings(jwt: string) {
+    const { orgId } = await this.resolveAuth(jwt);
     return this.db.select().from(muteTimings).where(eq(muteTimings.orgId, orgId));
   }
 
-  async getMuteTiming(orgId: string, id: string) {
+  private async getMuteTimingCore(orgId: string, id: string) {
     muteTimingIdSchema.parse(id);
     const rows = await this.db
       .select()
@@ -1313,7 +1409,13 @@ export class GraflareAPI extends WorkerEntrypoint<Bindings> {
     return rows[0] ?? null;
   }
 
-  async createMuteTiming(orgId: string, input: CreateMuteTiming) {
+  async getMuteTiming(jwt: string, id: string) {
+    const { orgId } = await this.resolveAuth(jwt);
+    return this.getMuteTimingCore(orgId, id);
+  }
+
+  async createMuteTiming(jwt: string, input: CreateMuteTiming) {
+    const { orgId } = await this.resolveAuth(jwt);
     const parsed = createMuteTimingSchema.parse(input);
     const id = crypto.randomUUID();
     const now = new Date();
@@ -1332,10 +1434,11 @@ export class GraflareAPI extends WorkerEntrypoint<Bindings> {
       throw new Error('Failed to create mute timing', { cause: error });
     }
 
-    return this.getMuteTiming(orgId, id);
+    return this.getMuteTimingCore(orgId, id);
   }
 
-  async updateMuteTiming(orgId: string, id: string, input: UpdateMuteTiming) {
+  async updateMuteTiming(jwt: string, id: string, input: UpdateMuteTiming) {
+    const { orgId } = await this.resolveAuth(jwt);
     muteTimingIdSchema.parse(id);
     const parsed = updateMuteTimingSchema.parse(input);
     const now = new Date();
@@ -1354,10 +1457,11 @@ export class GraflareAPI extends WorkerEntrypoint<Bindings> {
       throw new Error('Failed to update mute timing', { cause: error });
     }
 
-    return this.getMuteTiming(orgId, id);
+    return this.getMuteTimingCore(orgId, id);
   }
 
-  async deleteMuteTiming(orgId: string, id: string): Promise<void> {
+  async deleteMuteTiming(jwt: string, id: string): Promise<void> {
+    const { orgId } = await this.resolveAuth(jwt);
     muteTimingIdSchema.parse(id);
     try {
       await this.db.delete(muteTimings).where(and(eq(muteTimings.id, id), eq(muteTimings.orgId, orgId)));
@@ -1369,7 +1473,8 @@ export class GraflareAPI extends WorkerEntrypoint<Bindings> {
 
   // --- Annotation RPC ---
 
-  async listAnnotations(orgId: string, opts?: AnnotationListQuery) {
+  async listAnnotations(jwt: string, opts?: AnnotationListQuery) {
+    const { orgId } = await this.resolveAuth(jwt);
     const parsed = opts ? annotationListQuerySchema.parse(opts) : undefined;
     const conditions = [eq(annotations.orgId, orgId)];
 
@@ -1391,7 +1496,8 @@ export class GraflareAPI extends WorkerEntrypoint<Bindings> {
     return rows;
   }
 
-  async createAnnotation(orgId: string, input: CreateAnnotation) {
+  async createAnnotation(jwt: string, input: CreateAnnotation) {
+    const { orgId } = await this.resolveAuth(jwt);
     const parsed = createAnnotationSchema.parse(input);
     const id = crypto.randomUUID();
     const now = new Date();
@@ -1420,7 +1526,8 @@ export class GraflareAPI extends WorkerEntrypoint<Bindings> {
     return rows[0] ?? null;
   }
 
-  async deleteAnnotation(orgId: string, id: string): Promise<void> {
+  async deleteAnnotation(jwt: string, id: string): Promise<void> {
+    const { orgId } = await this.resolveAuth(jwt);
     annotationIdSchema.parse(id);
     try {
       await this.db.delete(annotations).where(and(eq(annotations.id, id), eq(annotations.orgId, orgId)));
