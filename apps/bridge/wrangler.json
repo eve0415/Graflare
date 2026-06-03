@@ -1,0 +1,21 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "graflare-bridge",
+  "main": "src/index.ts",
+  "compatibility_date": "2026-05-27",
+  "compatibility_flags": ["nodejs_compat"],
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "graflare-bridge",
+      "database_id": "placeholder-create-via-wrangler",
+      "migrations_dir": "drizzle"
+    }
+  ],
+  "triggers": {
+    "crons": ["*/5 * * * *"]
+  },
+  "observability": {
+    "enabled": true
+  }
+}
