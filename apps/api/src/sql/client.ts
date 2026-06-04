@@ -13,6 +13,7 @@ export class SqlClient {
     private baseUrl: string,
     private auth: SqlAuth,
     private timeoutMs: number,
+    private fetchFn: typeof fetch = fetch,
   ) {}
 
   async query(sql: string, params: (string | number)[]): Promise<SqlResponse> {
@@ -25,7 +26,7 @@ export class SqlClient {
     }
 
     try {
-      const res = await fetch(targetUrl, {
+      const res = await this.fetchFn(targetUrl, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -36,7 +37,7 @@ export class SqlClient {
       });
 
       if (!res.ok) {
-        return { columns: [], rows: [], error: `Upstream returned ${String(res.status)}` };
+        return { columns: [], rows: [], error: `Upstream ${targetUrl} returned ${String(res.status)}` };
       }
 
       return sqlResponseSchema.parse(await res.json());

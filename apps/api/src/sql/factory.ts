@@ -12,6 +12,7 @@ export const createSqlClient = async (
   encryptionKey: string,
   orgId: string,
   datasourceId: string,
+  fetchFn?: typeof fetch,
 ): Promise<SqlClient | null> => {
   const drizzle = createDb(db);
   const rows = await drizzle
@@ -32,5 +33,5 @@ export const createSqlClient = async (
     }
   }
 
-  return new SqlClient(ds.url, auth, ds.queryTimeoutMs);
+  return new SqlClient(ds.url, auth, ds.queryTimeoutMs, fetchFn);
 };
