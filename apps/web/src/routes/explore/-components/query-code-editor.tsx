@@ -12,13 +12,13 @@ import type { DatasourceDialect, DatasourceType } from '@graflare/shared/schemas
 
 interface QueryCodeEditorProps {
 	datasourceType: DatasourceType;
-	dialect?: DatasourceDialect;
-	schema?: Record<string, { name: string }[]>;
-	promqlClient?: PrometheusClient;
+	dialect?: DatasourceDialect | undefined;
+	schema?: Record<string, { name: string }[]> | undefined;
+	promqlClient?: PrometheusClient | undefined;
 	value: string;
 	onChange: (value: string) => void;
 	onRun: () => void;
-	placeholder?: string;
+	placeholder?: string | undefined;
 }
 
 const theme = EditorView.theme({

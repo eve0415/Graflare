@@ -1,3 +1,4 @@
+import type { DatasourceDialect, DatasourceType } from '@graflare/shared/schemas/datasource';
 import type { Panel, PanelQuery } from '@graflare/shared/schemas/panel';
 
 import { Button } from '@graflare/ui/components/button';
@@ -5,8 +6,13 @@ import { Input } from '@graflare/ui/components/input';
 import { Label } from '@graflare/ui/components/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@graflare/ui/components/select';
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@graflare/ui/components/sheet';
+import { useQuery } from '@tanstack/react-query';
 import { Plus, Trash2, X } from 'lucide-react';
 import { useCallback, useState } from 'react';
+
+import { databaseSchemaQueryOptions } from '../../-root/introspection-queries';
+import { QueryCodeEditor } from '../../explore/-components/query-code-editor';
+import { datasourcesQueryOptions } from '../../datasources/-queries';
 
 const PANEL_TYPE_OPTIONS = [
   { value: 'timeseries', label: 'Time Series' },
@@ -22,8 +28,19 @@ interface PanelEditorProps {
   onSave: (panel: Panel) => void;
 }
 
+const VALID_DIALECTS = new Set<string>(['postgres', 'sqlite']);
+const isValidDialect = (value: string | null | undefined): value is DatasourceDialect =>
+  typeof value === 'string' && VALID_DIALECTS.has(value);
+
 export const PanelEditor = ({ panel, open, onClose, onSave }: PanelEditorProps) => {
   const [draft, setDraft] = useState<Panel>(panel);
+  const dsQuery = useQuery(datasourcesQueryOptions());
+  const selectedDs = dsQuery.data?.find((d) => d.id === draft.datasourceId);
+  const rawType = selectedDs?.type ?? 'prometheus';
+  const dsType: DatasourceType = rawType === 'sql' ? 'sql' : 'prometheus';
+  const dsDialect = isValidDialect(selectedDs?.dialect) ? selectedDs.dialect : undefined;
+  const dbSchemaQuery = useQuery(databaseSchemaQueryOptions(dsType === 'sql' && draft.datasourceId !== undefined ? draft.datasourceId : ''));
+  const codeSchema = dsType === 'sql' ? dbSchemaQuery.data?.tables : undefined;
 
   const updateField = useCallback(<K extends keyof Panel>(key: K, value: Panel[K]) => {
     setDraft(prev => ({ ...prev, [key]: value }));
@@ -142,7 +159,16 @@ export const PanelEditor = ({ panel, open, onClose, onSave }: PanelEditorProps) 
             </div>
 
             {draft.queries.map((q, i) => (
-              <QueryRow key={q.refId} query={q} index={i} onUpdate={updateQuery} onRemove={removeQuery} />
+              <QueryRow
+                key={q.refId}
+                query={q}
+                index={i}
+                onUpdate={updateQuery}
+                onRemove={removeQuery}
+                datasourceType={dsType}
+                dialect={dsDialect}
+                schema={codeSchema}
+              />
             ))}
           </div>
 
@@ -177,15 +203,21 @@ const QueryRow = ({
   index,
   onUpdate,
   onRemove,
+  datasourceType,
+  dialect,
+  schema,
 }: {
   query: PanelQuery;
   index: number;
   onUpdate: (index: number, field: keyof PanelQuery, value: string) => void;
   onRemove: (index: number) => void;
+  datasourceType: DatasourceType;
+  dialect: DatasourceDialect | undefined;
+  schema: Record<string, { name: string; type: string; nullable: boolean }[]> | undefined;
 }) => {
   const handleExprChange = useCallback(
-    (e: React.ChangeEvent<HTMLInputElement>) => {
-      onUpdate(index, 'expr', e.target.value);
+    (value: string) => {
+      onUpdate(index, 'expr', value);
     },
     [index, onUpdate],
   );
@@ -201,6 +233,10 @@ const QueryRow = ({
     onRemove(index);
   }, [index, onRemove]);
 
+  const handleRun = useCallback(() => {
+    // no-op in panel editor — queries run on dashboard save/refresh
+  }, []);
+
   return (
     <div className='space-y-1.5 rounded-md border p-3'>
       <div className='flex items-center justify-between'>
@@ -209,7 +245,15 @@ const QueryRow = ({
           <X className='h-3 w-3' />
         </Button>
       </div>
-      <Input placeholder='Query expression' value={query.expr} onChange={handleExprChange} className='font-mono text-sm' />
+      <QueryCodeEditor
+        datasourceType={datasourceType}
+        dialect={dialect}
+        schema={schema}
+        value={query.expr}
+        onChange={handleExprChange}
+        onRun={handleRun}
+        placeholder={datasourceType === 'sql' ? 'SQL query...' : 'PromQL expression...'}
+      />
       <Input placeholder='Legend format (optional)' value={query.legendFormat} onChange={handleLegendChange} className='text-sm' />
     </div>
   );
