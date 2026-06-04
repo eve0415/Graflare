@@ -28,6 +28,10 @@
     "./sql/*": {
       "import": "./src/sql/*.ts",
       "types": "./src/sql/*.ts"
+    },
+    "./promql/*": {
+      "import": "./src/promql/*.ts",
+      "types": "./src/promql/*.ts"
     }
   },
   "scripts": {
