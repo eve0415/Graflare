@@ -18,8 +18,8 @@
     "deploy": "wrangler deploy"
   },
   "devDependencies": {
-    "@cloudflare/vitest-pool-workers": "0.16.11",
-    "@cloudflare/workers-types": "4.20260602.1",
+    "@cloudflare/vitest-pool-workers": "0.16.12",
+    "@cloudflare/workers-types": "4.20260603.1",
     "@graflare/shared": "workspace:*",
     "@hono/standard-validator": "0.2.2",
     "@types/node": "25.9.1",
