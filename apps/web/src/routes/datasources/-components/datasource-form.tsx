@@ -41,6 +41,22 @@ const isAuthType = (value: string): value is AuthType => value === 'none' || val
 
 const isDatasourceType = (value: string): value is DatasourceType => value === 'prometheus' || value === 'sql';
 
+const TYPE_OPTIONS = [
+  { value: 'prometheus', label: 'Prometheus' },
+  { value: 'sql', label: 'SQL' },
+] as const;
+
+const DIALECT_OPTIONS = [
+  { value: 'sqlite', label: 'SQLite / D1' },
+  { value: 'postgres', label: 'PostgreSQL (coming soon)' },
+] as const;
+
+const AUTH_OPTIONS = [
+  { value: 'none', label: 'None' },
+  { value: 'basic', label: 'Basic Auth' },
+  { value: 'bearer', label: 'Bearer Token' },
+] as const;
+
 export const DatasourceForm = ({ mode, initialData }: Props) => {
   const navigate = useNavigate();
   const [form, setForm] = useState<DatasourceFormData>(
@@ -218,13 +234,16 @@ export const DatasourceForm = ({ mode, initialData }: Props) => {
 
           <div className='space-y-2'>
             <Label htmlFor='type'>Type</Label>
-            <Select value={form.type} onValueChange={handleTypeChange}>
+            <Select value={form.type} onValueChange={handleTypeChange} items={TYPE_OPTIONS}>
               <SelectTrigger id='type'>
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value='prometheus'>Prometheus</SelectItem>
-                <SelectItem value='sql'>SQL</SelectItem>
+                {TYPE_OPTIONS.map(o => (
+                  <SelectItem key={o.value} value={o.value}>
+                    {o.label}
+                  </SelectItem>
+                ))}
               </SelectContent>
             </Select>
           </div>
@@ -232,15 +251,16 @@ export const DatasourceForm = ({ mode, initialData }: Props) => {
           {form.type === 'sql' && (
             <div className='space-y-2'>
               <Label htmlFor='dialect'>Dialect</Label>
-              <Select value={form.dialect ?? 'sqlite'} onValueChange={handleDialectChange}>
+              <Select value={form.dialect ?? 'sqlite'} onValueChange={handleDialectChange} items={DIALECT_OPTIONS}>
                 <SelectTrigger id='dialect'>
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value='sqlite'>SQLite / D1</SelectItem>
-                  <SelectItem value='postgres' disabled>
-                    PostgreSQL (coming soon)
-                  </SelectItem>
+                  {DIALECT_OPTIONS.map(o => (
+                    <SelectItem key={o.value} value={o.value} disabled={o.value === 'postgres'}>
+                      {o.label}
+                    </SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
             </div>
@@ -260,14 +280,16 @@ export const DatasourceForm = ({ mode, initialData }: Props) => {
 
           <div className='space-y-2'>
             <Label htmlFor='authType'>Authentication</Label>
-            <Select value={form.authType} onValueChange={handleAuthTypeChange}>
+            <Select value={form.authType} onValueChange={handleAuthTypeChange} items={AUTH_OPTIONS}>
               <SelectTrigger id='authType'>
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value='none'>None</SelectItem>
-                <SelectItem value='basic'>Basic Auth</SelectItem>
-                <SelectItem value='bearer'>Bearer Token</SelectItem>
+                {AUTH_OPTIONS.map(o => (
+                  <SelectItem key={o.value} value={o.value}>
+                    {o.label}
+                  </SelectItem>
+                ))}
               </SelectContent>
             </Select>
           </div>

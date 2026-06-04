@@ -15,6 +15,11 @@ const monoFontStyle = { fontFamily: 'Geist Mono, monospace' } as const;
 
 const isQueryType = (value: string): value is QueryType => value === 'instant' || value === 'range';
 
+const QUERY_TYPE_OPTIONS = [
+  { value: 'instant', label: 'Instant' },
+  { value: 'range', label: 'Range' },
+] as const;
+
 const QueryTestPage = () => {
   const { id } = Route.useParams();
   const [query, setQuery] = useState('up');
@@ -111,13 +116,16 @@ const QueryTestPage = () => {
 
             <div className='space-y-2'>
               <Label htmlFor='queryType'>Query Type</Label>
-              <Select value={queryType} onValueChange={handleQueryTypeChange}>
+              <Select value={queryType} onValueChange={handleQueryTypeChange} items={QUERY_TYPE_OPTIONS}>
                 <SelectTrigger id='queryType'>
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value='instant'>Instant</SelectItem>
-                  <SelectItem value='range'>Range</SelectItem>
+                  {QUERY_TYPE_OPTIONS.map(o => (
+                    <SelectItem key={o.value} value={o.value}>
+                      {o.label}
+                    </SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
             </div>

@@ -1,3 +1,7 @@
+import type { SqlResponse } from '@graflare/shared/schemas/sql';
+import type { Options as UPlotOptions } from 'uplot';
+
+import { sqlRowsToSeries } from '@graflare/shared/sql/adapters';
 import { Button } from '@graflare/ui/components/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@graflare/ui/components/select';
 import { Skeleton } from '@graflare/ui/components/skeleton';
@@ -5,24 +9,23 @@ import { useSuspenseQuery } from '@tanstack/react-query';
 import { BarChart3, Play, Table2 } from 'lucide-react';
 import { Suspense, useCallback, useMemo, useState } from 'react';
 
-import type { SqlResponse } from '@graflare/shared/schemas/sql';
-
-import { sqlRowsToSeries } from '@graflare/shared/sql/adapters';
-
+import { QueryResultTable, formatPrometheusToTable } from '../../-root/query-result-table';
+import { UPlotChart } from '../../-root/uplot-chart';
 import { proxyQuery } from '../../../lib/proxy';
 import { sqlQuery } from '../../../lib/sql-proxy';
 import { datasourcesQueryOptions } from '../../datasources/-queries';
 
-import type { Options as UPlotOptions } from 'uplot';
-
 import { PromQLEditor } from './promql-editor';
-import { QueryResultTable, formatPrometheusToTable } from '../../-root/query-result-table';
-import { UPlotChart } from '../../-root/uplot-chart';
 
 interface TimeRange {
   from: string;
   to: string;
 }
+
+const SQL_FORMAT_OPTIONS = [
+  { value: 'time_series', label: 'Time series' },
+  { value: 'table', label: 'Table' },
+] as const;
 
 interface ExplorePaneProps {
   timeRange: TimeRange;
@@ -51,6 +54,7 @@ const computeStep = (fromStr: string, toStr: string): string => {
 
 export const ExplorePane = ({ timeRange, label }: ExplorePaneProps) => {
   const { data: datasources } = useSuspenseQuery(datasourcesQueryOptions());
+  const dsItems = useMemo(() => datasources.map(ds => ({ value: ds.id, label: ds.name })), [datasources]);
 
   const [datasourceId, setDatasourceId] = useState<string>(datasources[0]?.id ?? '');
   const [queryExpr, setQueryExpr] = useState('');
@@ -64,7 +68,7 @@ export const ExplorePane = ({ timeRange, label }: ExplorePaneProps) => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const selectedDs = datasources.find((d) => d.id === datasourceId);
+  const selectedDs = datasources.find(d => d.id === datasourceId);
   const isSql = selectedDs?.type === 'sql';
 
   const handleRun = useCallback(() => {
@@ -155,8 +159,8 @@ export const ExplorePane = ({ timeRange, label }: ExplorePaneProps) => {
   const tableData = useMemo(() => {
     if (sqlTableResult !== null) {
       return {
-        columns: sqlTableResult.columns.map((c) => c.name),
-        rows: sqlTableResult.rows.map((row) => row.map((v) => (v === null ? '' : String(v)))),
+        columns: sqlTableResult.columns.map(c => c.name),
+        rows: sqlTableResult.rows.map(row => row.map(v => (v === null ? '' : String(v)))),
       };
     }
     if (queryResult === null) return { columns: [], rows: [] };
@@ -170,60 +174,67 @@ export const ExplorePane = ({ timeRange, label }: ExplorePaneProps) => {
     if (firstSeries?.values === undefined) return [[]];
 
     const timestamps = firstSeries.values.map(v => v[0]);
-    const series = queryResult.result.map(r =>
-      (r.values ?? []).map(v => Number(v[1])),
-    );
+    const series = queryResult.result.map(r => (r.values ?? []).map(v => Number(v[1])));
 
     return [timestamps, ...series];
   }, [queryResult]);
 
   const chartFallback = useMemo(() => <Skeleton className='h-72 w-full' />, []);
 
-  const chartOptions = useMemo((): UPlotOptions => ({
-    width: 800,
-    height: 300,
-    series: [
-      {},
-      ...(queryResult?.result ?? []).map((r, i) => ({
-        label: r.metric.__name__ ?? `Series ${String(i + 1)}`,
-        stroke: `hsl(${String(i * 60)}, 70%, 50%)`,
-      })),
-    ],
-  }), [queryResult]);
+  const chartOptions = useMemo(
+    (): UPlotOptions => ({
+      width: 800,
+      height: 300,
+      series: [
+        {},
+        ...(queryResult?.result ?? []).map((r, i) => ({
+          label: r.metric.__name__ ?? `Series ${String(i + 1)}`,
+          stroke: `hsl(${String(i * 60)}, 70%, 50%)`,
+        })),
+      ],
+    }),
+    [queryResult],
+  );
 
   return (
     <div className='space-y-3' aria-label={label}>
       <div className='flex items-center gap-2'>
-        <Select value={datasourceId} onValueChange={handleDatasourceChange}>
+        <Select value={datasourceId} onValueChange={handleDatasourceChange} items={dsItems}>
           <SelectTrigger className='w-48' aria-label='Select data source'>
             <SelectValue placeholder='Data source' />
           </SelectTrigger>
           <SelectContent>
-            {datasources.map(ds => (
-              <SelectItem key={ds.id} value={ds.id}>{ds.name}</SelectItem>
+            {dsItems.map(o => (
+              <SelectItem key={o.value} value={o.value}>
+                {o.label}
+              </SelectItem>
             ))}
           </SelectContent>
         </Select>
 
         {isSql && (
-          <Select value={sqlFormat} onValueChange={(v) => { if (v === 'time_series' || v === 'table') setSqlFormat(v); }}>
+          <Select
+            value={sqlFormat}
+            onValueChange={v => {
+              if (v === 'time_series' || v === 'table') setSqlFormat(v);
+            }}
+            items={SQL_FORMAT_OPTIONS}
+          >
             <SelectTrigger className='w-32' aria-label='SQL format mode'>
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value='time_series'>Time series</SelectItem>
-              <SelectItem value='table'>Table</SelectItem>
+              {SQL_FORMAT_OPTIONS.map(o => (
+                <SelectItem key={o.value} value={o.value}>
+                  {o.label}
+                </SelectItem>
+              ))}
             </SelectContent>
           </Select>
         )}
 
         <div className='flex-1'>
-          <PromQLEditor
-            value={queryExpr}
-            onChange={setQueryExpr}
-            onRun={handleRun}
-            placeholder={isSql ? 'Enter a SQL query...' : 'Enter a PromQL query...'}
-          />
+          <PromQLEditor value={queryExpr} onChange={setQueryExpr} onRun={handleRun} placeholder={isSql ? 'Enter a SQL query...' : 'Enter a PromQL query...'} />
         </div>
 
         <Button onClick={handleRun} disabled={loading || datasourceId === ''} size='sm'>
@@ -247,9 +258,7 @@ export const ExplorePane = ({ timeRange, label }: ExplorePaneProps) => {
               {resultView === 'graph' ? <Table2 className='h-4 w-4' /> : <BarChart3 className='h-4 w-4' />}
             </Button>
             <span className='text-muted-foreground text-xs'>
-              {sqlTableResult !== null
-                ? `${String(sqlTableResult.rows.length)} rows`
-                : `${String(queryResult?.result.length ?? 0)} series`}, {resultView} view
+              {sqlTableResult !== null ? `${String(sqlTableResult.rows.length)} rows` : `${String(queryResult?.result.length ?? 0)} series`}, {resultView} view
             </span>
           </div>
 
@@ -259,9 +268,7 @@ export const ExplorePane = ({ timeRange, label }: ExplorePaneProps) => {
             </Suspense>
           )}
 
-          {resultView === 'table' && (
-            <QueryResultTable data={tableData} />
-          )}
+          {resultView === 'table' && <QueryResultTable data={tableData} />}
         </div>
       )}
     </div>

@@ -34,6 +34,16 @@ const isContactPointType = (v: string): v is ContactPointType => v === 'email' |
 
 const isWebhookMethod = (v: string): v is WebhookMethod => v === 'POST' || v === 'PUT';
 
+const CONTACT_POINT_TYPE_OPTIONS = [
+  { value: 'email', label: 'Email' },
+  { value: 'webhook', label: 'Webhook' },
+] as const;
+
+const WEBHOOK_METHOD_OPTIONS = [
+  { value: 'POST', label: 'POST' },
+  { value: 'PUT', label: 'PUT' },
+] as const;
+
 const AddressRow = ({
   index,
   value,
@@ -48,10 +58,14 @@ const AddressRow = ({
   onRemove: (index: number) => void;
 }) => {
   const handleChange = useCallback(
-    (e: React.ChangeEvent<HTMLInputElement>) => { onChange(index, e.target.value); },
+    (e: React.ChangeEvent<HTMLInputElement>) => {
+      onChange(index, e.target.value);
+    },
     [index, onChange],
   );
-  const handleRemove = useCallback(() => { onRemove(index); }, [index, onRemove]);
+  const handleRemove = useCallback(() => {
+    onRemove(index);
+  }, [index, onRemove]);
 
   return (
     <div className='flex items-center gap-2'>
@@ -79,7 +93,7 @@ const NewContactPointPage = () => {
       const run = async () => {
         setSubmitting(true);
         try {
-          const {settings} = form;
+          const { settings } = form;
           await createContactPoint({
             data: {
               name: form.name,
@@ -193,13 +207,16 @@ const NewContactPointPage = () => {
 
           <div className='space-y-2'>
             <Label htmlFor='type'>Type</Label>
-            <Select value={form.settings.type} onValueChange={handleTypeChange}>
+            <Select value={form.settings.type} onValueChange={handleTypeChange} items={CONTACT_POINT_TYPE_OPTIONS}>
               <SelectTrigger id='type'>
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value='email'>Email</SelectItem>
-                <SelectItem value='webhook'>Webhook</SelectItem>
+                {CONTACT_POINT_TYPE_OPTIONS.map(o => (
+                  <SelectItem key={o.value} value={o.value}>
+                    {o.label}
+                  </SelectItem>
+                ))}
               </SelectContent>
             </Select>
           </div>
@@ -241,32 +258,26 @@ const NewContactPointPage = () => {
               </div>
               <div className='space-y-2'>
                 <Label htmlFor='webhookMethod'>Method</Label>
-                <Select value={form.settings.method} onValueChange={handleWebhookMethodChange}>
+                <Select value={form.settings.method} onValueChange={handleWebhookMethodChange} items={WEBHOOK_METHOD_OPTIONS}>
                   <SelectTrigger id='webhookMethod'>
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value='POST'>POST</SelectItem>
-                    <SelectItem value='PUT'>PUT</SelectItem>
+                    {WEBHOOK_METHOD_OPTIONS.map(o => (
+                      <SelectItem key={o.value} value={o.value}>
+                        {o.label}
+                      </SelectItem>
+                    ))}
                   </SelectContent>
                 </Select>
               </div>
               <div className='space-y-2'>
                 <Label htmlFor='webhookUsername'>Username (optional)</Label>
-                <Input
-                  id='webhookUsername'
-                  value={form.settings.username}
-                  onChange={handleWebhookUsernameChange}
-                />
+                <Input id='webhookUsername' value={form.settings.username} onChange={handleWebhookUsernameChange} />
               </div>
               <div className='space-y-2'>
                 <Label htmlFor='webhookPassword'>Password (optional)</Label>
-                <Input
-                  id='webhookPassword'
-                  type='password'
-                  value={form.settings.password}
-                  onChange={handleWebhookPasswordChange}
-                />
+                <Input id='webhookPassword' type='password' value={form.settings.password} onChange={handleWebhookPasswordChange} />
               </div>
             </>
           )}

@@ -8,6 +8,13 @@ import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@graflare/ui/compo
 import { Plus, Trash2, X } from 'lucide-react';
 import { useCallback, useState } from 'react';
 
+const PANEL_TYPE_OPTIONS = [
+  { value: 'timeseries', label: 'Time Series' },
+  { value: 'stat', label: 'Stat' },
+  { value: 'table', label: 'Table' },
+  { value: 'gauge', label: 'Gauge' },
+] as const;
+
 interface PanelEditorProps {
   panel: Panel;
   open: boolean;
@@ -22,15 +29,21 @@ export const PanelEditor = ({ panel, open, onClose, onSave }: PanelEditorProps) 
     setDraft(prev => ({ ...prev, [key]: value }));
   }, []);
 
-  const handleTitleChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
-    updateField('title', e.target.value);
-  }, [updateField]);
+  const handleTitleChange = useCallback(
+    (e: React.ChangeEvent<HTMLInputElement>) => {
+      updateField('title', e.target.value);
+    },
+    [updateField],
+  );
 
-  const handleTypeChange = useCallback((val: string) => {
-    if (val === 'timeseries' || val === 'stat' || val === 'table' || val === 'gauge') {
-      updateField('type', val);
-    }
-  }, [updateField]);
+  const handleTypeChange = useCallback(
+    (val: string) => {
+      if (val === 'timeseries' || val === 'stat' || val === 'table' || val === 'gauge') {
+        updateField('type', val);
+      }
+    },
+    [updateField],
+  );
 
   const addQuery = useCallback(() => {
     const refId = String.fromCodePoint(65 + draft.queries.length);
@@ -38,38 +51,57 @@ export const PanelEditor = ({ panel, open, onClose, onSave }: PanelEditorProps) 
     updateField('queries', [...draft.queries, newQuery]);
   }, [draft.queries, updateField]);
 
-  const removeQuery = useCallback((index: number) => {
-    updateField('queries', draft.queries.filter((_, i) => i !== index));
-  }, [draft.queries, updateField]);
+  const removeQuery = useCallback(
+    (index: number) => {
+      updateField(
+        'queries',
+        draft.queries.filter((_, i) => i !== index),
+      );
+    },
+    [draft.queries, updateField],
+  );
 
-  const updateQuery = useCallback((index: number, field: keyof PanelQuery, value: string) => {
-    const updated = draft.queries.map((q, i) =>
-      i === index ? { ...q, [field]: value } : q,
-    );
-    updateField('queries', updated);
-  }, [draft.queries, updateField]);
+  const updateQuery = useCallback(
+    (index: number, field: keyof PanelQuery, value: string) => {
+      const updated = draft.queries.map((q, i) => (i === index ? { ...q, [field]: value } : q));
+      updateField('queries', updated);
+    },
+    [draft.queries, updateField],
+  );
 
   const addThreshold = useCallback(() => {
     updateField('thresholds', [...draft.thresholds, { value: 0, color: '#ef4444' }]);
   }, [draft.thresholds, updateField]);
 
-  const removeThreshold = useCallback((index: number) => {
-    updateField('thresholds', draft.thresholds.filter((_, i) => i !== index));
-  }, [draft.thresholds, updateField]);
+  const removeThreshold = useCallback(
+    (index: number) => {
+      updateField(
+        'thresholds',
+        draft.thresholds.filter((_, i) => i !== index),
+      );
+    },
+    [draft.thresholds, updateField],
+  );
 
   const handleSave = useCallback(() => {
     onSave(draft);
     onClose();
   }, [draft, onSave, onClose]);
 
-  const handleOpenChange = useCallback((isOpen: boolean) => { if (!isOpen) onClose(); }, [onClose]);
+  const handleOpenChange = useCallback(
+    (isOpen: boolean) => {
+      if (!isOpen) onClose();
+    },
+    [onClose],
+  );
 
-  const handleThresholdChange = useCallback((index: number, field: 'value' | 'color', value: string) => {
-    const updated = draft.thresholds.map((th, j) =>
-      j === index ? Object.assign(th, { [field]: field === 'value' ? Number(value) : value }) : th,
-    );
-    updateField('thresholds', updated);
-  }, [draft.thresholds, updateField]);
+  const handleThresholdChange = useCallback(
+    (index: number, field: 'value' | 'color', value: string) => {
+      const updated = draft.thresholds.map((th, j) => (j === index ? Object.assign(th, { [field]: field === 'value' ? Number(value) : value }) : th));
+      updateField('thresholds', updated);
+    },
+    [draft.thresholds, updateField],
+  );
 
   return (
     <Sheet open={open} onOpenChange={handleOpenChange}>
@@ -86,15 +118,16 @@ export const PanelEditor = ({ panel, open, onClose, onSave }: PanelEditorProps) 
 
           <div className='space-y-2'>
             <Label>Panel Type</Label>
-            <Select value={draft.type} onValueChange={handleTypeChange}>
+            <Select value={draft.type} onValueChange={handleTypeChange} items={PANEL_TYPE_OPTIONS}>
               <SelectTrigger>
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value='timeseries'>Time Series</SelectItem>
-                <SelectItem value='stat'>Stat</SelectItem>
-                <SelectItem value='table'>Table</SelectItem>
-                <SelectItem value='gauge'>Gauge</SelectItem>
+                {PANEL_TYPE_OPTIONS.map(o => (
+                  <SelectItem key={o.value} value={o.value}>
+                    {o.label}
+                  </SelectItem>
+                ))}
               </SelectContent>
             </Select>
           </div>
@@ -109,13 +142,7 @@ export const PanelEditor = ({ panel, open, onClose, onSave }: PanelEditorProps) 
             </div>
 
             {draft.queries.map((q, i) => (
-              <QueryRow
-                key={q.refId}
-                query={q}
-                index={i}
-                onUpdate={updateQuery}
-                onRemove={removeQuery}
-              />
+              <QueryRow key={q.refId} query={q} index={i} onUpdate={updateQuery} onRemove={removeQuery} />
             ))}
           </div>
 
@@ -129,18 +156,14 @@ export const PanelEditor = ({ panel, open, onClose, onSave }: PanelEditorProps) 
             </div>
 
             {draft.thresholds.map((t, i) => (
-              <ThresholdRow
-                key={String(i)}
-                threshold={t}
-                index={i}
-                onRemove={removeThreshold}
-                onChange={handleThresholdChange}
-              />
+              <ThresholdRow key={String(i)} threshold={t} index={i} onRemove={removeThreshold} onChange={handleThresholdChange} />
             ))}
           </div>
 
           <div className='flex justify-end gap-2'>
-            <Button variant='outline' onClick={onClose}>Cancel</Button>
+            <Button variant='outline' onClick={onClose}>
+              Cancel
+            </Button>
             <Button onClick={handleSave}>Apply</Button>
           </div>
         </div>
@@ -160,15 +183,23 @@ const QueryRow = ({
   onUpdate: (index: number, field: keyof PanelQuery, value: string) => void;
   onRemove: (index: number) => void;
 }) => {
-  const handleExprChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
-    onUpdate(index, 'expr', e.target.value);
-  }, [index, onUpdate]);
+  const handleExprChange = useCallback(
+    (e: React.ChangeEvent<HTMLInputElement>) => {
+      onUpdate(index, 'expr', e.target.value);
+    },
+    [index, onUpdate],
+  );
 
-  const handleLegendChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
-    onUpdate(index, 'legendFormat', e.target.value);
-  }, [index, onUpdate]);
+  const handleLegendChange = useCallback(
+    (e: React.ChangeEvent<HTMLInputElement>) => {
+      onUpdate(index, 'legendFormat', e.target.value);
+    },
+    [index, onUpdate],
+  );
 
-  const handleRemove = useCallback(() => { onRemove(index); }, [index, onRemove]);
+  const handleRemove = useCallback(() => {
+    onRemove(index);
+  }, [index, onRemove]);
 
   return (
     <div className='space-y-1.5 rounded-md border p-3'>
@@ -178,18 +209,8 @@ const QueryRow = ({
           <X className='h-3 w-3' />
         </Button>
       </div>
-      <Input
-        placeholder='Query expression'
-        value={query.expr}
-        onChange={handleExprChange}
-        className='font-mono text-sm'
-      />
-      <Input
-        placeholder='Legend format (optional)'
-        value={query.legendFormat}
-        onChange={handleLegendChange}
-        className='text-sm'
-      />
+      <Input placeholder='Query expression' value={query.expr} onChange={handleExprChange} className='font-mono text-sm' />
+      <Input placeholder='Legend format (optional)' value={query.legendFormat} onChange={handleLegendChange} className='text-sm' />
     </div>
   );
 };
@@ -205,15 +226,23 @@ const ThresholdRow = ({
   onRemove: (index: number) => void;
   onChange: (index: number, field: 'value' | 'color', value: string) => void;
 }) => {
-  const handleValueChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
-    onChange(index, 'value', e.target.value);
-  }, [index, onChange]);
+  const handleValueChange = useCallback(
+    (e: React.ChangeEvent<HTMLInputElement>) => {
+      onChange(index, 'value', e.target.value);
+    },
+    [index, onChange],
+  );
 
-  const handleColorChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
-    onChange(index, 'color', e.target.value);
-  }, [index, onChange]);
+  const handleColorChange = useCallback(
+    (e: React.ChangeEvent<HTMLInputElement>) => {
+      onChange(index, 'color', e.target.value);
+    },
+    [index, onChange],
+  );
 
-  const handleRemove = useCallback(() => { onRemove(index); }, [index, onRemove]);
+  const handleRemove = useCallback(() => {
+    onRemove(index);
+  }, [index, onRemove]);
 
   return (
     <div className='flex items-center gap-2'>
@@ -224,13 +253,7 @@ const ThresholdRow = ({
         className='h-8 w-8 cursor-pointer rounded border-0'
         aria-label={`Threshold ${String(index + 1)} color`}
       />
-      <Input
-        type='number'
-        value={threshold.value}
-        onChange={handleValueChange}
-        className='w-24 text-sm'
-        aria-label={`Threshold ${String(index + 1)} value`}
-      />
+      <Input type='number' value={threshold.value} onChange={handleValueChange} className='w-24 text-sm' aria-label={`Threshold ${String(index + 1)} value`} />
       <Button variant='ghost' size='icon' className='h-8 w-8' onClick={handleRemove} aria-label={`Remove threshold ${String(index + 1)}`}>
         <Trash2 className='h-3.5 w-3.5' />
       </Button>

@@ -54,9 +54,12 @@ export const DashboardToolbar = ({
   onSettings,
   saving,
 }: DashboardToolbarProps) => {
-  const handleRefreshChange = useCallback((val: string) => {
-    if (isRefreshInterval(val)) onRefreshIntervalChange(val);
-  }, [onRefreshIntervalChange]);
+  const handleRefreshChange = useCallback(
+    (val: string) => {
+      if (isRefreshInterval(val)) onRefreshIntervalChange(val);
+    },
+    [onRefreshIntervalChange],
+  );
 
   return (
     <div className='flex items-center justify-between border-b px-4 py-2'>
@@ -65,14 +68,16 @@ export const DashboardToolbar = ({
       <div className='flex items-center gap-2'>
         <TimeRangePicker value={timeRange} onChange={onTimeRangeChange} />
 
-        <Select value={refreshInterval} onValueChange={handleRefreshChange}>
+        <Select value={refreshInterval} onValueChange={handleRefreshChange} items={refreshOptions}>
           <SelectTrigger className='w-20' aria-label='Auto-refresh interval'>
             <RefreshCw className='mr-1 h-3 w-3' />
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
             {refreshOptions.map(opt => (
-              <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>
+              <SelectItem key={opt.value} value={opt.value}>
+                {opt.label}
+              </SelectItem>
             ))}
           </SelectContent>
         </Select>

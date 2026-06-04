@@ -17,8 +17,14 @@ interface Matcher {
   value: string;
 }
 
-const isMatchOperator = (v: string): v is MatchOperator =>
-  v === '=' || v === '!=' || v === '=~' || v === '!~';
+const isMatchOperator = (v: string): v is MatchOperator => v === '=' || v === '!=' || v === '=~' || v === '!~';
+
+const MATCH_OPERATOR_OPTIONS = [
+  { value: '=', label: '=' },
+  { value: '!=', label: '!=' },
+  { value: '=~', label: '=~' },
+  { value: '!~', label: '!~' },
+] as const;
 
 const MatcherRow = ({
   index,
@@ -38,31 +44,40 @@ const MatcherRow = ({
   onRemove: (index: number) => void;
 }) => {
   const handleName = useCallback(
-    (e: React.ChangeEvent<HTMLInputElement>) => { onNameChange(index, e.target.value); },
+    (e: React.ChangeEvent<HTMLInputElement>) => {
+      onNameChange(index, e.target.value);
+    },
     [index, onNameChange],
   );
   const handleOp = useCallback(
-    (v: string | null) => { onOperatorChange(index, v ?? '='); },
+    (v: string | null) => {
+      onOperatorChange(index, v ?? '=');
+    },
     [index, onOperatorChange],
   );
   const handleValue = useCallback(
-    (e: React.ChangeEvent<HTMLInputElement>) => { onValueChange(index, e.target.value); },
+    (e: React.ChangeEvent<HTMLInputElement>) => {
+      onValueChange(index, e.target.value);
+    },
     [index, onValueChange],
   );
-  const handleRemove = useCallback(() => { onRemove(index); }, [index, onRemove]);
+  const handleRemove = useCallback(() => {
+    onRemove(index);
+  }, [index, onRemove]);
 
   return (
     <div className='flex items-center gap-2'>
       <Input value={matcher.name} onChange={handleName} placeholder='Label name' className='flex-1' />
-      <Select value={matcher.operator} onValueChange={handleOp}>
+      <Select value={matcher.operator} onValueChange={handleOp} items={MATCH_OPERATOR_OPTIONS}>
         <SelectTrigger className='w-24'>
           <SelectValue />
         </SelectTrigger>
         <SelectContent>
-          <SelectItem value='='>=</SelectItem>
-          <SelectItem value='!='>!=</SelectItem>
-          <SelectItem value='=~'>=~</SelectItem>
-          <SelectItem value='!~'>!~</SelectItem>
+          {MATCH_OPERATOR_OPTIONS.map(o => (
+            <SelectItem key={o.value} value={o.value}>
+              {o.label}
+            </SelectItem>
+          ))}
         </SelectContent>
       </Select>
       <Input value={matcher.value} onChange={handleValue} placeholder='Value' className='flex-1' />
@@ -117,9 +132,7 @@ const NewSilencePage = () => {
         try {
           await createSilence({
             data: {
-              matchers: form.matchers
-                .filter(m => m.name.trim() !== '')
-                .map(m => ({ name: m.name, operator: m.operator, value: m.value })),
+              matchers: form.matchers.filter(m => m.name.trim() !== '').map(m => ({ name: m.name, operator: m.operator, value: m.value })),
               startsAt: toEpoch(form.startsAt),
               endsAt: toEpoch(form.endsAt),
               comment: form.comment,
@@ -172,7 +185,9 @@ const NewSilencePage = () => {
     setForm(prev => ({ ...prev, comment: value }));
   }, []);
 
-  const handleCancel = useCallback(() => { void navigate({ to: '/alerting/silences' }); }, [navigate]);
+  const handleCancel = useCallback(() => {
+    void navigate({ to: '/alerting/silences' });
+  }, [navigate]);
 
   return (
     <form onSubmit={handleSubmit}>

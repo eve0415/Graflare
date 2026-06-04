@@ -7,7 +7,7 @@ import { Skeleton } from '@graflare/ui/components/skeleton';
 import { useSuspenseQuery } from '@tanstack/react-query';
 import { createFileRoute, useNavigate } from '@tanstack/react-router';
 import { Plus, Trash2 } from 'lucide-react';
-import { useCallback, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 
 import { createAlertRule } from '../-api';
 import { alertRuleGroupsQueryOptions } from '../-queries';
@@ -39,17 +39,42 @@ interface FormState {
   annotations: { key: string; value: string }[];
 }
 
-const isConditionReducer = (v: string): v is ConditionReducer =>
-  v === 'last' || v === 'avg' || v === 'min' || v === 'max' || v === 'sum' || v === 'count';
+const isConditionReducer = (v: string): v is ConditionReducer => v === 'last' || v === 'avg' || v === 'min' || v === 'max' || v === 'sum' || v === 'count';
 
-const isConditionOperator = (v: string): v is ConditionOperator =>
-  v === 'gt' || v === 'lt' || v === 'gte' || v === 'lte' || v === 'eq' || v === 'neq';
+const isConditionOperator = (v: string): v is ConditionOperator => v === 'gt' || v === 'lt' || v === 'gte' || v === 'lte' || v === 'eq' || v === 'neq';
 
-const isNoDataState = (v: string): v is NoDataState =>
-  v === 'Alerting' || v === 'OK' || v === 'KeepLastState';
+const isNoDataState = (v: string): v is NoDataState => v === 'Alerting' || v === 'OK' || v === 'KeepLastState';
 
-const isExecErrState = (v: string): v is ExecErrState =>
-  v === 'Alerting' || v === 'KeepLastState';
+const isExecErrState = (v: string): v is ExecErrState => v === 'Alerting' || v === 'KeepLastState';
+
+const REDUCER_OPTIONS = [
+  { value: 'last', label: 'Last' },
+  { value: 'avg', label: 'Average' },
+  { value: 'min', label: 'Min' },
+  { value: 'max', label: 'Max' },
+  { value: 'sum', label: 'Sum' },
+  { value: 'count', label: 'Count' },
+] as const;
+
+const OPERATOR_OPTIONS = [
+  { value: 'gt', label: 'Greater than' },
+  { value: 'lt', label: 'Less than' },
+  { value: 'gte', label: 'Greater or equal' },
+  { value: 'lte', label: 'Less or equal' },
+  { value: 'eq', label: 'Equal' },
+  { value: 'neq', label: 'Not equal' },
+] as const;
+
+const NO_DATA_STATE_OPTIONS = [
+  { value: 'Alerting', label: 'Alerting' },
+  { value: 'OK', label: 'OK' },
+  { value: 'KeepLastState', label: 'Keep Last State' },
+] as const;
+
+const EXEC_ERR_STATE_OPTIONS = [
+  { value: 'Alerting', label: 'Alerting' },
+  { value: 'KeepLastState', label: 'Keep Last State' },
+] as const;
 
 const QueryRow = ({
   query,
@@ -65,14 +90,20 @@ const QueryRow = ({
   onRemove: (index: number) => void;
 }) => {
   const handleDsChange = useCallback(
-    (e: React.ChangeEvent<HTMLInputElement>) => { onChange(index, 'datasourceId', e.target.value); },
+    (e: React.ChangeEvent<HTMLInputElement>) => {
+      onChange(index, 'datasourceId', e.target.value);
+    },
     [index, onChange],
   );
   const handleExprChange = useCallback(
-    (e: React.ChangeEvent<HTMLInputElement>) => { onChange(index, 'expr', e.target.value); },
+    (e: React.ChangeEvent<HTMLInputElement>) => {
+      onChange(index, 'expr', e.target.value);
+    },
     [index, onChange],
   );
-  const handleRemove = useCallback(() => { onRemove(index); }, [index, onRemove]);
+  const handleRemove = useCallback(() => {
+    onRemove(index);
+  }, [index, onRemove]);
 
   return (
     <div className='space-y-2 rounded-md border p-3'>
@@ -110,14 +141,20 @@ const KvRow = ({
   onRemove: (index: number) => void;
 }) => {
   const handleKeyChange = useCallback(
-    (e: React.ChangeEvent<HTMLInputElement>) => { onChange(index, 'key', e.target.value); },
+    (e: React.ChangeEvent<HTMLInputElement>) => {
+      onChange(index, 'key', e.target.value);
+    },
     [index, onChange],
   );
   const handleValueChange = useCallback(
-    (e: React.ChangeEvent<HTMLInputElement>) => { onChange(index, 'value', e.target.value); },
+    (e: React.ChangeEvent<HTMLInputElement>) => {
+      onChange(index, 'value', e.target.value);
+    },
     [index, onChange],
   );
-  const handleRemove = useCallback(() => { onRemove(index); }, [index, onRemove]);
+  const handleRemove = useCallback(() => {
+    onRemove(index);
+  }, [index, onRemove]);
 
   return (
     <div className='flex items-center gap-2'>
@@ -140,6 +177,7 @@ const NewAlertRuleSkeleton = () => (
 const NewAlertRulePage = () => {
   const navigate = useNavigate();
   const { data: groups } = useSuspenseQuery(alertRuleGroupsQueryOptions());
+  const groupItems = useMemo(() => groups.map(g => ({ value: g.id, label: g.name })), [groups]);
   const [submitting, setSubmitting] = useState(false);
   const [form, setForm] = useState<FormState>({
     groupId: '',
@@ -155,6 +193,8 @@ const NewAlertRulePage = () => {
     labels: [],
     annotations: [],
   });
+
+  const queryRefItems = useMemo(() => form.queries.map(q => ({ value: q.refId, label: q.refId })), [form.queries]);
 
   const handleSubmit = useCallback(
     (e: React.SyntheticEvent) => {
@@ -284,7 +324,9 @@ const NewAlertRulePage = () => {
     setForm(prev => ({ ...prev, annotations: prev.annotations.map((a, i) => (i === index ? { ...a, [field]: value } : a)) }));
   }, []);
 
-  const handleCancel = useCallback(() => { void navigate({ to: '/alerting/rules' }); }, [navigate]);
+  const handleCancel = useCallback(() => {
+    void navigate({ to: '/alerting/rules' });
+  }, [navigate]);
 
   return (
     <form onSubmit={handleSubmit}>
@@ -295,13 +337,15 @@ const NewAlertRulePage = () => {
         <CardContent className='space-y-6'>
           <div className='space-y-2'>
             <Label htmlFor='group'>Rule Group</Label>
-            <Select value={form.groupId} onValueChange={handleGroupChange}>
+            <Select value={form.groupId} onValueChange={handleGroupChange} items={groupItems}>
               <SelectTrigger id='group'>
                 <SelectValue placeholder='Select a group' />
               </SelectTrigger>
               <SelectContent>
-                {groups.map(g => (
-                  <SelectItem key={g.id} value={g.id}>{g.name}</SelectItem>
+                {groupItems.map(o => (
+                  <SelectItem key={o.value} value={o.value}>
+                    {o.label}
+                  </SelectItem>
                 ))}
               </SelectContent>
             </Select>
@@ -329,44 +373,60 @@ const NewAlertRulePage = () => {
             <Label>Condition</Label>
             <div className='grid grid-cols-4 gap-3'>
               <div className='space-y-1'>
-                <Label htmlFor='condRef' className='text-xs'>Query</Label>
-                <Select value={form.conditionRefId} onValueChange={handleConditionRefIdChange}>
-                  <SelectTrigger id='condRef'><SelectValue /></SelectTrigger>
+                <Label htmlFor='condRef' className='text-xs'>
+                  Query
+                </Label>
+                <Select value={form.conditionRefId} onValueChange={handleConditionRefIdChange} items={queryRefItems}>
+                  <SelectTrigger id='condRef'>
+                    <SelectValue />
+                  </SelectTrigger>
                   <SelectContent>
-                    {form.queries.map(q => (<SelectItem key={q.refId} value={q.refId}>{q.refId}</SelectItem>))}
+                    {queryRefItems.map(o => (
+                      <SelectItem key={o.value} value={o.value}>
+                        {o.label}
+                      </SelectItem>
+                    ))}
                   </SelectContent>
                 </Select>
               </div>
               <div className='space-y-1'>
-                <Label htmlFor='reducer' className='text-xs'>Reducer</Label>
-                <Select value={form.conditionReducer} onValueChange={handleConditionReducerChange}>
-                  <SelectTrigger id='reducer'><SelectValue /></SelectTrigger>
+                <Label htmlFor='reducer' className='text-xs'>
+                  Reducer
+                </Label>
+                <Select value={form.conditionReducer} onValueChange={handleConditionReducerChange} items={REDUCER_OPTIONS}>
+                  <SelectTrigger id='reducer'>
+                    <SelectValue />
+                  </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value='last'>Last</SelectItem>
-                    <SelectItem value='avg'>Average</SelectItem>
-                    <SelectItem value='min'>Min</SelectItem>
-                    <SelectItem value='max'>Max</SelectItem>
-                    <SelectItem value='sum'>Sum</SelectItem>
-                    <SelectItem value='count'>Count</SelectItem>
+                    {REDUCER_OPTIONS.map(o => (
+                      <SelectItem key={o.value} value={o.value}>
+                        {o.label}
+                      </SelectItem>
+                    ))}
                   </SelectContent>
                 </Select>
               </div>
               <div className='space-y-1'>
-                <Label htmlFor='operator' className='text-xs'>Operator</Label>
-                <Select value={form.conditionOperator} onValueChange={handleConditionOperatorChange}>
-                  <SelectTrigger id='operator'><SelectValue /></SelectTrigger>
+                <Label htmlFor='operator' className='text-xs'>
+                  Operator
+                </Label>
+                <Select value={form.conditionOperator} onValueChange={handleConditionOperatorChange} items={OPERATOR_OPTIONS}>
+                  <SelectTrigger id='operator'>
+                    <SelectValue />
+                  </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value='gt'>Greater than</SelectItem>
-                    <SelectItem value='lt'>Less than</SelectItem>
-                    <SelectItem value='gte'>Greater or equal</SelectItem>
-                    <SelectItem value='lte'>Less or equal</SelectItem>
-                    <SelectItem value='eq'>Equal</SelectItem>
-                    <SelectItem value='neq'>Not equal</SelectItem>
+                    {OPERATOR_OPTIONS.map(o => (
+                      <SelectItem key={o.value} value={o.value}>
+                        {o.label}
+                      </SelectItem>
+                    ))}
                   </SelectContent>
                 </Select>
               </div>
               <div className='space-y-1'>
-                <Label htmlFor='threshold' className='text-xs'>Threshold</Label>
+                <Label htmlFor='threshold' className='text-xs'>
+                  Threshold
+                </Label>
                 <Input id='threshold' type='number' value={form.conditionThreshold} onChange={handleConditionThresholdChange} />
               </div>
             </div>
@@ -379,22 +439,31 @@ const NewAlertRulePage = () => {
             </div>
             <div className='space-y-2'>
               <Label htmlFor='noData'>No data state</Label>
-              <Select value={form.noDataState} onValueChange={handleNoDataStateChange}>
-                <SelectTrigger id='noData'><SelectValue /></SelectTrigger>
+              <Select value={form.noDataState} onValueChange={handleNoDataStateChange} items={NO_DATA_STATE_OPTIONS}>
+                <SelectTrigger id='noData'>
+                  <SelectValue />
+                </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value='Alerting'>Alerting</SelectItem>
-                  <SelectItem value='OK'>OK</SelectItem>
-                  <SelectItem value='KeepLastState'>Keep Last State</SelectItem>
+                  {NO_DATA_STATE_OPTIONS.map(o => (
+                    <SelectItem key={o.value} value={o.value}>
+                      {o.label}
+                    </SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
             </div>
             <div className='space-y-2'>
               <Label htmlFor='execErr'>Error state</Label>
-              <Select value={form.execErrState} onValueChange={handleExecErrStateChange}>
-                <SelectTrigger id='execErr'><SelectValue /></SelectTrigger>
+              <Select value={form.execErrState} onValueChange={handleExecErrStateChange} items={EXEC_ERR_STATE_OPTIONS}>
+                <SelectTrigger id='execErr'>
+                  <SelectValue />
+                </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value='Alerting'>Alerting</SelectItem>
-                  <SelectItem value='KeepLastState'>Keep Last State</SelectItem>
+                  {EXEC_ERR_STATE_OPTIONS.map(o => (
+                    <SelectItem key={o.value} value={o.value}>
+                      {o.label}
+                    </SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
             </div>
