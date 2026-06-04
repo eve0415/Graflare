@@ -59,6 +59,15 @@ vi.mock('../src/lib/sql-proxy', () => ({
   sqlQuery: () => Promise.resolve({ columns: [], rows: [] }),
 }));
 
+vi.mock('../src/lib/introspection', () => ({
+  listTables: () => Promise.resolve({ tables: [] }),
+  describeTable: () => Promise.resolve({ columns: [] }),
+  describeDatabase: () => Promise.resolve({ tables: {} }),
+  listMetrics: () => Promise.resolve({ metrics: [] }),
+  listLabels: () => Promise.resolve({ labels: [] }),
+  listLabelValues: () => Promise.resolve({ values: [] }),
+}));
+
 const MockGrid = ({ children }: { children: React.ReactNode }) => children;
 vi.mock('react-grid-layout', () => ({
   default: MockGrid,
@@ -78,6 +87,15 @@ vi.mock('../src/routes/dashboards/-queries', () => ({
 vi.mock('../src/routes/datasources/-queries', () => ({
   datasourcesQueryOptions: () => ({ queryKey: ['datasources'], queryFn: () => Promise.resolve([]) }),
   datasourceQueryOptions: () => ({ queryKey: ['datasource'], queryFn: () => Promise.resolve(null) }),
+}));
+
+vi.mock('../src/routes/-root/introspection-queries', () => ({
+  tablesQueryOptions: () => ({ queryKey: ['introspection', 'tables'], queryFn: () => Promise.resolve({ tables: [] }), enabled: false }),
+  columnsQueryOptions: () => ({ queryKey: ['introspection', 'columns'], queryFn: () => Promise.resolve({ columns: [] }), enabled: false }),
+  databaseSchemaQueryOptions: () => ({ queryKey: ['introspection', 'database'], queryFn: () => Promise.resolve({ tables: {} }), enabled: false }),
+  metricsQueryOptions: () => ({ queryKey: ['introspection', 'metrics'], queryFn: () => Promise.resolve({ metrics: [] }), enabled: false }),
+  labelsQueryOptions: () => ({ queryKey: ['introspection', 'labels'], queryFn: () => Promise.resolve({ labels: [] }), enabled: false }),
+  labelValuesQueryOptions: () => ({ queryKey: ['introspection', 'labelValues'], queryFn: () => Promise.resolve({ values: [] }), enabled: false }),
 }));
 
 vi.mock('../src/routes/alerting/-api', () => ({
