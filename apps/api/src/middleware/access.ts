@@ -142,16 +142,17 @@ export const verifyJwt = async (token: string, teamDomain: string, expectedAud?:
     throw new Error('Token expired');
   }
 
-  const expectedIss = `https://${teamDomain}.cloudflareaccess.com`;
+  const normalizedDomain = teamDomain.replace(/^https?:\/\//, '').replace(/\.cloudflareaccess\.com$/, '');
+  const expectedIss = `https://${normalizedDomain}.cloudflareaccess.com`;
   if (payload.iss !== expectedIss) {
-    throw new Error('Bad issuer');
+    throw new Error(`Bad issuer: expected ${expectedIss}, got ${payload.iss}`);
   }
 
   if (expectedAud !== undefined && !payload.aud.includes(expectedAud)) {
-    throw new Error('Bad audience');
+    throw new Error(`Bad audience: expected ${expectedAud}, got ${JSON.stringify(payload.aud)}`);
   }
 
-  const keys = await getPublicKeys(teamDomain);
+  const keys = await getPublicKeys(normalizedDomain);
   const key = keys.get(header.kid);
   if (!key) {
     throw new Error('Unknown signing key');
