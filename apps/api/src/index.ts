@@ -11,6 +11,7 @@ import type { CreateMuteTiming, UpdateMuteTiming } from '@graflare/shared/schema
 import type { CreateNotificationPolicy, UpdateNotificationPolicy } from '@graflare/shared/schemas/notification-policy';
 import type { PrometheusResponse } from '@graflare/shared/schemas/prometheus';
 import type { CreateSilence, UpdateSilence } from '@graflare/shared/schemas/silence';
+import type { DescribeDatabaseResponse, DescribeTableResponse, ListLabelsResponse, ListLabelValuesResponse, ListMetricsResponse, ListTablesResponse } from '@graflare/shared/schemas/introspection';
 import type { SqlFormat, SqlResponse } from '@graflare/shared/schemas/sql';
 import type { DurableObjectNamespace } from 'cloudflare:workers';
 
@@ -78,8 +79,10 @@ import { datasourceRoutes } from './routes/datasources/datasources';
 import { datasourceTestRoutes } from './routes/datasources/datasources-test';
 import { proxyRoutes } from './routes/datasources/proxy';
 import { folderRoutes } from './routes/folders/folders';
+import { createPrometheusClient } from './prometheus/factory';
 import { SqlClient } from './sql/client';
 import { createSqlClient } from './sql/factory';
+import { describeTableQuery, listTablesQuery } from './sql/introspection';
 
 interface Bindings {
   DB: D1Database;
@@ -476,6 +479,173 @@ export class GraflareAPI extends WorkerEntrypoint<Bindings> {
     }
 
     return client.query(expandedSql, params);
+  }
+
+  // --- Introspection RPC ---
+
+  async listTables(jwt: string, datasourceId: string): Promise<ListTablesResponse> {
+    try {
+      const { orgId } = await this.resolveAuth(jwt);
+      datasourceIdSchema.parse(datasourceId);
+
+      const rows = await this.db
+        .select()
+        .from(datasources)
+        .where(and(eq(datasources.id, datasourceId), eq(datasources.orgId, orgId)))
+        .limit(1);
+
+      const [ds] = rows;
+      if (ds === undefined) return { tables: [], error: 'Data source not found' };
+      if (ds.type !== 'sql') return { tables: [], error: 'Data source is not a SQL type' };
+
+      const dialect = ds.dialect === 'postgres' ? 'postgres' : 'sqlite';
+      const client = await createSqlClient(this.env.DB, this.env.ENCRYPTION_KEY, orgId, datasourceId, this.bridgeFetch);
+      if (client === null) return { tables: [], error: 'Data source not found' };
+
+      const q = listTablesQuery(dialect);
+      const result = await client.query(q.sql, q.params);
+      if (result.error !== undefined) return { tables: [], error: result.error };
+
+      const nameIdx = result.columns.findIndex((c) => c.name === 'name');
+      const schemaIdx = result.columns.findIndex((c) => c.name === 'schema');
+
+      const tables = result.rows.map((row) => ({
+        name: String(row[nameIdx] ?? ''),
+        ...(schemaIdx >= 0 && row[schemaIdx] !== null ? { schema: String(row[schemaIdx]) } : {}),
+      }));
+
+      return { tables };
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Failed to list tables';
+      return { tables: [], error: message };
+    }
+  }
+
+  async describeTable(jwt: string, datasourceId: string, tableName: string, schema?: string): Promise<DescribeTableResponse> {
+    try {
+      const { orgId } = await this.resolveAuth(jwt);
+      datasourceIdSchema.parse(datasourceId);
+
+      const rows = await this.db
+        .select()
+        .from(datasources)
+        .where(and(eq(datasources.id, datasourceId), eq(datasources.orgId, orgId)))
+        .limit(1);
+
+      const [ds] = rows;
+      if (ds === undefined) return { columns: [], error: 'Data source not found' };
+      if (ds.type !== 'sql') return { columns: [], error: 'Data source is not a SQL type' };
+
+      const dialect = ds.dialect === 'postgres' ? 'postgres' : 'sqlite';
+      const client = await createSqlClient(this.env.DB, this.env.ENCRYPTION_KEY, orgId, datasourceId, this.bridgeFetch);
+      if (client === null) return { columns: [], error: 'Data source not found' };
+
+      const q = describeTableQuery(dialect, tableName, schema);
+      const result = await client.query(q.sql, q.params);
+      if (result.error !== undefined) return { columns: [], error: result.error };
+
+      const nameIdx = result.columns.findIndex((c) => c.name === 'name');
+      const typeIdx = result.columns.findIndex((c) => c.name === 'type');
+      const nullableIdx = result.columns.findIndex((c) => c.name === 'nullable');
+
+      const columns = result.rows.map((row) => ({
+        name: String(row[nameIdx] ?? ''),
+        type: String(row[typeIdx] ?? ''),
+        nullable: Number(row[nullableIdx]) === 1,
+      }));
+
+      return { columns };
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Failed to describe table';
+      return { columns: [], error: message };
+    }
+  }
+
+  async describeDatabase(jwt: string, datasourceId: string): Promise<DescribeDatabaseResponse> {
+    try {
+      const tablesResult = await this.listTables(jwt, datasourceId);
+      if (tablesResult.error !== undefined) return { tables: {}, error: tablesResult.error };
+
+      const tables: Record<string, Array<{ name: string; type: string; nullable: boolean }>> = {};
+      for (const table of tablesResult.tables) {
+        const columnsResult = await this.describeTable(jwt, datasourceId, table.name, table.schema);
+        if (columnsResult.error !== undefined) continue;
+        tables[table.name] = columnsResult.columns;
+      }
+
+      return { tables };
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Failed to describe database';
+      return { tables: {}, error: message };
+    }
+  }
+
+  async listMetrics(jwt: string, datasourceId: string): Promise<ListMetricsResponse> {
+    try {
+      const { orgId } = await this.resolveAuth(jwt);
+      datasourceIdSchema.parse(datasourceId);
+
+      const client = await createPrometheusClient(this.env.DB, this.env.ENCRYPTION_KEY, orgId, datasourceId);
+      if (client === null) return { metrics: [], error: 'Data source not found' };
+
+      const res = await client.labelValues('__name__');
+      if (res.status === 'error') return { metrics: [], error: res.error ?? 'Failed to fetch metrics' };
+
+      const d = res.data;
+      if (Array.isArray(d) && d.every((x): x is string => typeof x === 'string')) {
+        return { metrics: d };
+      }
+      return { metrics: [] };
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Failed to list metrics';
+      return { metrics: [], error: message };
+    }
+  }
+
+  async listLabels(jwt: string, datasourceId: string, metric?: string): Promise<ListLabelsResponse> {
+    try {
+      const { orgId } = await this.resolveAuth(jwt);
+      datasourceIdSchema.parse(datasourceId);
+
+      const client = await createPrometheusClient(this.env.DB, this.env.ENCRYPTION_KEY, orgId, datasourceId);
+      if (client === null) return { labels: [], error: 'Data source not found' };
+
+      const match = metric !== undefined && metric !== '' ? [metric] : undefined;
+      const res = await client.labels(match);
+      if (res.status === 'error') return { labels: [], error: res.error ?? 'Failed to fetch labels' };
+
+      const d = res.data;
+      if (Array.isArray(d) && d.every((x): x is string => typeof x === 'string')) {
+        return { labels: d };
+      }
+      return { labels: [] };
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Failed to list labels';
+      return { labels: [], error: message };
+    }
+  }
+
+  async listLabelValues(jwt: string, datasourceId: string, label: string, metric?: string): Promise<ListLabelValuesResponse> {
+    try {
+      const { orgId } = await this.resolveAuth(jwt);
+      datasourceIdSchema.parse(datasourceId);
+
+      const client = await createPrometheusClient(this.env.DB, this.env.ENCRYPTION_KEY, orgId, datasourceId);
+      if (client === null) return { values: [], error: 'Data source not found' };
+
+      const match = metric !== undefined && metric !== '' ? [metric] : undefined;
+      const res = await client.labelValues(label, match);
+      if (res.status === 'error') return { values: [], error: res.error ?? 'Failed to fetch label values' };
+
+      const d = res.data;
+      if (Array.isArray(d) && d.every((x): x is string => typeof x === 'string')) {
+        return { values: d };
+      }
+      return { values: [] };
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Failed to list label values';
+      return { values: [], error: message };
+    }
   }
 
   // --- Folder RPC ---
