@@ -14,6 +14,13 @@ export default defineConfig(async () => {
         miniflare: {
           bindings: { TEST_MIGRATIONS: migrations },
           d1Databases: { DB: 'test-db' },
+          workers: [
+            {
+              name: 'graflare-bridge',
+              modules: true,
+              script: 'export default { fetch() { return Response.json({ columns: [], rows: [] }); } }',
+            },
+          ],
         },
       }),
     ],

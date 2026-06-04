@@ -33,6 +33,12 @@
       "class_name": "NotificationWorkflow"
     }
   ],
+  "services": [
+    {
+      "binding": "BRIDGE",
+      "service": "graflare-bridge"
+    }
+  ],
   "send_email": [
     {
       "name": "EMAIL"

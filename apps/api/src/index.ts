@@ -90,6 +90,7 @@ interface Bindings {
   ALERT_RULE: DurableObjectNamespace<AlertRuleDO>;
   NOTIFICATION_WORKFLOW: Workflow;
   EMAIL: SendEmail;
+  BRIDGE?: Fetcher;
 }
 
 export interface AppEnv {
@@ -146,6 +147,13 @@ export default app;
 export class GraflareAPI extends WorkerEntrypoint<Bindings> {
   private get db() {
     return createDb(this.env.DB);
+  }
+
+  private get bridgeFetch(): typeof fetch {
+    if (this.env.BRIDGE) {
+      return this.env.BRIDGE.fetch.bind(this.env.BRIDGE);
+    }
+    return fetch;
   }
 
   private async resolveAuth(jwt: string): Promise<{ orgId: string; email: string }> {
@@ -295,7 +303,7 @@ export class GraflareAPI extends WorkerEntrypoint<Bindings> {
     }
 
     if (ds.type === 'sql') {
-      const client = await createSqlClient(this.env.DB, this.env.ENCRYPTION_KEY, orgId, id);
+      const client = await createSqlClient(this.env.DB, this.env.ENCRYPTION_KEY, orgId, id, this.bridgeFetch);
       if (client === null) {
         return { success: false, latencyMs: 0, error: 'Not found' };
       }
@@ -342,7 +350,7 @@ export class GraflareAPI extends WorkerEntrypoint<Bindings> {
     if (parsed.type === 'sql') {
       const auth =
         parsed.authType !== 'none' && parsed.credentials !== undefined ? { type: parsed.authType, credentials: parsed.credentials } : { type: 'none' as const };
-      const client = new SqlClient(parsed.url, auth, parsed.queryTimeoutMs);
+      const client = new SqlClient(parsed.url, auth, parsed.queryTimeoutMs, this.bridgeFetch);
       return client.testConnection();
     }
 
@@ -462,7 +470,7 @@ export class GraflareAPI extends WorkerEntrypoint<Bindings> {
 
     const { sql: expandedSql, params } = expandSqlMacros(rawSql, dialect, resolvedTimeRange);
 
-    const client = await createSqlClient(this.env.DB, this.env.ENCRYPTION_KEY, orgId, datasourceId);
+    const client = await createSqlClient(this.env.DB, this.env.ENCRYPTION_KEY, orgId, datasourceId, this.bridgeFetch);
     if (client === null) {
       return { columns: [], rows: [], error: 'Data source not found' };
     }
