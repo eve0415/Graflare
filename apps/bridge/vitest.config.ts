@@ -17,6 +17,8 @@ export default defineConfig(async () => {
 						BRIDGE_AUTH_TOKEN: 'test-token',
 						CF_API_TOKEN: 'test-cf-token',
 						CF_ACCOUNT_ID: 'test-account-id',
+						CF_ZONE_IDS: '',
+						BRIDGE_DEBUG: '',
 					},
 					d1Databases: { DB: 'test-db' },
 				},

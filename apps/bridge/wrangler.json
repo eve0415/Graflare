@@ -12,6 +12,10 @@
       "migrations_dir": "drizzle"
     }
   ],
+  "vars": {
+    "CF_ZONE_IDS": "",
+    "BRIDGE_DEBUG": ""
+  },
   "triggers": {
     "crons": ["*/5 * * * *"]
   },
