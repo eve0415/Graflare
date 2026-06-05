@@ -3,15 +3,9 @@ import type { SqlResponse } from '@graflare/shared/schemas/sql';
 import { Hono } from 'hono';
 
 import { collectMetrics } from './cron';
+import type { BridgeEnv } from './env';
 
-interface Bindings {
-	DB: D1Database;
-	CF_API_TOKEN: string;
-	CF_ACCOUNT_ID: string;
-	BRIDGE_AUTH_TOKEN: string;
-}
-
-const app = new Hono<{ Bindings: Bindings }>();
+const app = new Hono<{ Bindings: BridgeEnv }>();
 
 app.get('/health', (c) => c.json({ status: 'ok' }));
 
@@ -83,7 +77,15 @@ app.post('/sql', async (c) => {
 
 export default {
 	fetch: app.fetch,
-	async scheduled(event: ScheduledEvent, env: Bindings) {
-		await collectMetrics(env, event.scheduledTime);
+	async scheduled(event: ScheduledEvent, env: BridgeEnv) {
+		try {
+			await collectMetrics(env, event.scheduledTime);
+		} catch (error: unknown) {
+			console.error(JSON.stringify({
+				level: 'error',
+				event: 'cron_fatal',
+				error: error instanceof Error ? error.message : String(error),
+			}));
+		}
 	},
 };
