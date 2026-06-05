@@ -14,6 +14,11 @@ describe('classifyError', () => {
 		expect(classifyError({ message: 'CF API returned 401' })).toBe('permission');
 	});
 
+	it('classifies authorization errors as permission', () => {
+		expect(classifyError({ message: 'not authorized for that account' })).toBe('permission');
+		expect(classifyError({ message: 'authorization denied' })).toBe('permission');
+	});
+
 	it('classifies validation errors', () => {
 		expect(classifyError({ message: 'Validation error in query' })).toBe('validation');
 		expect(classifyError({ message: "Cannot query field 'fooBar' on type 'Account'" })).toBe('validation');
