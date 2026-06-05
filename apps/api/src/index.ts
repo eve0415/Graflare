@@ -11,7 +11,7 @@ import type { CreateMuteTiming, UpdateMuteTiming } from '@graflare/shared/schema
 import type { CreateNotificationPolicy, UpdateNotificationPolicy } from '@graflare/shared/schemas/notification-policy';
 import type { PrometheusResponse } from '@graflare/shared/schemas/prometheus';
 import type { CreateSilence, UpdateSilence } from '@graflare/shared/schemas/silence';
-import type { DescribeDatabaseResponse, DescribeTableResponse, ListLabelsResponse, ListLabelValuesResponse, ListMetricsResponse, ListTablesResponse } from '@graflare/shared/schemas/introspection';
+import type { DescribeDatabaseResponse, DescribeTableResponse, ListLabelValuesResponse, ListLabelsResponse, ListMetricsResponse, ListTablesResponse } from '@graflare/shared/schemas/introspection';
 import type { SqlFormat, SqlResponse } from '@graflare/shared/schemas/sql';
 import type { DurableObjectNamespace } from 'cloudflare:workers';
 
@@ -509,10 +509,7 @@ export class GraflareAPI extends WorkerEntrypoint<Bindings> {
       const nameIdx = result.columns.findIndex((c) => c.name === 'name');
       const schemaIdx = result.columns.findIndex((c) => c.name === 'schema');
 
-      const tables = result.rows.map((row) => ({
-        name: String(row[nameIdx] ?? ''),
-        ...(schemaIdx >= 0 && row[schemaIdx] !== null ? { schema: String(row[schemaIdx]) } : {}),
-      }));
+      const tables = result.rows.map((row) => (({name: String(row[nameIdx] ?? ''), ...(schemaIdx >= 0 && row[schemaIdx] !== null ? { schema: String(row[schemaIdx]) } : {})})));
 
       return { tables };
     } catch (error) {
@@ -566,7 +563,7 @@ export class GraflareAPI extends WorkerEntrypoint<Bindings> {
       const tablesResult = await this.listTables(jwt, datasourceId);
       if (tablesResult.error !== undefined) return { tables: {}, error: tablesResult.error };
 
-      const tables: Record<string, Array<{ name: string; type: string; nullable: boolean }>> = {};
+      const tables: Record<string, { name: string; type: string; nullable: boolean }[]> = {};
       for (const table of tablesResult.tables) {
         const columnsResult = await this.describeTable(jwt, datasourceId, table.name, table.schema);
         if (columnsResult.error !== undefined) continue;

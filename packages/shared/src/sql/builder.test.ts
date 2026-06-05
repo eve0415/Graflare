@@ -29,7 +29,7 @@ describe('buildSql', () => {
 		);
 	});
 
-	describe('WHERE clauses', () => {
+	describe('wHERE clauses', () => {
 		it('generates a single WHERE condition', () => {
 			const result = buildSql({
 				...empty,
@@ -167,7 +167,7 @@ describe('buildSql', () => {
 		});
 	});
 
-	describe('GROUP BY', () => {
+	describe('gROUP BY', () => {
 		it('generates GROUP BY clause', () => {
 			const result = buildSql({
 				...empty,
@@ -188,7 +188,7 @@ describe('buildSql', () => {
 		});
 	});
 
-	describe('ORDER BY', () => {
+	describe('oRDER BY', () => {
 		it('generates ORDER BY clause', () => {
 			const result = buildSql({
 				...empty,
@@ -211,7 +211,7 @@ describe('buildSql', () => {
 		});
 	});
 
-	describe('LIMIT', () => {
+	describe('lIMIT', () => {
 		it('generates LIMIT clause', () => {
 			const result = buildSql({ ...empty, table: 'metrics', limit: 100 });
 			expect(result).toContain('LIMIT 100');

@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 
 import { FUNCTION_CATALOG, catalogByName } from './catalog';
 
-describe('FUNCTION_CATALOG', () => {
+describe('fUNCTION_CATALOG', () => {
 	it('contains all expected entries', () => {
 		const names = FUNCTION_CATALOG.map((e) => e.name);
 		expect(names).toContain('rate');
