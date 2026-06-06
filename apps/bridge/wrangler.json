@@ -13,7 +13,7 @@
     }
   ],
   "vars": {
-    "CF_ZONE_IDS": "",
+    "CF_ZONE_IDS": "5c5515f7b476206c9f2c60ba46293978",
     "BRIDGE_DEBUG": ""
   },
   "triggers": {
