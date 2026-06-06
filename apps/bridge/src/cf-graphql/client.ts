@@ -18,8 +18,7 @@ const isGraphQLError = (v: unknown): v is GraphQLError =>
 const isGraphQLResponse = <T>(json: unknown): json is GraphQLResponse<T> =>
 	typeof json === 'object'
 	&& json !== null
-	&& 'data' in json
-	&& (!('errors' in json) || (Array.isArray(json.errors) && json.errors.every(isGraphQLError)));
+	&& 'data' in json;
 
 export type ErrorClass = 'permission' | 'validation' | 'rate_limit' | 'server' | 'unknown';
 
@@ -124,13 +123,18 @@ export const cfGraphQL = async <T>(
 		return { data: null, errors: [{ message: `Invalid response: ${preview}` }] };
 	}
 
-	if (debug && json.errors !== undefined && json.errors.length > 0) {
+	const rawErrors: unknown = 'errors' in json ? json.errors : undefined;
+	const errors = Array.isArray(rawErrors)
+		? rawErrors.filter((e): e is GraphQLError => isGraphQLError(e))
+		: undefined;
+
+	if (debug && errors !== undefined && errors.length > 0) {
 		console.log(JSON.stringify({
 			level: 'debug',
 			event: 'graphql_errors',
-			errors: json.errors,
+			errors,
 		}));
 	}
 
-	return json;
+	return { data: json.data, errors } satisfies GraphQLResponse<T>;
 };
