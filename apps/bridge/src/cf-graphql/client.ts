@@ -120,7 +120,8 @@ export const cfGraphQL = async <T>(
 	}
 
 	if (!isGraphQLResponse<T>(json)) {
-		return { data: null, errors: [{ message: 'Invalid response' }] };
+		const preview = JSON.stringify(json).slice(0, 200);
+		return { data: null, errors: [{ message: `Invalid response: ${preview}` }] };
 	}
 
 	if (debug && json.errors !== undefined && json.errors.length > 0) {
