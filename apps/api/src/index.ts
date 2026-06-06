@@ -509,7 +509,7 @@ export class GraflareAPI extends WorkerEntrypoint<Bindings> {
       const nameIdx = result.columns.findIndex((c) => c.name === 'name');
       const schemaIdx = result.columns.findIndex((c) => c.name === 'schema');
 
-      const tables = result.rows.map((row) => (((((((((((((({name: String(row[nameIdx] ?? ''), ...(schemaIdx >= 0 && row[schemaIdx] !== null ? { schema: String(row[schemaIdx]) } : {})})))))))))))))));
+      const tables = result.rows.map((row) => (Object.assign({ name: String(row[nameIdx] ?? '') }, schemaIdx >= 0 && row[schemaIdx] !== null && { schema: String(row[schemaIdx]) })));
 
       return { tables };
     } catch (error) {

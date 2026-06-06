@@ -1,3 +1,9 @@
+export const parseZoneIds = (raw: string): string[] =>
+	raw
+		.split(',')
+		.map((z) => z.trim())
+		.filter((z) => z.length > 0);
+
 export interface BridgeEnv {
 	DB: D1Database;
 	CF_API_TOKEN: string;

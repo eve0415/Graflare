@@ -1,9 +1,7 @@
 import { dimsHash } from '../lib/dims-hash';
+import { isRecord } from '../lib/typed-access';
 
 import type { MetricRow, RESTCollector } from './types';
-
-const isRecord = (v: unknown): v is Record<string, unknown> =>
-	typeof v === 'object' && v !== null;
 
 const isUsageItem = (v: unknown): v is {
 	serviceName: string;
@@ -21,7 +19,6 @@ const isUsageItem = (v: unknown): v is {
 	&& 'contractedCost' in v
 	&& typeof v.contractedCost === 'number';
 
-const isUnknownArray = (v: unknown): v is unknown[] => Array.isArray(v);
 
 // Alpha endpoint with restricted access — may 403 on some accounts.
 // The datasetStatus skip/retry logic handles this gracefully.
@@ -41,7 +38,7 @@ const runBilling = async (env: { CF_API_TOKEN: string; CF_ACCOUNT_ID: string }, 
 	if (!isRecord(json) || !('result' in json)) return [];
 
 	const { result } = json;
-	if (!isUnknownArray(result)) return [];
+	if (!Array.isArray(result)) return [];
 
 	const ts = Math.floor(new Date(from).getTime() / 1000);
 	const rows: MetricRow[] = [];

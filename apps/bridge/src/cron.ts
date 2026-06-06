@@ -8,7 +8,9 @@ import { REGISTRY, REST_COLLECTORS, toCollector } from './collectors/index';
 import type { GraphQLCollector, MetricRow, RESTCollector } from './collectors/types';
 import { datasetStatus, metrics, syncState } from './db/schema';
 import { getEnabledDatasets, runDiscovery, shouldRunDiscovery } from './discovery';
+import { parseZoneIds } from './env';
 import type { BridgeEnv } from './env';
+import { isRecord } from './lib/typed-access';
 import { checkTokenPermissions } from './lib/token-check';
 
 const RETENTION_SECONDS = 31 * 24 * 3600;
@@ -45,17 +47,6 @@ interface DatasetStatusRow {
 	scopeId: string;
 	retryAfter: number;
 }
-
-const isRecord = (v: unknown): v is Record<string, unknown> =>
-	typeof v === 'object' && v !== null;
-
-const isUnknownArray = (v: unknown): v is unknown[] => Array.isArray(v);
-
-const parseZoneIds = (raw: string): string[] =>
-	raw
-		.split(',')
-		.map((z) => z.trim())
-		.filter((z) => z.length > 0);
 
 const isSkipped = (statuses: DatasetStatusRow[], name: string, scope: string, scopeId: string, nowSeconds: number): boolean =>
 	statuses.some(
@@ -193,7 +184,7 @@ const extractScopeData = (
 	if (!isRecord(viewer)) return null;
 
 	const scopeArray: unknown = viewer[scopeNode];
-	if (!isUnknownArray(scopeArray) || scopeArray.length === 0) return null;
+	if (!Array.isArray(scopeArray) || scopeArray.length === 0) return null;
 
 	const [first] = scopeArray;
 	if (!isRecord(first)) return null;
@@ -218,18 +209,11 @@ const processGraphQLBatch = async (
 	const needsTime = collectors.some((c) => c.timeVarType === 'Time');
 	const needsDate = collectors.some((c) => c.timeVarType === 'Date');
 	const query = buildBatchedQuery(scope, collectors);
-	const variables: Record<string, unknown> =
-		scope === 'account'
-			? { accountId: scopeId }
-			: { zoneId: scopeId };
-	if (needsTime) {
-		variables['fromTime'] = fromTime;
-		variables['toTime'] = toTime;
-	}
-	if (needsDate) {
-		variables['fromDate'] = fromDate;
-		variables['toDate'] = toDate;
-	}
+	const variables: Record<string, unknown> = {
+		...(scope === 'account' ? { accountId: scopeId } : { zoneId: scopeId }),
+		...(needsTime && { fromTime, toTime }),
+		...(needsDate && { fromDate, toDate }),
+	};
 
 	const response: GraphQLResponse<Record<string, unknown>> = await cfGraphQL(
 		env.CF_API_TOKEN,
@@ -278,7 +262,7 @@ const processGraphQLBatch = async (
 			dataset: c.name,
 			scope,
 			scopeId,
-			status: 'error' satisfies CollectResult['status'],
+			status: 'error',
 			rowCount: 0,
 			error: errorMsg,
 		}));
@@ -292,7 +276,7 @@ const processGraphQLBatch = async (
 			dataset: c.name,
 			scope,
 			scopeId,
-			status: 'empty' satisfies CollectResult['status'],
+			status: 'empty',
 			rowCount: 0,
 			error: '',
 		}));
@@ -315,7 +299,7 @@ const processGraphQLBatch = async (
 					scopeId,
 					error: errorMsg,
 				}));
-				return { dataset: collector.name, scope, scopeId, status: 'error' satisfies CollectResult['status'], rowCount: 0, error: errorMsg };
+				return { dataset: collector.name, scope, scopeId, status: 'error', rowCount: 0, error: errorMsg };
 			}
 		}),
 	);
@@ -363,16 +347,15 @@ const processOneRESTCollector = async (
 		return { dataset: collector.name, scope: collector.scope, scopeId, status: 'success', rowCount: rows.length, error: '' };
 	} catch (error: unknown) {
 		const errorMsg = error instanceof Error ? error.message : String(error);
-		const isPermErr = errorMsg.toLowerCase().includes('403') || errorMsg.toLowerCase().includes('permission');
-		if (isPermErr) {
-			try {
-				await markDatasetStatus(db, collector.name, collector.scope, scopeId, 'permission_denied', errorMsg, nowSeconds + RETRY_SECONDS.permission);
-			} catch { /* best-effort status update */ }
-		}
+		const errClass = classifyError({ message: errorMsg });
+		try {
+			await markDatasetStatus(db, collector.name, collector.scope, scopeId, STATUS_LABELS[errClass], errorMsg, nowSeconds + RETRY_SECONDS[errClass]);
+		} catch { /* best-effort status update */ }
 		console.error(JSON.stringify({
 			level: 'error',
 			event: 'rest_collector_failed',
 			dataset: collector.name,
+			errorClass: errClass,
 			error: errorMsg,
 		}));
 		return { dataset: collector.name, scope: collector.scope, scopeId, status: 'error', rowCount: 0, error: errorMsg };

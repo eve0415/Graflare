@@ -4,6 +4,7 @@ import type { drizzle } from 'drizzle-orm/d1';
 import { cfGraphQL } from './cf-graphql/client';
 import type { DatasetConfig } from './collectors/registry';
 import { discoveryCache } from './db/schema';
+import { parseZoneIds } from './env';
 import type { BridgeEnv } from './env';
 import { isRecord } from './lib/typed-access';
 
@@ -89,7 +90,7 @@ const processDiscoveryScope = async (
 
 	const scopeIds = scope === 'account'
 		? [env.CF_ACCOUNT_ID]
-		: env.CF_ZONE_IDS.split(',').map((z) => z.trim()).filter((z) => z.length > 0);
+		: parseZoneIds(env.CF_ZONE_IDS);
 
 	const responses = await Promise.all(
 		scopeIds.map((scopeId) => {
