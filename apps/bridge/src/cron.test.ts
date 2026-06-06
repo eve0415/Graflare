@@ -78,6 +78,10 @@ const mockSmartFetch = (opts: {
 	vi.spyOn(globalThis, 'fetch').mockImplementation((input) => {
 		const url = resolveUrl(input);
 
+		if (url.includes('tokens/verify')) {
+			return Promise.resolve(jsonResponse({ success: true, result: { status: 'active' } }));
+		}
+
 		if (url.includes('paygo-usage')) {
 			return Promise.resolve(opts.billingResponse ?? jsonResponse({ result: [] }));
 		}
@@ -93,6 +97,10 @@ const mockSmartFetchWithZones = (opts: {
 } = {}) => {
 	vi.spyOn(globalThis, 'fetch').mockImplementation((input, init) => {
 		const url = resolveUrl(input);
+
+		if (url.includes('tokens/verify')) {
+			return Promise.resolve(jsonResponse({ success: true, result: { status: 'active' } }));
+		}
 
 		if (url.includes('paygo-usage')) {
 			return Promise.resolve(opts.billingResponse ?? jsonResponse({ result: [] }));

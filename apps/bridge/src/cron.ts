@@ -9,6 +9,7 @@ import type { GraphQLCollector, MetricRow, RESTCollector } from './collectors/ty
 import { datasetStatus, metrics, syncState } from './db/schema';
 import { getEnabledDatasets, runDiscovery, shouldRunDiscovery } from './discovery';
 import type { BridgeEnv } from './env';
+import { checkTokenPermissions } from './lib/token-check';
 
 const RETENTION_SECONDS = 31 * 24 * 3600;
 const INSERT_CHUNK_SIZE = 100;
@@ -432,6 +433,22 @@ export const collectMetrics = async (env: BridgeEnv, scheduledTime: number): Pro
 
 	const db = drizzle(env.DB);
 	const zoneIds = parseZoneIds(env.CF_ZONE_IDS);
+
+	const syncRows = await db.select().from(syncState).limit(1);
+	if (syncRows.length === 0) {
+		const tokenCheck = await checkTokenPermissions(env.CF_API_TOKEN);
+		if (!tokenCheck.valid || tokenCheck.missingPermissions.length > 0) {
+			for (const perm of tokenCheck.missingPermissions) {
+				console.error(JSON.stringify({
+					level: 'error',
+					event: 'token_permission_missing',
+					permission: perm,
+					help: 'Create an API token at https://dash.cloudflare.com/profile/api-tokens with the listed permissions, then update CF_API_TOKEN secret.',
+				}));
+			}
+			if (!tokenCheck.valid) return;
+		}
+	}
 
 	if (await shouldRunDiscovery(db, nowSeconds)) {
 		try {
