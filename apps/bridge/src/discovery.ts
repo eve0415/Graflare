@@ -116,7 +116,7 @@ const processDiscoveryScope = async (
 		const [first] = narrowed;
 		if (!isRecord(first)) continue;
 
-		const settings: unknown = first['settings'];
+		const {settings} = first;
 		if (!isRecord(settings)) continue;
 
 		for (const config of scopedConfigs) {
