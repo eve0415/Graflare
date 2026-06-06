@@ -229,20 +229,6 @@ export const REGISTRY: DatasetConfig[] = [
 		],
 	},
 	{
-		nodeName: 'workersSubrequestsAdaptiveGroups',
-		datasetName: 'workers-subrequests',
-		scope: 'account',
-		time: { kind: 'dimension', field: 'datetimeMinute' },
-		filter: { kind: 'time', filterField: 'datetime' },
-		orderBy: 'datetimeMinute_ASC',
-		limit: 10000,
-		resourceDimension: 'scriptName',
-		dimKeys: ['scriptName'],
-		metrics: [
-			{ source: 'sum', field: 'requests' },
-		],
-	},
-	{
 		nodeName: 'videoPlaybackEventsAdaptiveGroups',
 		datasetName: 'stream-playback',
 		scope: 'account',
