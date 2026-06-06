@@ -10,7 +10,7 @@ interface DatasetFilterConfig {
 }
 
 interface MetricSpec {
-	source: 'count' | 'sum' | 'quantiles' | 'avg';
+	source: 'count' | 'sum' | 'quantiles' | 'avg' | 'max';
 	field?: string;
 	name?: string;
 }
@@ -151,12 +151,40 @@ export const REGISTRY: DatasetConfig[] = [
 		],
 	},
 
-	// --- Expanded datasets (discovery filters unavailable ones) ---
-	// Datasets below got permission_denied (correct fragments, needs token scope).
-	// Datasets with unverified field structures were removed — add back after
-	// verifying via GraphQL introspection once the token has Analytics Read.
+	// --- Expanded datasets (verified via CF docs / introspection) ---
 
 	// Account-scoped
+	{
+		nodeName: 'kvStorageAdaptiveGroups',
+		datasetName: 'kv-storage',
+		scope: 'account',
+		time: { kind: 'dateDimension', field: 'date' },
+		filter: { kind: 'date', filterField: 'date' },
+		orderBy: 'date_ASC',
+		limit: 10000,
+		resourceDimension: 'namespaceId',
+		dimKeys: ['namespaceId'],
+		metrics: [
+			{ source: 'max', field: 'keyCount' },
+			{ source: 'max', field: 'byteCount' },
+		],
+	},
+	{
+		nodeName: 'r2StorageAdaptiveGroups',
+		datasetName: 'r2-storage',
+		scope: 'account',
+		time: { kind: 'dimension', field: 'datetime' },
+		filter: { kind: 'time', filterField: 'datetime' },
+		orderBy: 'datetime_DESC',
+		limit: 10000,
+		resourceDimension: 'bucketName',
+		dimKeys: ['bucketName'],
+		metrics: [
+			{ source: 'max', field: 'objectCount' },
+			{ source: 'max', field: 'payloadSize' },
+			{ source: 'max', field: 'metadataSize' },
+		],
+	},
 	{
 		nodeName: 'streamMinutesViewedAdaptiveGroups',
 		datasetName: 'stream',
@@ -190,7 +218,7 @@ export const REGISTRY: DatasetConfig[] = [
 		datasetName: 'queues',
 		scope: 'account',
 		time: { kind: 'dimension', field: 'datetimeMinute' },
-		filter: { kind: 'time', filterField: 'datetimeMinute' },
+		filter: { kind: 'time', filterField: 'datetime' },
 		orderBy: 'datetimeMinute_ASC',
 		limit: 10000,
 		resourceDimension: 'queueId',
@@ -201,14 +229,104 @@ export const REGISTRY: DatasetConfig[] = [
 		],
 	},
 	{
+		nodeName: 'workersSubrequestsAdaptiveGroups',
+		datasetName: 'workers-subrequests',
+		scope: 'account',
+		time: { kind: 'dimension', field: 'datetimeMinute' },
+		filter: { kind: 'time', filterField: 'datetime' },
+		orderBy: 'datetimeMinute_ASC',
+		limit: 10000,
+		resourceDimension: 'scriptName',
+		dimKeys: ['scriptName'],
+		metrics: [
+			{ source: 'count', name: 'subrequests' },
+			{ source: 'sum', field: 'requests' },
+		],
+	},
+	{
+		nodeName: 'videoPlaybackEventsAdaptiveGroups',
+		datasetName: 'stream-playback',
+		scope: 'account',
+		time: { kind: 'dateDimension', field: 'date' },
+		filter: { kind: 'date', filterField: 'date' },
+		orderBy: 'date_ASC',
+		limit: 10000,
+		resourceDimension: 'uid',
+		dimKeys: ['uid'],
+		metrics: [
+			{ source: 'count', name: 'plays' },
+			{ source: 'sum', field: 'timeViewedMinutes' },
+		],
+	},
+	{
+		nodeName: 'magicFirewallSamplesAdaptiveGroups',
+		datasetName: 'magic-firewall',
+		scope: 'account',
+		time: { kind: 'dimension', field: 'datetimeFiveMinute' },
+		filter: { kind: 'time', filterField: 'datetime' },
+		orderBy: 'datetimeFiveMinute_DESC',
+		limit: 10000,
+		resourceDimension: '_all',
+		dimKeys: ['ruleId'],
+		metrics: [
+			{ source: 'count', name: 'samples' },
+			{ source: 'sum', field: 'bits' },
+			{ source: 'sum', field: 'packets' },
+		],
+	},
+	{
 		nodeName: 'logpushHealthAdaptiveGroups',
 		datasetName: 'logpush-health',
 		scope: 'account',
 		time: { kind: 'dimension', field: 'datetimeMinute' },
-		filter: { kind: 'time', filterField: 'datetimeMinute' },
+		filter: { kind: 'time', filterField: 'datetime' },
 		orderBy: 'datetimeMinute_ASC',
 		limit: 10000,
 		resourceDimension: '_all',
+		dimKeys: [],
+		metrics: [
+			{ source: 'count', name: 'events' },
+		],
+	},
+	{
+		nodeName: 'nelReportsAdaptiveGroups',
+		datasetName: 'nel',
+		scope: 'account',
+		time: { kind: 'dimension', field: 'datetimeMinute' },
+		filter: { kind: 'time', filterField: 'datetime' },
+		orderBy: 'datetimeMinute_ASC',
+		limit: 10000,
+		resourceDimension: '_all',
+		dimKeys: [],
+		metrics: [
+			{ source: 'count', name: 'reports' },
+		],
+	},
+
+	// Zone-scoped
+	{
+		nodeName: 'loadBalancingRequestsAdaptiveGroups',
+		datasetName: 'load-balancing',
+		scope: 'zone',
+		time: { kind: 'dimension', field: 'datetimeMinute' },
+		filter: { kind: 'time', filterField: 'datetime' },
+		orderBy: 'datetimeMinute_ASC',
+		limit: 10000,
+		resourceDimension: '_scopeId',
+		dimKeys: [],
+		metrics: [
+			{ source: 'count', name: 'requests' },
+		],
+	},
+	{
+		nodeName: 'healthCheckEventsAdaptiveGroups',
+		datasetName: 'health-checks',
+		scope: 'zone',
+		time: { kind: 'dimension', field: 'datetimeMinute' },
+		filter: { kind: 'time', filterField: 'datetime' },
+		orderBy: 'datetimeMinute_ASC',
+		limit: 10000,
+		resourceDimension: '_scopeId',
 		dimKeys: [],
 		metrics: [
 			{ source: 'count', name: 'events' },
