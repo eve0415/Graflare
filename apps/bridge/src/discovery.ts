@@ -20,14 +20,16 @@ export const buildDiscoveryQuery = (
 	const filterKey = scope === 'account' ? 'accountTag' : 'zoneTag';
 	const scopeNode = scope === 'account' ? 'accounts' : 'zones';
 
-	const fragments = filtered.map((c) =>
-		`${c.nodeName}: settings { enabled maxPageSize notOlderThan }`,
+	const datasetFields = filtered.map((c) =>
+		`${c.nodeName} { enabled maxPageSize notOlderThan }`,
 	);
 
 	return `query Discovery(${scopeIdVar}: String!) {
   viewer {
     ${scopeNode}(filter: { ${filterKey}: ${scopeIdVar} }) {
-      ${fragments.join('\n      ')}
+      settings {
+        ${datasetFields.join('\n        ')}
+      }
     }
   }
 }`;
@@ -114,8 +116,11 @@ const processDiscoveryScope = async (
 		const [first] = narrowed;
 		if (!isRecord(first)) continue;
 
+		const settings: unknown = first['settings'];
+		if (!isRecord(settings)) continue;
+
 		for (const config of scopedConfigs) {
-			const settingsData: unknown = first[config.nodeName];
+			const settingsData: unknown = settings[config.nodeName];
 
 			if (isSettingsData(settingsData)) {
 				upserts.push(upsertDiscoveryEntry(

@@ -26,11 +26,13 @@ const mockDiscoveryFetch = (_input: RequestInfo | URL, init?: RequestInit) => {
 			data: {
 				viewer: {
 					accounts: [{
-						workersInvocationsAdaptive: { enabled: true, maxPageSize: 10000, notOlderThan: 259200 },
-						durableObjectsInvocationsAdaptiveGroups: { enabled: true, maxPageSize: 5000, notOlderThan: 86400 },
-						d1AnalyticsAdaptiveGroups: { enabled: false, maxPageSize: 0, notOlderThan: 0 },
-						kvOperationsAdaptiveGroups: { enabled: true, maxPageSize: 10000, notOlderThan: 0 },
-						r2OperationsAdaptiveGroups: { enabled: true, maxPageSize: 10000, notOlderThan: 0 },
+						settings: {
+							workersInvocationsAdaptive: { enabled: true, maxPageSize: 10000, notOlderThan: 259200 },
+							durableObjectsInvocationsAdaptiveGroups: { enabled: true, maxPageSize: 5000, notOlderThan: 86400 },
+							d1AnalyticsAdaptiveGroups: { enabled: false, maxPageSize: 0, notOlderThan: 0 },
+							kvOperationsAdaptiveGroups: { enabled: true, maxPageSize: 10000, notOlderThan: 0 },
+							r2OperationsAdaptiveGroups: { enabled: true, maxPageSize: 10000, notOlderThan: 0 },
+						},
 					}],
 				},
 			},
@@ -39,9 +41,11 @@ const mockDiscoveryFetch = (_input: RequestInfo | URL, init?: RequestInit) => {
 			data: {
 				viewer: {
 					zones: [{
-						httpRequestsAdaptiveGroups: { enabled: true, maxPageSize: 10000, notOlderThan: 259200 },
-						firewallEventsAdaptiveGroups: { enabled: true, maxPageSize: 10000, notOlderThan: 86400 },
-						dnsAnalyticsAdaptiveGroups: { enabled: false, maxPageSize: 0, notOlderThan: 0 },
+						settings: {
+							httpRequestsAdaptiveGroups: { enabled: true, maxPageSize: 10000, notOlderThan: 259200 },
+							firewallEventsAdaptiveGroups: { enabled: true, maxPageSize: 10000, notOlderThan: 86400 },
+							dnsAnalyticsAdaptiveGroups: { enabled: false, maxPageSize: 0, notOlderThan: 0 },
+						},
 					}],
 				},
 			},
@@ -59,18 +63,20 @@ afterEach(async () => {
 });
 
 describe('buildDiscoveryQuery', () => {
-	it('builds account-scoped query', () => {
+	it('builds account-scoped query with settings wrapper', () => {
 		const query = buildDiscoveryQuery(REGISTRY, 'account');
 		expect(query).toContain('query Discovery($accountId: String!)');
 		expect(query).toContain('accounts(filter: { accountTag: $accountId })');
-		expect(query).toContain('workersInvocationsAdaptive: settings');
+		expect(query).toContain('settings {');
+		expect(query).toContain('workersInvocationsAdaptive { enabled maxPageSize notOlderThan }');
 	});
 
-	it('builds zone-scoped query', () => {
+	it('builds zone-scoped query with settings wrapper', () => {
 		const query = buildDiscoveryQuery(REGISTRY, 'zone');
 		expect(query).toContain('query Discovery($zoneId: String!)');
 		expect(query).toContain('zones(filter: { zoneTag: $zoneId })');
-		expect(query).toContain('httpRequestsAdaptiveGroups: settings');
+		expect(query).toContain('settings {');
+		expect(query).toContain('httpRequestsAdaptiveGroups { enabled maxPageSize notOlderThan }');
 	});
 
 	it('returns empty for scope with no datasets', () => {

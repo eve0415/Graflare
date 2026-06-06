@@ -31,6 +31,7 @@ export const classifyError = (error: GraphQLError): ErrorClass => {
 		|| msg.includes('not authorized')
 		|| msg.includes('authorization denied')
 		|| msg.includes('access denied')
+		|| msg.includes('does not have access')
 		|| msg.includes('returned 401')
 		|| msg.includes('returned 403')
 	) {
