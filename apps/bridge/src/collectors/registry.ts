@@ -239,7 +239,6 @@ export const REGISTRY: DatasetConfig[] = [
 		resourceDimension: 'scriptName',
 		dimKeys: ['scriptName'],
 		metrics: [
-			{ source: 'count', name: 'subrequests' },
 			{ source: 'sum', field: 'requests' },
 		],
 	},
@@ -269,7 +268,6 @@ export const REGISTRY: DatasetConfig[] = [
 		resourceDimension: '_all',
 		dimKeys: ['ruleId'],
 		metrics: [
-			{ source: 'count', name: 'samples' },
 			{ source: 'sum', field: 'bits' },
 			{ source: 'sum', field: 'packets' },
 		],
