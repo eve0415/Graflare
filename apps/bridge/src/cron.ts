@@ -215,11 +215,21 @@ const processGraphQLBatch = async (
 ): Promise<CollectResult[]> => {
 	if (collectors.length === 0) return [];
 
+	const needsTime = collectors.some((c) => c.timeVarType === 'Time');
+	const needsDate = collectors.some((c) => c.timeVarType === 'Date');
 	const query = buildBatchedQuery(scope, collectors);
 	const variables: Record<string, unknown> =
 		scope === 'account'
-			? { accountId: scopeId, fromTime, toTime, fromDate, toDate }
-			: { zoneId: scopeId, fromTime, toTime, fromDate, toDate };
+			? { accountId: scopeId }
+			: { zoneId: scopeId };
+	if (needsTime) {
+		variables['fromTime'] = fromTime;
+		variables['toTime'] = toTime;
+	}
+	if (needsDate) {
+		variables['fromDate'] = fromDate;
+		variables['toDate'] = toDate;
+	}
 
 	const response: GraphQLResponse<Record<string, unknown>> = await cfGraphQL(
 		env.CF_API_TOKEN,
