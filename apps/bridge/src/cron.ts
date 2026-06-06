@@ -242,7 +242,7 @@ const processGraphQLBatch = async (
 			error: errorMsg,
 		}));
 
-		if (errClass === 'validation' && collectors.length > 1) {
+		if (collectors.length > 1 && errClass !== 'rate_limit') {
 			const fallback = (c: GraphQLCollector): CollectResult => ({
 				dataset: c.name, scope, scopeId, status: 'error', rowCount: 0, error: errorMsg,
 			});
