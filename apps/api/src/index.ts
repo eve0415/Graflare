@@ -509,7 +509,7 @@ export class GraflareAPI extends WorkerEntrypoint<Bindings> {
       const nameIdx = result.columns.findIndex((c) => c.name === 'name');
       const schemaIdx = result.columns.findIndex((c) => c.name === 'schema');
 
-      const tables = result.rows.map((row) => (Object.assign({ name: String(row[nameIdx] ?? '') }, schemaIdx >= 0 && row[schemaIdx] !== null && { schema: String(row[schemaIdx]) })));
+      const tables = result.rows.map((row) => (((({name: String(row[nameIdx] ?? ''), ...schemaIdx >= 0 && row[schemaIdx] !== null && { schema: String(row[schemaIdx]) }})))));
 
       return { tables };
     } catch (error) {
@@ -1099,6 +1099,34 @@ export class GraflareAPI extends WorkerEntrypoint<Bindings> {
         .update(alertRuleGroups)
         .set(setData)
         .where(and(eq(alertRuleGroups.id, id), eq(alertRuleGroups.orgId, orgId)));
+
+      if (parsed.evalIntervalS !== undefined) {
+        const group = await this.getAlertRuleGroupCore(orgId, id);
+        if (group !== null) {
+          const rules = await this.db
+            .select()
+            .from(alertRules)
+            .where(and(eq(alertRules.groupId, id), eq(alertRules.orgId, orgId)));
+
+          for (const rule of rules) {
+            if (!rule.isPaused) {
+              const stub = this.env.ALERT_RULE.getByName(rule.id);
+              await stub.updateConfig({
+                orgId,
+                ruleId: rule.id,
+                queries: rule.queries,
+                condition: rule.condition,
+                evalIntervalS: group.evalIntervalS,
+                forDurationS: rule.forDurationS,
+                noDataState: rule.noDataState,
+                execErrState: rule.execErrState,
+                labels: rule.labels,
+                annotations: rule.annotations,
+              });
+            }
+          }
+        }
+      }
     } catch (error) {
       console.error('updateAlertRuleGroup failed:', error);
       throw new Error('Failed to update alert rule group', { cause: error });
@@ -1213,6 +1241,46 @@ export class GraflareAPI extends WorkerEntrypoint<Bindings> {
         .update(alertRules)
         .set(setData)
         .where(and(eq(alertRules.id, id), eq(alertRules.orgId, orgId)));
+
+      const updated = await this.getAlertRuleCore(orgId, id);
+      if (updated !== null) {
+        const stub = this.env.ALERT_RULE.getByName(id);
+        if (parsed.isPaused === true) {
+          await stub.stop();
+        } else if (parsed.isPaused === false) {
+          const group = await this.getAlertRuleGroupCore(orgId, updated.groupId);
+          if (group !== null) {
+            await stub.init({
+              orgId,
+              ruleId: id,
+              queries: updated.queries,
+              condition: updated.condition,
+              evalIntervalS: group.evalIntervalS,
+              forDurationS: updated.forDurationS,
+              noDataState: updated.noDataState,
+              execErrState: updated.execErrState,
+              labels: updated.labels,
+              annotations: updated.annotations,
+            });
+          }
+        } else if (!updated.isPaused) {
+          const group = await this.getAlertRuleGroupCore(orgId, updated.groupId);
+          if (group !== null) {
+            await stub.updateConfig({
+              orgId,
+              ruleId: id,
+              queries: updated.queries,
+              condition: updated.condition,
+              evalIntervalS: group.evalIntervalS,
+              forDurationS: updated.forDurationS,
+              noDataState: updated.noDataState,
+              execErrState: updated.execErrState,
+              labels: updated.labels,
+              annotations: updated.annotations,
+            });
+          }
+        }
+      }
     } catch (error) {
       console.error('updateAlertRule failed:', error);
       throw new Error('Failed to update alert rule', { cause: error });
