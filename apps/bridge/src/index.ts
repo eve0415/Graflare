@@ -24,8 +24,12 @@ const isSqlRequestBody = (body: unknown): body is SqlRequestBody =>
 	&& typeof body.sql === 'string';
 
 app.post('/sql', async (c) => {
-	const authHeader = c.req.header('Authorization');
-	if (authHeader === undefined || authHeader !== `Bearer ${c.env.BRIDGE_AUTH_TOKEN}`) {
+	const authHeader = c.req.header('Authorization') ?? '';
+	const expected = `Bearer ${c.env.BRIDGE_AUTH_TOKEN}`;
+	const enc = new TextEncoder();
+	const a = enc.encode(authHeader);
+	const b = enc.encode(expected);
+	if (a.byteLength !== b.byteLength || !crypto.subtle.timingSafeEqual(a, b)) {
 		return c.json({ columns: [], rows: [], error: 'Unauthorized' } satisfies SqlResponse, 401);
 	}
 
