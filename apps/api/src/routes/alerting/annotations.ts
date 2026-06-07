@@ -74,7 +74,7 @@ app.delete('/:id', sValidator('param', annotationIdParamSchema, onValidationErro
     return c.json({ error: 'Not found' }, 404);
   }
 
-  await db.delete(annotations).where(eq(annotations.id, id));
+  await db.delete(annotations).where(and(eq(annotations.id, id), eq(annotations.orgId, orgId)));
 
   return c.body(null, 204);
 });

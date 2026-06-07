@@ -11,25 +11,21 @@ interface UPlotChartProps {
 export const UPlotChart = ({ options, data, className }: UPlotChartProps) => {
   const containerRef = useRef<HTMLDivElement>(null);
   const chartRef = useRef<uPlot | null>(null);
-
   useEffect(() => {
     const container = containerRef.current;
     if (container === null) return;
 
-    const chart = new uPlot(options, data, container);
+    const chart = new uPlot(options, [[]], container);
     chartRef.current = chart;
 
     return () => {
       chart.destroy();
       chartRef.current = null;
     };
-  }, [data, options]);
+  }, [options]);
 
   useEffect(() => {
-    const chart = chartRef.current;
-    if (chart !== null) {
-      chart.setData(data);
-    }
+    chartRef.current?.setData(data);
   }, [data]);
 
   return (

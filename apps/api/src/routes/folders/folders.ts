@@ -77,9 +77,9 @@ app.put('/:id', sValidator('param', folderIdParamSchema, onValidationError), sVa
   await db
     .update(folders)
     .set(updates)
-    .where(eq(folders.id, id));
+    .where(and(eq(folders.id, id), eq(folders.orgId, orgId)));
 
-  const updated = await db.select().from(folders).where(eq(folders.id, id)).limit(1);
+  const updated = await db.select().from(folders).where(and(eq(folders.id, id), eq(folders.orgId, orgId))).limit(1);
   return c.json(updated[0]);
 });
 
@@ -108,14 +108,14 @@ app.delete('/:id', sValidator('param', folderIdParamSchema, onValidationError), 
   await db
     .update(dashboards)
     .set({ folderId: parentFolderId })
-    .where(eq(dashboards.folderId, id));
+    .where(and(eq(dashboards.folderId, id), eq(dashboards.orgId, orgId)));
 
   await db
     .update(alertRuleGroups)
     .set({ folderId: parentFolderId })
-    .where(eq(alertRuleGroups.folderId, id));
+    .where(and(eq(alertRuleGroups.folderId, id), eq(alertRuleGroups.orgId, orgId)));
 
-  await db.delete(folders).where(eq(folders.id, id));
+  await db.delete(folders).where(and(eq(folders.id, id), eq(folders.orgId, orgId)));
 
   return c.body(null, 204);
 });

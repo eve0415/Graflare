@@ -96,9 +96,9 @@ app.put('/:id', sValidator('param', alertRuleIdParamSchema, onValidationError), 
   if (data.execErrState !== undefined) updates['execErrState'] = data.execErrState;
   if (data.isPaused !== undefined) updates['isPaused'] = data.isPaused;
 
-  await db.update(alertRules).set(updates).where(eq(alertRules.id, id));
+  await db.update(alertRules).set(updates).where(and(eq(alertRules.id, id), eq(alertRules.orgId, orgId)));
 
-  const updated = await db.select().from(alertRules).where(eq(alertRules.id, id)).limit(1);
+  const updated = await db.select().from(alertRules).where(and(eq(alertRules.id, id), eq(alertRules.orgId, orgId))).limit(1);
   return c.json(updated[0]);
 });
 
@@ -117,7 +117,7 @@ app.delete('/:id', sValidator('param', alertRuleIdParamSchema, onValidationError
     return c.json({ error: 'Not found' }, 404);
   }
 
-  await db.delete(alertRules).where(eq(alertRules.id, id));
+  await db.delete(alertRules).where(and(eq(alertRules.id, id), eq(alertRules.orgId, orgId)));
 
   return c.body(null, 204);
 });

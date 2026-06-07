@@ -79,9 +79,9 @@ app.put('/:id', sValidator('param', muteTimingIdParamSchema, onValidationError),
   if (data.name !== undefined) updates['name'] = data.name;
   if (data.intervals !== undefined) updates['intervals'] = data.intervals;
 
-  await db.update(muteTimings).set(updates).where(eq(muteTimings.id, id));
+  await db.update(muteTimings).set(updates).where(and(eq(muteTimings.id, id), eq(muteTimings.orgId, orgId)));
 
-  const updated = await db.select().from(muteTimings).where(eq(muteTimings.id, id)).limit(1);
+  const updated = await db.select().from(muteTimings).where(and(eq(muteTimings.id, id), eq(muteTimings.orgId, orgId))).limit(1);
   return c.json(updated[0]);
 });
 
@@ -100,7 +100,7 @@ app.delete('/:id', sValidator('param', muteTimingIdParamSchema, onValidationErro
     return c.json({ error: 'Not found' }, 404);
   }
 
-  await db.delete(muteTimings).where(eq(muteTimings.id, id));
+  await db.delete(muteTimings).where(and(eq(muteTimings.id, id), eq(muteTimings.orgId, orgId)));
 
   return c.body(null, 204);
 });

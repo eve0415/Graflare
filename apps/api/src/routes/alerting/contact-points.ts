@@ -104,9 +104,9 @@ app.put('/:id', sValidator('param', contactPointIdParamSchema, onValidationError
     updates['settings'] = await encryptSettingsCredentials(data.settings, c.env.ENCRYPTION_KEY);
   }
 
-  await db.update(contactPoints).set(updates).where(eq(contactPoints.id, id));
+  await db.update(contactPoints).set(updates).where(and(eq(contactPoints.id, id), eq(contactPoints.orgId, orgId)));
 
-  const updated = await db.select().from(contactPoints).where(eq(contactPoints.id, id)).limit(1);
+  const updated = await db.select().from(contactPoints).where(and(eq(contactPoints.id, id), eq(contactPoints.orgId, orgId))).limit(1);
   return c.json({ ...updated[0], settings: redactSettings(updated[0].settings) });
 });
 
@@ -125,7 +125,7 @@ app.delete('/:id', sValidator('param', contactPointIdParamSchema, onValidationEr
     return c.json({ error: 'Not found' }, 404);
   }
 
-  await db.delete(contactPoints).where(eq(contactPoints.id, id));
+  await db.delete(contactPoints).where(and(eq(contactPoints.id, id), eq(contactPoints.orgId, orgId)));
 
   return c.body(null, 204);
 });

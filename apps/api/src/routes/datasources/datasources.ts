@@ -127,7 +127,7 @@ app.put('/:id', sValidator('param', datasourceIdParamSchema, onValidationError),
       ...(encryptedCreds !== undefined && { credentials: encryptedCreds }),
       updatedAt: now,
     })
-    .where(eq(datasources.id, id));
+    .where(and(eq(datasources.id, id), eq(datasources.orgId, orgId)));
 
   const updated = await db
     .select({
@@ -142,7 +142,7 @@ app.put('/:id', sValidator('param', datasourceIdParamSchema, onValidationError),
       updatedAt: datasources.updatedAt,
     })
     .from(datasources)
-    .where(eq(datasources.id, id))
+    .where(and(eq(datasources.id, id), eq(datasources.orgId, orgId)))
     .limit(1);
 
   return c.json(updated[0]);
@@ -163,7 +163,7 @@ app.delete('/:id', sValidator('param', datasourceIdParamSchema, onValidationErro
     return c.json({ error: 'Not found' }, 404);
   }
 
-  await db.delete(datasources).where(eq(datasources.id, id));
+  await db.delete(datasources).where(and(eq(datasources.id, id), eq(datasources.orgId, orgId)));
 
   return c.body(null, 204);
 });

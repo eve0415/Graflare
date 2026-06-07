@@ -86,9 +86,9 @@ app.put('/:id', sValidator('param', silenceIdParamSchema, onValidationError), sV
   if (data.comment !== undefined) updates['comment'] = data.comment;
   if (data.createdBy !== undefined) updates['createdBy'] = data.createdBy;
 
-  await db.update(silences).set(updates).where(eq(silences.id, id));
+  await db.update(silences).set(updates).where(and(eq(silences.id, id), eq(silences.orgId, orgId)));
 
-  const updated = await db.select().from(silences).where(eq(silences.id, id)).limit(1);
+  const updated = await db.select().from(silences).where(and(eq(silences.id, id), eq(silences.orgId, orgId))).limit(1);
   return c.json(updated[0]);
 });
 
@@ -107,7 +107,7 @@ app.delete('/:id', sValidator('param', silenceIdParamSchema, onValidationError),
     return c.json({ error: 'Not found' }, 404);
   }
 
-  await db.delete(silences).where(eq(silences.id, id));
+  await db.delete(silences).where(and(eq(silences.id, id), eq(silences.orgId, orgId)));
 
   return c.body(null, 204);
 });

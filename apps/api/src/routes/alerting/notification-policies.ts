@@ -76,9 +76,9 @@ app.put('/:id', sValidator('param', notificationPolicyIdParamSchema, onValidatio
   if (data.repeatIntervalS !== undefined) updates['repeatIntervalS'] = data.repeatIntervalS;
   if (data.continueMatching !== undefined) updates['continueMatching'] = data.continueMatching;
 
-  await db.update(notificationPolicies).set(updates).where(eq(notificationPolicies.id, id));
+  await db.update(notificationPolicies).set(updates).where(and(eq(notificationPolicies.id, id), eq(notificationPolicies.orgId, orgId)));
 
-  const updated = await db.select().from(notificationPolicies).where(eq(notificationPolicies.id, id)).limit(1);
+  const updated = await db.select().from(notificationPolicies).where(and(eq(notificationPolicies.id, id), eq(notificationPolicies.orgId, orgId))).limit(1);
   return c.json(updated[0]);
 });
 
@@ -97,7 +97,7 @@ app.delete('/:id', sValidator('param', notificationPolicyIdParamSchema, onValida
     return c.json({ error: 'Not found' }, 404);
   }
 
-  await db.delete(notificationPolicies).where(eq(notificationPolicies.id, id));
+  await db.delete(notificationPolicies).where(and(eq(notificationPolicies.id, id), eq(notificationPolicies.orgId, orgId)));
 
   return c.body(null, 204);
 });

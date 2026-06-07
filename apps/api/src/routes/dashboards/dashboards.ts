@@ -156,9 +156,9 @@ app.put('/:id', sValidator('param', dashboardIdParamSchema, onValidationError), 
   if (updates.variables !== undefined) setData['variables'] = updates.variables;
   if (updates.timeRange !== undefined) setData['timeRange'] = updates.timeRange;
 
-  await db.update(dashboards).set(setData).where(eq(dashboards.id, id));
+  await db.update(dashboards).set(setData).where(and(eq(dashboards.id, id), eq(dashboards.orgId, orgId)));
 
-  const updated = await db.select().from(dashboards).where(eq(dashboards.id, id)).limit(1);
+  const updated = await db.select().from(dashboards).where(and(eq(dashboards.id, id), eq(dashboards.orgId, orgId))).limit(1);
 
   const versionId = crypto.randomUUID();
   await db.insert(dashboardVersions).values({
@@ -189,7 +189,7 @@ app.delete('/:id', sValidator('param', dashboardIdParamSchema, onValidationError
     return c.json({ error: 'Not found' }, 404);
   }
 
-  await db.delete(dashboards).where(eq(dashboards.id, id));
+  await db.delete(dashboards).where(and(eq(dashboards.id, id), eq(dashboards.orgId, orgId)));
 
   return c.body(null, 204);
 });

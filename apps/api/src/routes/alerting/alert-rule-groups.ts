@@ -81,9 +81,9 @@ app.put('/:id', sValidator('param', alertRuleGroupIdParamSchema, onValidationErr
   if (data.folderId !== undefined) updates['folderId'] = data.folderId;
   if (data.evalIntervalS !== undefined) updates['evalIntervalS'] = data.evalIntervalS;
 
-  await db.update(alertRuleGroups).set(updates).where(eq(alertRuleGroups.id, id));
+  await db.update(alertRuleGroups).set(updates).where(and(eq(alertRuleGroups.id, id), eq(alertRuleGroups.orgId, orgId)));
 
-  const updated = await db.select().from(alertRuleGroups).where(eq(alertRuleGroups.id, id)).limit(1);
+  const updated = await db.select().from(alertRuleGroups).where(and(eq(alertRuleGroups.id, id), eq(alertRuleGroups.orgId, orgId))).limit(1);
   return c.json(updated[0]);
 });
 
@@ -102,7 +102,7 @@ app.delete('/:id', sValidator('param', alertRuleGroupIdParamSchema, onValidation
     return c.json({ error: 'Not found' }, 404);
   }
 
-  await db.delete(alertRuleGroups).where(eq(alertRuleGroups.id, id));
+  await db.delete(alertRuleGroups).where(and(eq(alertRuleGroups.id, id), eq(alertRuleGroups.orgId, orgId)));
 
   return c.body(null, 204);
 });
