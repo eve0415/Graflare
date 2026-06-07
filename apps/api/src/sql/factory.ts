@@ -1,5 +1,5 @@
 import { datasourceCredentialsSchema } from '@graflare/shared/schemas/datasource';
-import { eq } from 'drizzle-orm';
+import { and, eq } from 'drizzle-orm';
 
 import { decryptCredentials } from '../crypto/credentials';
 import { createDb } from '../db';
@@ -18,11 +18,11 @@ export const createSqlClient = async (
   const rows = await drizzle
     .select()
     .from(datasources)
-    .where(eq(datasources.id, datasourceId))
+    .where(and(eq(datasources.id, datasourceId), eq(datasources.orgId, orgId)))
     .limit(1);
 
   const [ds] = rows;
-  if (ds === undefined || ds.orgId !== orgId) return null;
+  if (ds === undefined) return null;
 
   let auth: { type: 'none' | 'basic' | 'bearer'; credentials?: { username?: string | undefined; password?: string | undefined; token?: string | undefined } } = { type: 'none' };
 
