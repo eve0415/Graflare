@@ -1,5 +1,19 @@
 import { index, integer, real, sqliteTable, text, uniqueIndex } from 'drizzle-orm/sqlite-core';
 
+export const schemaCache = sqliteTable(
+	'schema_cache',
+	{
+		nodeName: text('node_name').notNull(),
+		scope: text('scope').notNull(),
+		typeName: text('type_name').notNull(),
+		schemaJson: text('schema_json').notNull(),
+		lastCheckedAt: integer('last_checked_at').notNull(),
+	},
+	(table) => [
+		uniqueIndex('schema_cache_pk').on(table.nodeName, table.scope),
+	],
+);
+
 export const discoveryCache = sqliteTable(
 	'discovery_cache',
 	{
