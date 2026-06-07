@@ -229,16 +229,17 @@ export const getEnabledDatasets = async (
 		return [...configs];
 	}
 
-	const available = new Set(
-		cached
-			.filter((c) => c.isAvailable)
-			.map((c) => `${c.nodeName}:${c.scope}`),
-	);
+	const known = new Set<string>();
+	const available = new Set<string>();
+	for (const c of cached) {
+		const key = `${c.nodeName}:${c.scope}`;
+		known.add(key);
+		if (c.isAvailable) available.add(key);
+	}
 
 	return configs.filter((config) => {
-		const entry = cached.find((c) => c.nodeName === config.nodeName && c.scope === config.scope);
-		if (entry === undefined) return true;
-		return available.has(`${config.nodeName}:${config.scope}`);
+		const key = `${config.nodeName}:${config.scope}`;
+		return !known.has(key) || available.has(key);
 	});
 };
 
