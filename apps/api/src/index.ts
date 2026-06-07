@@ -1323,25 +1323,9 @@ export class GraflareAPI extends WorkerEntrypoint<Bindings> {
     for (const inst of instances) {
       const parsed = upsertAlertInstanceSchema.parse(inst);
       try {
-        const existing = await this.db
-          .select({ id: alertInstances.id })
-          .from(alertInstances)
-          .where(and(eq(alertInstances.ruleId, parsed.ruleId), eq(alertInstances.labelsHash, parsed.labelsHash)))
-          .limit(1);
-
-        if (existing.length > 0) {
-          await this.db
-            .update(alertInstances)
-            .set({
-              labels: parsed.labels ?? {},
-              state: parsed.state,
-              value: parsed.value,
-              activeAt: parsed.activeAt !== null ? new Date(parsed.activeAt) : null,
-              lastEvalAt: new Date(parsed.lastEvalAt),
-            })
-            .where(eq(alertInstances.id, existing[0].id));
-        } else {
-          await this.db.insert(alertInstances).values({
+        await this.db
+          .insert(alertInstances)
+          .values({
             id: crypto.randomUUID(),
             orgId,
             ruleId: parsed.ruleId,
@@ -1351,8 +1335,17 @@ export class GraflareAPI extends WorkerEntrypoint<Bindings> {
             value: parsed.value,
             activeAt: parsed.activeAt !== null ? new Date(parsed.activeAt) : null,
             lastEvalAt: new Date(parsed.lastEvalAt),
+          })
+          .onConflictDoUpdate({
+            target: [alertInstances.ruleId, alertInstances.labelsHash],
+            set: {
+              labels: parsed.labels ?? {},
+              state: parsed.state,
+              value: parsed.value,
+              activeAt: parsed.activeAt !== null ? new Date(parsed.activeAt) : null,
+              lastEvalAt: new Date(parsed.lastEvalAt),
+            },
           });
-        }
       } catch (error) {
         console.error('upsertAlertInstances failed:', error);
         throw new Error('Failed to upsert alert instance', { cause: error });
