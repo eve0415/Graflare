@@ -352,8 +352,8 @@ export class AlertRuleDO extends DurableObject<Env> {
           externalURL: '',
         },
       });
-    } catch (e) {
-      console.error('Failed to trigger notification workflow:', e);
+    } catch (error) {
+      console.error('Failed to trigger notification workflow:', error);
     }
   }
 }
