@@ -45,6 +45,7 @@ interface InstanceRow {
 interface Env {
   DB: D1Database;
   ENCRYPTION_KEY: string;
+  NOTIFICATION_WORKFLOW: Workflow;
 }
 
 export class AlertRuleDO extends DurableObject<Env> {
@@ -225,6 +226,9 @@ export class AlertRuleDO extends DurableObject<Env> {
 
         if (prevState !== newState.state) {
           await this.syncInstanceToD1(config, result.labelsHash, result.labels, newState.state, String(result.value), newState.firedAt ?? prev?.fired_at ?? null, now);
+          if (newState.state === 'Firing' || newState.state === 'Resolved') {
+            await this.triggerNotification(config);
+          }
         }
       }
 
@@ -239,13 +243,14 @@ export class AlertRuleDO extends DurableObject<Env> {
           );
           const labels: Record<string, string> = JSON.parse(inst.labels);
           await this.syncInstanceToD1(config, inst.labels_hash, labels, 'Resolved', String(inst.value ?? 0), inst.fired_at, now);
+          await this.triggerNotification(config);
         }
       }
+      await this.ctx.storage.setAlarm(now + config.evalIntervalS * 1000);
     } catch {
       await this.handleError(config, now);
+      await this.ctx.storage.setAlarm(now + config.evalIntervalS * 1000);
     }
-
-    await this.ctx.storage.setAlarm(now + config.evalIntervalS * 1000);
   }
 
   private transitionState(
@@ -333,5 +338,22 @@ export class AlertRuleDO extends DurableObject<Env> {
     await stmt
       .bind(crypto.randomUUID(), config.orgId, config.ruleId, labelsHash, JSON.stringify(labels), state, value, activeAt, evalAt)
       .run();
+  }
+
+  private async triggerNotification(config: AlertRuleConfig): Promise<void> {
+    try {
+      await this.env.NOTIFICATION_WORKFLOW.create({
+        params: {
+          orgId: config.orgId,
+          ruleId: config.ruleId,
+          ruleName: config.annotations['summary'] ?? config.ruleId,
+          ruleLabels: config.labels,
+          ruleAnnotations: config.annotations,
+          externalURL: '',
+        },
+      });
+    } catch (e) {
+      console.error('Failed to trigger notification workflow:', e);
+    }
   }
 }
