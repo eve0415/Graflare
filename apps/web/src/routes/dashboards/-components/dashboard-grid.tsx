@@ -63,7 +63,7 @@ export const DashboardGrid = ({ panels, timeRange, refreshInterval, editMode, on
           <PanelRenderer
             panel={panel}
             timeRange={timeRange}
-            refetchInterval={typeof refreshInterval === 'number' ? refreshInterval + index * 100 : false}
+            refetchInterval={typeof refreshInterval === 'number' ? refreshInterval : false}
             width={panel.gridPos.w * (ROW_HEIGHT + 10)}
             height={panel.gridPos.h * ROW_HEIGHT}
           />

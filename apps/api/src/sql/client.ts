@@ -21,9 +21,6 @@ export class SqlClient {
     url.pathname = `${url.pathname.replace(/\/$/, '')}/sql`;
 
     const targetUrl = url.toString();
-    if (new URL(targetUrl).origin !== url.origin) {
-      return { columns: [], rows: [], error: 'URL origin mismatch' };
-    }
 
     try {
       const res = await this.fetchFn(targetUrl, {
