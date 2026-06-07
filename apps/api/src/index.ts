@@ -42,7 +42,7 @@ import { prometheusResponseSchema } from '@graflare/shared/schemas/prometheus';
 import { createSilenceSchema, updateSilenceSchema } from '@graflare/shared/schemas/silence';
 import { expandSqlMacros } from '@graflare/shared/sql/macros';
 import { WorkerEntrypoint } from 'cloudflare:workers';
-import { and, desc, eq, gte, like, lte } from 'drizzle-orm';
+import { and, desc, eq, gte, like, lte, sql } from 'drizzle-orm';
 import { Hono } from 'hono';
 
 import { decryptCredentials, encryptCredentials } from './crypto/credentials';
@@ -850,10 +850,9 @@ export class GraflareAPI extends WorkerEntrypoint<Bindings> {
     if (current === undefined) return null;
 
     const now = new Date();
-    const newVersion = current.version + 1;
     const { message, ...updates } = parsed;
 
-    const setData: Record<string, unknown> = { updatedAt: now, version: newVersion };
+    const setData: Record<string, unknown> = { updatedAt: now, version: sql`version + 1` };
     if (updates.title !== undefined) {
       setData['title'] = updates.title;
       setData['slug'] = updates.title
@@ -869,22 +868,23 @@ export class GraflareAPI extends WorkerEntrypoint<Bindings> {
     if (updates.timeRange !== undefined) setData['timeRange'] = updates.timeRange;
 
     try {
-      await this.db.update(dashboards).set(setData).where(eq(dashboards.id, id));
+      await this.db.update(dashboards).set(setData).where(and(eq(dashboards.id, id), eq(dashboards.orgId, orgId)));
 
-      const updated = await this.db.select().from(dashboards).where(eq(dashboards.id, id)).limit(1);
+      const updated = await this.db.select().from(dashboards).where(and(eq(dashboards.id, id), eq(dashboards.orgId, orgId))).limit(1);
+      if (updated[0] === undefined) return null;
 
       const versionId = crypto.randomUUID();
       await this.db.insert(dashboardVersions).values({
         id: versionId,
         dashboardId: id,
-        version: newVersion,
+        version: updated[0].version,
         data: JSON.stringify(updated[0]),
         message: message ?? '',
         createdBy: email,
         createdAt: now,
       });
 
-      return updated[0] ?? null;
+      return updated[0];
     } catch (error) {
       console.error('updateDashboard failed:', error);
       throw new Error('Failed to update dashboard', { cause: error });
@@ -974,12 +974,9 @@ export class GraflareAPI extends WorkerEntrypoint<Bindings> {
     if (typeof snapshotData !== 'object' || snapshotData === null) return null;
 
     const snapshot = snapshotData;
-    const [current] = existing;
-    if (current === undefined) return null;
     const now = new Date();
-    const newVersion = current.version + 1;
 
-    const restoreFields: Record<string, unknown> = { version: newVersion, updatedAt: now };
+    const restoreFields: Record<string, unknown> = { version: sql`version + 1`, updatedAt: now };
     if ('title' in snapshot && typeof snapshot.title === 'string') restoreFields['title'] = snapshot.title;
     if ('slug' in snapshot && typeof snapshot.slug === 'string') restoreFields['slug'] = snapshot.slug;
     if ('description' in snapshot && typeof snapshot.description === 'string') restoreFields['description'] = snapshot.description;
@@ -992,22 +989,23 @@ export class GraflareAPI extends WorkerEntrypoint<Bindings> {
     if ('folderId' in snapshot) restoreFields['folderId'] = snapshot.folderId;
 
     try {
-      await this.db.update(dashboards).set(restoreFields).where(eq(dashboards.id, dashboardId));
+      await this.db.update(dashboards).set(restoreFields).where(and(eq(dashboards.id, dashboardId), eq(dashboards.orgId, orgId)));
 
-      const updated = await this.db.select().from(dashboards).where(eq(dashboards.id, dashboardId)).limit(1);
+      const updated = await this.db.select().from(dashboards).where(and(eq(dashboards.id, dashboardId), eq(dashboards.orgId, orgId))).limit(1);
+      if (updated[0] === undefined) return null;
 
       const versionId = crypto.randomUUID();
       await this.db.insert(dashboardVersions).values({
         id: versionId,
         dashboardId,
-        version: newVersion,
+        version: updated[0].version,
         data: JSON.stringify(updated[0]),
         message: `Restored from version ${version}`,
         createdBy: email,
         createdAt: now,
       });
 
-      return updated[0] ?? null;
+      return updated[0];
     } catch (error) {
       console.error('restoreDashboardVersion failed:', error);
       throw new Error('Failed to restore dashboard version', { cause: error });
