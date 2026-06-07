@@ -188,11 +188,12 @@ const stripDeniedFieldFromCache = async (
 	const mb: unknown = parsed['metricBlocks'];
 	if (!isRecord(mb)) return false;
 
+	const fieldLower = fieldName.toLowerCase();
 	let changed = false;
 	const strip = (block: unknown): string[] => {
 		if (!Array.isArray(block)) return [];
 		const original = block.filter((f): f is string => typeof f === 'string');
-		const filtered = original.filter((f) => f !== fieldName);
+		const filtered = original.filter((f) => f.toLowerCase() !== fieldLower);
 		if (filtered.length !== original.length) changed = true;
 		return filtered;
 	};
@@ -201,7 +202,7 @@ const stripDeniedFieldFromCache = async (
 	const dimFields = Array.isArray(rawDims)
 		? rawDims.filter((f): f is string => typeof f === 'string')
 		: [];
-	const newDimFields = dimFields.filter((f) => f !== fieldName);
+	const newDimFields = dimFields.filter((f) => f.toLowerCase() !== fieldLower);
 	if (newDimFields.length !== dimFields.length) changed = true;
 
 	const newMetricBlocks = {

@@ -88,10 +88,12 @@ export const discoverScopeDatasets = async (
 
 const isObjectType = (type: unknown): boolean => {
 	if (!isRecord(type)) return false;
-	if (type['kind'] === 'OBJECT') return true;
+	if (type['kind'] === 'OBJECT' || type['kind'] === 'LIST') return true;
 	if ('ofType' in type) return isObjectType(type['ofType']);
 	return false;
 };
+
+const COMPLEX_FIELD_SUFFIX_RE = /(?:Map|Array)$/;
 
 const extractFieldNames = (data: Record<string, unknown>, key: string, excludeObjects = false): string[] => {
 	const block: unknown = data[key];
@@ -101,7 +103,10 @@ const extractFieldNames = (data: Record<string, unknown>, key: string, excludeOb
 	return fields
 		.filter((f: unknown): f is Record<string, unknown> => {
 			if (!isRecord(f) || typeof f['name'] !== 'string') return false;
-			if (excludeObjects && isObjectType(f['type'])) return false;
+			if (excludeObjects) {
+				if (isObjectType(f['type'])) return false;
+				if (COMPLEX_FIELD_SUFFIX_RE.test(f['name'])) return false;
+			}
 			return true;
 		})
 		.map((f) => String(f['name']));
@@ -121,7 +126,7 @@ export const introspectDatasetFields = async (
 
 	const blocks = ['Dimensions', 'Sum', 'Avg', 'Max', 'Quantiles'];
 	const aliases = blocks
-		.map((b) => `${b.toLowerCase()}: __type(name: "${typeName}${b}") { fields { name type { name kind ofType { name kind } } } }`)
+		.map((b) => `${b.toLowerCase()}: __type(name: "${typeName}${b}") { fields { name type { name kind ofType { name kind ofType { name kind } } } } }`)
 		.join(' ');
 
 	const query = `{ root: __type(name: "${typeName}") { fields { name type { name kind } } } ${aliases} }`;
