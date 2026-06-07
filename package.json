@@ -13,13 +13,13 @@
   },
   "devDependencies": {
     "@tanstack/intent": "0.0.41",
-    "@typescript/native-preview": "7.0.0-dev.20260602.1",
+    "@typescript/native-preview": "7.0.0-dev.20260605.1",
     "eslint-plugin-react-hooks": "7.1.1",
     "localflare": "0.5.0",
     "oxfmt": "0.53.0",
     "oxlint": "1.68.0",
     "oxlint-tsgolint": "0.23.0",
-    "wrangler": "4.97.0"
+    "wrangler": "4.98.0"
   },
   "engines": {
     "node": "24.15.x"
