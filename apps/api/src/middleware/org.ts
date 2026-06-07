@@ -1,8 +1,6 @@
 import type { AppEnv } from '../index';
 import type { Context, MiddlewareHandler } from 'hono';
 
-import { eq } from 'drizzle-orm';
-
 import { createDb } from '../db';
 import { organizations } from '../db/schema';
 
@@ -18,17 +16,13 @@ const orgMiddleware = (): MiddlewareHandler<AppEnv> => async (c: Context<AppEnv>
   const db = createDb(c.env.DB);
 
   const orgId = await emailToOrgId(user.email);
-  const existing = await db.select().from(organizations).where(eq(organizations.id, orgId)).limit(1);
-
-  if (existing.length === 0) {
-    const now = new Date();
-    await db.insert(organizations).values({
-      id: orgId,
-      name: user.email,
-      createdAt: now,
-      updatedAt: now,
-    });
-  }
+  const now = new Date();
+  await db.insert(organizations).values({
+    id: orgId,
+    name: user.email,
+    createdAt: now,
+    updatedAt: now,
+  }).onConflictDoNothing();
 
   c.set('orgId', orgId);
   await next();
