@@ -80,6 +80,7 @@ import { datasourceTestRoutes } from './routes/datasources/datasources-test';
 import { proxyRoutes } from './routes/datasources/proxy';
 import { folderRoutes } from './routes/folders/folders';
 import { createPrometheusClient } from './prometheus/factory';
+import { slugify } from './slugify';
 import { SqlClient } from './sql/client';
 import { createSqlClient } from './sql/factory';
 import { describeTableQuery, listTablesQuery } from './sql/introspection';
@@ -693,10 +694,7 @@ export class GraflareAPI extends WorkerEntrypoint<Bindings> {
     const parsed = createFolderSchema.parse(input);
     const id = crypto.randomUUID();
     const now = new Date();
-    const slug = parsed.title
-      .toLowerCase()
-      .replaceAll(/[^a-z0-9]+/g, '-')
-      .replaceAll(/^-|-$/g, '');
+    const slug = slugify(parsed.title);
 
     try {
       await this.db.insert(folders).values({
@@ -725,10 +723,7 @@ export class GraflareAPI extends WorkerEntrypoint<Bindings> {
     const setData: Record<string, unknown> = { updatedAt: now };
     if (parsed.title !== undefined) {
       setData['title'] = parsed.title;
-      setData['slug'] = parsed.title
-        .toLowerCase()
-        .replaceAll(/[^a-z0-9]+/g, '-')
-        .replaceAll(/^-|-$/g, '');
+      setData['slug'] = slugify(parsed.title);
     }
     if (parsed.parentId !== undefined) setData['parentId'] = parsed.parentId;
 
@@ -824,10 +819,7 @@ export class GraflareAPI extends WorkerEntrypoint<Bindings> {
     const parsed = createDashboardSchema.parse(input);
     const id = crypto.randomUUID();
     const now = new Date();
-    const slug = parsed.title
-      .toLowerCase()
-      .replaceAll(/[^a-z0-9]+/g, '-')
-      .replaceAll(/^-|-$/g, '');
+    const slug = slugify(parsed.title);
 
     try {
       await this.db.insert(dashboards).values({
@@ -889,10 +881,7 @@ export class GraflareAPI extends WorkerEntrypoint<Bindings> {
     const setData: Record<string, unknown> = { updatedAt: now, version: sql`version + 1` };
     if (updates.title !== undefined) {
       setData['title'] = updates.title;
-      setData['slug'] = updates.title
-        .toLowerCase()
-        .replaceAll(/[^a-z0-9]+/g, '-')
-        .replaceAll(/^-|-$/g, '');
+      setData['slug'] = slugify(updates.title);
     }
     if (updates.folderId !== undefined) setData['folderId'] = updates.folderId;
     if (updates.description !== undefined) setData['description'] = updates.description;
@@ -1770,6 +1759,17 @@ export class GraflareAPI extends WorkerEntrypoint<Bindings> {
     const parsed = createAnnotationSchema.parse(input);
     const id = crypto.randomUUID();
     const now = new Date();
+
+    if (parsed.dashboardId !== undefined) {
+      const dash = await this.db.select({ id: dashboards.id }).from(dashboards)
+        .where(and(eq(dashboards.id, parsed.dashboardId), eq(dashboards.orgId, orgId))).limit(1);
+      if (dash.length === 0) throw new Error('Dashboard not found');
+    }
+    if (parsed.alertRuleId !== undefined) {
+      const rule = await this.db.select({ id: alertRules.id }).from(alertRules)
+        .where(and(eq(alertRules.id, parsed.alertRuleId), eq(alertRules.orgId, orgId))).limit(1);
+      if (rule.length === 0) throw new Error('Alert rule not found');
+    }
 
     try {
       await this.db.insert(annotations).values({

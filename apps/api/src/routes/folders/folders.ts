@@ -8,12 +8,7 @@ import { Hono } from 'hono';
 import { createDb } from '../../db';
 import { alertRuleGroups, dashboards, folders } from '../../db/schema';
 import { onValidationError } from '../../middleware/validate';
-
-const slugify = (title: string) =>
-  title
-    .toLowerCase()
-    .replaceAll(/[^a-z0-9]+/g, '-')
-    .replaceAll(/^-|-$/g, '');
+import { slugify } from '../../slugify';
 
 const app = new Hono<AppEnv>();
 
