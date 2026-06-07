@@ -276,8 +276,14 @@ const processCollectorResult = async (
 	}
 
 	await insertMetricRows(db, rows);
-	await updateSyncState(db, collector.name, scope, scopeId, nowSeconds);
-	await clearDatasetStatus(db, collector.name, scope, scopeId);
+	try {
+		await updateSyncState(db, collector.name, scope, scopeId, nowSeconds);
+	} catch (error: unknown) {
+		console.error(JSON.stringify({ level: 'error', event: 'sync_state_update_failed', dataset: collector.name, scope, scopeId, error: error instanceof Error ? error.message : String(error) }));
+	}
+	try {
+		await clearDatasetStatus(db, collector.name, scope, scopeId);
+	} catch { /* best-effort */ }
 	return { dataset: collector.name, scope, scopeId, status: 'success', rowCount: rows.length, error: '' };
 };
 
@@ -511,6 +517,22 @@ const getSyncStateTime = async (
 	return row === undefined ? defaultTime : row.lastSyncAt;
 };
 
+const runSequentialBatches = async (
+	thunks: (() => Promise<CollectResult[]>)[],
+	index = 0,
+	outcomes: CollectResult[] = [],
+): Promise<CollectResult[]> => {
+	const thunk = thunks[index];
+	if (thunk === undefined) return outcomes;
+	try {
+		const results = await thunk();
+		outcomes.push(...results);
+	} catch (error: unknown) {
+		console.error(JSON.stringify({ level: 'error', event: 'batch_failed', error: error instanceof Error ? error.message : String(error) }));
+	}
+	return runSequentialBatches(thunks, index + 1, outcomes);
+};
+
 const buildTimeVars = async (
 	db: ReturnType<typeof drizzle>,
 	collectors: readonly GraphQLCollector[],
@@ -600,16 +622,20 @@ export const collectMetrics = async (env: BridgeEnv, scheduledTime: number): Pro
 
 	const toTime = new Date(scheduledTime).toISOString();
 
-	const tasks: Promise<CollectResult[]>[] = [];
+	const processChunk = async (
+		chunk: readonly GraphQLCollector[],
+		scope: 'account' | 'zone',
+		scopeId: string,
+	): Promise<CollectResult[]> => {
+		const tv = await buildTimeVars(db, chunk, scope, scopeId, nowSeconds, toTime);
+		return processGraphQLBatch(db, env, chunk, scope, scopeId, tv.fromTime, tv.toTime, tv.fromDate, tv.toDate, nowSeconds, statuses);
+	};
+
+	const tasks: (() => Promise<CollectResult[]>)[] = [];
 
 	for (let i = 0; i < activeAccountCollectors.length; i += BATCH_CHUNK_SIZE) {
 		const chunk = activeAccountCollectors.slice(i, i + BATCH_CHUNK_SIZE);
-		tasks.push(
-			(async () => {
-				const tv = await buildTimeVars(db, chunk, 'account', env.CF_ACCOUNT_ID, nowSeconds, toTime);
-				return processGraphQLBatch(db, env, chunk, 'account', env.CF_ACCOUNT_ID, tv.fromTime, tv.toTime, tv.fromDate, tv.toDate, nowSeconds, statuses);
-			})(),
-		);
+		tasks.push(() => processChunk(chunk, 'account', env.CF_ACCOUNT_ID));
 	}
 
 	for (const zid of zoneIds) {
@@ -618,34 +644,16 @@ export const collectMetrics = async (env: BridgeEnv, scheduledTime: number): Pro
 		);
 		for (let i = 0; i < perZone.length; i += BATCH_CHUNK_SIZE) {
 			const chunk = perZone.slice(i, i + BATCH_CHUNK_SIZE);
-			tasks.push(
-				(async () => {
-					const tv = await buildTimeVars(db, chunk, 'zone', zid, nowSeconds, toTime);
-					return processGraphQLBatch(db, env, chunk, 'zone', zid, tv.fromTime, tv.toTime, tv.fromDate, tv.toDate, nowSeconds, statuses);
-				})(),
-			);
+			tasks.push(() => processChunk(chunk, 'zone', zid));
 		}
 	}
 
 	if (REST_COLLECTORS.length > 0) {
 		const fromTime = new Date((nowSeconds - 86400) * 1000).toISOString();
-		tasks.push(processRESTCollectors(db, env, REST_COLLECTORS, fromTime, toTime, nowSeconds, statuses));
+		tasks.push(() => processRESTCollectors(db, env, REST_COLLECTORS, fromTime, toTime, nowSeconds, statuses));
 	}
 
-	const batchResults = await Promise.allSettled(tasks);
-
-	const outcomes: CollectResult[] = [];
-	for (const r of batchResults) {
-		if (r.status === 'fulfilled') {
-			outcomes.push(...r.value);
-		} else {
-			console.error(JSON.stringify({
-				level: 'error',
-				event: 'batch_failed',
-				error: r.reason instanceof Error ? r.reason.message : String(r.reason),
-			}));
-		}
-	}
+	const outcomes = await runSequentialBatches(tasks);
 
 	try {
 		const cutoff = nowSeconds - RETENTION_SECONDS;
