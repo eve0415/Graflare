@@ -24,6 +24,8 @@ const SCOPE_TYPE_NAMES: Record<string, string> = {
 	zone: 'zone',
 };
 
+const SAFE_GQL_NAME = /^[A-Za-z_]\w*$/;
+
 const unwrapType = (type: unknown): string | undefined => {
 	if (!isRecord(type)) return undefined;
 	if (typeof type['name'] === 'string' && type['kind'] === 'OBJECT') return type['name'];
@@ -103,6 +105,8 @@ export const introspectDatasetFields = async (
 		dimensionFields: [],
 		metricBlocks: { sum: [], avg: [], max: [], quantiles: [] },
 	};
+
+	if (!SAFE_GQL_NAME.test(typeName)) return empty;
 
 	const blocks = ['Dimensions', 'Sum', 'Avg', 'Max', 'Quantiles'];
 	const aliases = blocks
