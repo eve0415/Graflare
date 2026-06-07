@@ -63,8 +63,8 @@ export const deleteAlertRuleGroup = createServerFn({ method: 'POST' })
     await env.API.deleteAlertRuleGroup(getAccessJwt(), id);
   });
 
-export const listAlertRules = createServerFn({ method: 'GET' }).handler(async () => {
-  const rows = await env.API.listAlertRules(getAccessJwt());
+export const listAlertRules = createServerFn({ method: 'GET' }).handler(() => {
+  const rows =  env.API.listAlertRules(getAccessJwt());
   return rows.map(r => ({
     id: r.id,
     orgId: r.orgId,
@@ -145,8 +145,8 @@ export const listAlertInstances = createServerFn({ method: 'GET' })
     }));
   });
 
-export const listContactPoints = createServerFn({ method: 'GET' }).handler(async () => {
-  const rows = await env.API.listContactPoints(getAccessJwt());
+export const listContactPoints = createServerFn({ method: 'GET' }).handler(() => {
+  const rows =  env.API.listContactPoints(getAccessJwt());
   return rows.map(r => ({ id: r.id, orgId: r.orgId, name: r.name, type: r.type, settings: r.settings, createdAt: r.createdAt, updatedAt: r.updatedAt }));
 });
 
@@ -180,8 +180,8 @@ export const deleteContactPoint = createServerFn({ method: 'POST' })
     await env.API.deleteContactPoint(getAccessJwt(), id);
   });
 
-export const listNotificationPolicies = createServerFn({ method: 'GET' }).handler(async () => {
-  const rows = await env.API.listNotificationPolicies(getAccessJwt());
+export const listNotificationPolicies = createServerFn({ method: 'GET' }).handler(() => {
+  const rows =  env.API.listNotificationPolicies(getAccessJwt());
   return rows.map(r => ({
     id: r.id,
     orgId: r.orgId,
@@ -221,8 +221,8 @@ export const deleteNotificationPolicy = createServerFn({ method: 'POST' })
     await env.API.deleteNotificationPolicy(getAccessJwt(), id);
   });
 
-export const listSilences = createServerFn({ method: 'GET' }).handler(async () => {
-  const rows = await env.API.listSilences(getAccessJwt());
+export const listSilences = createServerFn({ method: 'GET' }).handler(() => {
+  const rows =  env.API.listSilences(getAccessJwt());
   return rows.map(r => ({
     id: r.id,
     orgId: r.orgId,
@@ -276,8 +276,8 @@ export const deleteSilence = createServerFn({ method: 'POST' })
     await env.API.deleteSilence(getAccessJwt(), id);
   });
 
-export const listMuteTimings = createServerFn({ method: 'GET' }).handler(async () => {
-  const rows = await env.API.listMuteTimings(getAccessJwt());
+export const listMuteTimings = createServerFn({ method: 'GET' }).handler(() => {
+  const rows =  env.API.listMuteTimings(getAccessJwt());
   return rows.map(r => ({ id: r.id, orgId: r.orgId, name: r.name, intervals: r.intervals, createdAt: r.createdAt, updatedAt: r.updatedAt }));
 });
 

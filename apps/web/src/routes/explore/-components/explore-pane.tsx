@@ -6,6 +6,7 @@ import { generatePromQL } from '@graflare/shared/promql/generate';
 import { buildSql } from '@graflare/shared/sql/builder';
 import type { SqlBuilderState } from '@graflare/shared/sql/builder';
 import { sqlRowsToSeries } from '@graflare/shared/sql/adapters';
+import { computeStep, resolveTime } from '@graflare/shared/time/resolve';
 import { Button } from '@graflare/ui/components/button';
 import { Dialog, DialogClose, DialogContent, DialogDescription, DialogFooter, DialogTitle } from '@graflare/ui/components/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@graflare/ui/components/select';
@@ -60,25 +61,6 @@ const VALID_DIALECTS = new Set<string>(['postgres', 'sqlite']);
 const isValidDialect = (value: string | null | undefined): value is DatasourceDialect =>
 	typeof value === 'string' && VALID_DIALECTS.has(value);
 
-const TIME_MULTIPLIERS: Readonly<Record<string, number>> = { s: 1, m: 60, h: 3600, d: 86400, w: 604800 };
-
-const resolveTime = (expr: string): string => {
-	if (expr === 'now') return String(Date.now() / 1000);
-	const match = /^now-(\d+)([smhdw])$/.exec(expr);
-	if (match === null) return expr;
-	const [, amount, unit] = match;
-	if (unit === undefined) return expr;
-	const seconds = Number(amount) * (TIME_MULTIPLIERS[unit] ?? 1);
-	return String((Date.now() - seconds * 1000) / 1000);
-};
-
-const computeStep = (fromStr: string, toStr: string): string => {
-	const from = Number(resolveTime(fromStr));
-	const to = Number(resolveTime(toStr));
-	const duration = Math.max(1, to - from);
-	const step = Math.max(1, Math.floor(duration / 250));
-	return `${String(step)}s`;
-};
 
 export const ExplorePane = ({ timeRange, label }: ExplorePaneProps) => {
 	const { data: datasources } = useSuspenseQuery(datasourcesQueryOptions());
@@ -163,8 +145,8 @@ export const ExplorePane = ({ timeRange, label }: ExplorePaneProps) => {
 							rawSql: effectiveQuery,
 							format: sqlFormat,
 							timeRange: {
-								from: resolveTime(timeRange.from),
-								to: resolveTime(timeRange.to),
+								from: String(resolveTime(timeRange.from)),
+								to: String(resolveTime(timeRange.to)),
 							},
 						},
 					});
@@ -195,8 +177,8 @@ export const ExplorePane = ({ timeRange, label }: ExplorePaneProps) => {
 							endpoint: '/api/v1/query_range',
 							params: {
 								query: effectiveQuery,
-								start: resolveTime(timeRange.from),
-								end: resolveTime(timeRange.to),
+								start: String(resolveTime(timeRange.from)),
+								end: String(resolveTime(timeRange.to)),
 								step,
 							},
 						},

@@ -15,6 +15,7 @@ import type { DescribeDatabaseResponse, DescribeTableResponse, ListLabelValuesRe
 import type { SqlFormat, SqlResponse } from '@graflare/shared/schemas/sql';
 import type { DurableObjectNamespace } from 'cloudflare:workers';
 
+import { resolveTime } from '@graflare/shared/time/resolve';
 import { detectFormat, importDashboard as importDashboardFn } from '@graflare/shared/import';
 import { alertInstanceListQuerySchema, upsertAlertInstanceSchema } from '@graflare/shared/schemas/alert-instance';
 import { createAlertRuleSchema, updateAlertRuleSchema } from '@graflare/shared/schemas/alert-rule';
@@ -105,24 +106,6 @@ export interface AppEnv {
   };
 }
 
-const TIME_MULTIPLIERS: Record<string, number> = { s: 1, m: 60, h: 3600, d: 86400, w: 604800 };
-
-const resolveTimeValue = (expr: string): number => {
-  if (expr === 'now') return Math.floor(Date.now() / 1000);
-  const match = /^now-(\d+)([smhdw])$/.exec(expr);
-  if (match !== null) {
-    const [, amount, unit] = match;
-    if (amount !== undefined && unit !== undefined) {
-      const multiplier = TIME_MULTIPLIERS[unit];
-      if (multiplier !== undefined) {
-        return Math.floor(Date.now() / 1000) - Number(amount) * multiplier;
-      }
-    }
-  }
-  const parsed = Number(expr);
-  if (!Number.isNaN(parsed)) return parsed;
-  return Math.floor(Date.now() / 1000);
-};
 
 const app = new Hono<AppEnv>();
 
@@ -469,8 +452,8 @@ export class GraflareAPI extends WorkerEntrypoint<Bindings> {
     const dialect = ds.dialect === 'postgres' ? 'postgres' : 'sqlite';
 
     const resolvedTimeRange = {
-      from: timeRange ? resolveTimeValue(timeRange.from) : Math.floor(Date.now() / 1000) - 3600,
-      to: timeRange ? resolveTimeValue(timeRange.to) : Math.floor(Date.now() / 1000),
+      from: timeRange ? resolveTime(timeRange.from) : Math.floor(Date.now() / 1000) - 3600,
+      to: timeRange ? resolveTime(timeRange.to) : Math.floor(Date.now() / 1000),
     };
 
     const { sql: expandedSql, params } = expandSqlMacros(rawSql, dialect, resolvedTimeRange);

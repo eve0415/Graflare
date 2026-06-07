@@ -3,6 +3,7 @@ import type { PrometheusResponse } from '@graflare/shared/schemas/prometheus';
 import type { SqlResponse } from '@graflare/shared/schemas/sql';
 
 import { sqlRowsToSeries } from '@graflare/shared/sql/adapters';
+import { computeStep, resolveTime } from '@graflare/shared/time/resolve';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 
 import type { DatasourceRow } from '../../../datasources/-api';
@@ -14,24 +15,6 @@ interface TimeRange {
   from: string;
   to: string;
 }
-
-const resolveTime = (expr: string): string => {
-  if (expr === 'now') return String(Date.now() / 1000);
-  const match = /^now-(\d+)([smhdw])$/.exec(expr);
-  if (match === null) return expr;
-  const [, amount, unit] = match;
-  const multipliers: Record<string, number> = { s: 1, m: 60, h: 3600, d: 86400, w: 604800 };
-  const seconds = Number(amount) * (multipliers[unit] ?? 1);
-  return String((Date.now() - seconds * 1000) / 1000);
-};
-
-const computeStep = (fromStr: string, toStr: string): string => {
-  const from = Number(resolveTime(fromStr));
-  const to = Number(resolveTime(toStr));
-  const duration = Math.max(1, to - from);
-  const step = Math.max(1, Math.floor(duration / 250));
-  return `${String(step)}s`;
-};
 
 const executePrometheusQueries = async (
   datasourceId: string,
@@ -47,8 +30,8 @@ const executePrometheusQueries = async (
           endpoint: '/api/v1/query_range',
           params: {
             query: q.expr,
-            start: resolveTime(timeRange.from),
-            end: resolveTime(timeRange.to),
+            start: String(resolveTime(timeRange.from)),
+            end: String(resolveTime(timeRange.to)),
             step,
           },
         },
@@ -70,8 +53,8 @@ const executeSqlQueries = async (
           rawSql: q.expr,
           format: q.format,
           timeRange: {
-            from: resolveTime(timeRange.from),
-            to: resolveTime(timeRange.to),
+            from: String(resolveTime(timeRange.from)),
+            to: String(resolveTime(timeRange.to)),
           },
         },
       });
