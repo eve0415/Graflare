@@ -387,11 +387,12 @@ export class GraflareAPI extends WorkerEntrypoint<Bindings> {
   }
 
   private static ALLOWED_ENDPOINTS = new Set(['/api/v1/query', '/api/v1/query_range', '/api/v1/labels', '/api/v1/series']);
+  private static LABEL_VALUES_RE = /^\/api\/v1\/label\/[^/]+\/values$/;
 
   async proxyQuery(jwt: string, datasourceId: string, endpoint: string, params: Record<string, string>): Promise<PrometheusResponse> {
     const { orgId } = await this.resolveAuth(jwt);
     datasourceIdSchema.parse(datasourceId);
-    if (!GraflareAPI.ALLOWED_ENDPOINTS.has(endpoint) && !endpoint.startsWith('/api/v1/label/')) {
+    if (!GraflareAPI.ALLOWED_ENDPOINTS.has(endpoint) && !GraflareAPI.LABEL_VALUES_RE.test(endpoint)) {
       return { status: 'error', errorType: 'bad_request', error: 'Invalid endpoint' };
     }
 
