@@ -100,7 +100,10 @@ export const usePanelData = (
 
       const datasources = queryClient.getQueryData<DatasourceRow[]>(['datasources']);
       const ds = datasources?.find((d) => d.id === datasourceId);
-      const dsType = ds?.type ?? 'prometheus';
+      if (ds === undefined) {
+        return [{ status: 'error', errorType: 'internal', error: 'Data source not loaded' }];
+      }
+      const dsType = ds.type;
 
       if (dsType === 'sql') {
         return executeSqlQueries(datasourceId, queries, timeRange);
