@@ -4,7 +4,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { REGISTRY } from './collectors/registry';
 import type { BridgeEnv } from './env';
 
-import { collectMetrics } from './cron';
+import { BATCH_CHUNK_SIZE, collectMetrics, computeBackoff } from './cron';
 
 const testEnv: BridgeEnv = {
 	DB: env.DB,
@@ -138,6 +138,7 @@ describe('collectMetrics orchestrator', () => {
 		await env.DB.exec('DELETE FROM sync_state');
 		await env.DB.exec('DELETE FROM metrics');
 		await env.DB.exec('DELETE FROM discovery_cache');
+		await env.DB.exec('DELETE FROM schema_cache');
 	});
 
 	it('collects account metrics and inserts rows', async () => {
@@ -274,5 +275,179 @@ describe('collectMetrics orchestrator', () => {
 
 		const result = await env.DB.prepare('SELECT * FROM dataset_status WHERE status = ?').bind('validation_error').all();
 		expect(result.results.length).toBeGreaterThan(0);
+	});
+
+	it('clears dataset_status on successful sync', async () => {
+		const nowSeconds = Math.floor(SCHEDULED_TIME / 1000);
+		await env.DB.prepare(
+			"INSERT INTO dataset_status (dataset, scope, scope_id, status, last_error, retry_after, attempt_count) VALUES ('workers', 'account', ?, 'error', 'old error', ?, 3)",
+		).bind(env.CF_ACCOUNT_ID, nowSeconds - 100).run();
+
+		mockSmartFetch();
+
+		await collectMetrics(testEnv, SCHEDULED_TIME);
+
+		const result = await env.DB.prepare("SELECT * FROM dataset_status WHERE dataset = 'workers'").all();
+		expect(result.results).toHaveLength(0);
+	});
+
+	it('uses exponential backoff for retry_after', async () => {
+		mockSmartFetch({
+			accountResponse: { data: null, errors: [{ message: 'Something unexpected happened' }] },
+		});
+
+		await collectMetrics(testEnv, SCHEDULED_TIME);
+
+		const result = await env.DB.prepare('SELECT attempt_count, retry_after FROM dataset_status WHERE status = ?').bind('error').first<{ attempt_count: number; retry_after: number }>();
+		expect(result).toBeDefined();
+		expect(result?.attempt_count).toBe(1);
+		const nowSeconds = Math.floor(SCHEDULED_TIME / 1000);
+		expect(result?.retry_after).toBe(nowSeconds + computeBackoff(1));
+	});
+
+	it('increments attempt_count on repeated errors', async () => {
+		const nowSeconds = Math.floor(SCHEDULED_TIME / 1000);
+		await env.DB.prepare(
+			"INSERT INTO dataset_status (dataset, scope, scope_id, status, last_error, retry_after, attempt_count) VALUES ('workers', 'account', ?, 'error', 'old', ?, 2)",
+		).bind(env.CF_ACCOUNT_ID, nowSeconds - 100).run();
+
+		mockSmartFetch({
+			accountResponse: { data: null, errors: [{ message: 'Something unexpected happened' }] },
+		});
+
+		await collectMetrics(testEnv, SCHEDULED_TIME);
+
+		const result = await env.DB.prepare("SELECT attempt_count FROM dataset_status WHERE dataset = 'workers'").first<{ attempt_count: number }>();
+		expect(result?.attempt_count).toBe(3);
+	});
+
+	it('strips denied field from schema_cache instead of erroring', async () => {
+		const nowSeconds = Math.floor(SCHEDULED_TIME / 1000);
+		const cachedSchema = JSON.stringify({
+			hasCount: true,
+			dimensionFields: ['datetimeMinute', 'scriptName'],
+			metricBlocks: { sum: ['requests', 'edgetimetofirstbytems'], avg: [], max: [], quantiles: [] },
+		});
+		await env.DB.prepare(
+			"INSERT INTO schema_cache (node_name, scope, type_name, schema_json, last_checked_at) VALUES ('workersInvocationsAdaptive', 'account', 'WorkersInvocationsAdaptive', ?, ?)",
+		).bind(cachedSchema, nowSeconds).run();
+
+		mockSmartFetch({
+			accountResponse: {
+				data: {
+					viewer: {
+						accounts: [{
+							workersInvocations: [],
+						}],
+					},
+				},
+				errors: [{
+					message: "does not have access to the field 'edgetimetofirstbytems'",
+					path: ['viewer', 'accounts', 0, 'workersInvocations'],
+				}],
+			},
+		});
+
+		await collectMetrics(testEnv, SCHEDULED_TIME);
+
+		const row = await env.DB.prepare("SELECT schema_json FROM schema_cache WHERE node_name = 'workersInvocationsAdaptive'")
+			.first<{ schema_json: string }>();
+		expect(row).toBeDefined();
+		expect(row?.schema_json).not.toContain('edgetimetofirstbytems');
+		expect(row?.schema_json).toContain('requests');
+
+		const statusRow = await env.DB.prepare("SELECT * FROM dataset_status WHERE dataset = 'workers-invocations' AND status = 'permission_denied'").all();
+		expect(statusRow.results).toHaveLength(0);
+	});
+	it('strips denied field even when response data is null', async () => {
+		const nowSeconds = Math.floor(SCHEDULED_TIME / 1000);
+		const cachedSchema = JSON.stringify({
+			hasCount: true,
+			dimensionFields: ['datetimeMinute', 'scriptName'],
+			metricBlocks: { sum: ['requests', 'badField'], avg: [], max: [], quantiles: [] },
+		});
+		await env.DB.prepare(
+			"INSERT INTO schema_cache (node_name, scope, type_name, schema_json, last_checked_at) VALUES ('workersInvocationsAdaptive', 'account', 'WorkersInvocationsAdaptive', ?, ?)",
+		).bind(cachedSchema, nowSeconds).run();
+
+		mockSmartFetch({
+			accountResponse: {
+				data: null,
+				errors: [{ message: "does not have access to the field 'badField'" }],
+			},
+		});
+
+		await collectMetrics(testEnv, SCHEDULED_TIME);
+
+		const row = await env.DB.prepare("SELECT schema_json FROM schema_cache WHERE node_name = 'workersInvocationsAdaptive'")
+			.first<{ schema_json: string }>();
+		expect(row).toBeDefined();
+		expect(row?.schema_json).not.toContain("'badField'");
+		expect(row?.schema_json).toContain('requests');
+	});
+
+	it('chunks large collector sets into multiple batches', async () => {
+		const nowSeconds = Math.floor(SCHEDULED_TIME / 1000);
+
+		const schema = JSON.stringify({
+			hasCount: true,
+			dimensionFields: ['datetimeMinute'],
+			metricBlocks: { sum: ['requests'], avg: [], max: [], quantiles: [] },
+		});
+		const inserts: Promise<unknown>[] = [];
+		for (let i = 0; i < 20; i++) {
+			const name = `fakeDataset${String(i)}Adaptive`;
+			inserts.push(
+				env.DB.prepare(
+					'INSERT INTO schema_cache (node_name, scope, type_name, schema_json, last_checked_at) VALUES (?, ?, ?, ?, ?)',
+				).bind(name, 'account', `FakeType${String(i)}`, schema, nowSeconds).run(),
+				env.DB.prepare(
+					'INSERT INTO discovery_cache (node_name, scope, is_available, max_page_size, not_older_than, last_checked_at) VALUES (?, ?, 1, 10000, 0, ?)',
+				).bind(name, 'account', nowSeconds).run(),
+			);
+		}
+		await Promise.all(inserts);
+
+		mockSmartFetch({
+			accountResponse: {
+				data: { viewer: { accounts: [{}] } },
+			},
+		});
+
+		await collectMetrics(testEnv, SCHEDULED_TIME);
+
+		const fetchSpy = vi.mocked(globalThis.fetch);
+		const graphqlCalls = fetchSpy.mock.calls.filter(([input]) => {
+			const url = resolveUrl(input);
+			return url.includes('graphql');
+		});
+		expect(graphqlCalls.length).toBeGreaterThanOrEqual(2);
+	});
+});
+
+describe('computeBackoff', () => {
+	it('follows exponential sequence capped at 14400', () => {
+		expect(computeBackoff(0)).toBe(300);
+		expect(computeBackoff(1)).toBe(600);
+		expect(computeBackoff(2)).toBe(1200);
+		expect(computeBackoff(3)).toBe(2400);
+		expect(computeBackoff(4)).toBe(4800);
+		expect(computeBackoff(5)).toBe(9600);
+		expect(computeBackoff(6)).toBe(14400);
+		expect(computeBackoff(7)).toBe(14400);
+		expect(computeBackoff(10)).toBe(14400);
+	});
+});
+
+describe('batch chunk size', () => {
+	it('is 15', () => {
+		expect(BATCH_CHUNK_SIZE).toBe(15);
+	});
+
+	it('ensures registry fits within chunk limit', () => {
+		const accountConfigs = REGISTRY.filter((c) => c.scope === 'account');
+		const zoneConfigs = REGISTRY.filter((c) => c.scope === 'zone');
+		expect(accountConfigs.length).toBeLessThanOrEqual(BATCH_CHUNK_SIZE * 3);
+		expect(zoneConfigs.length).toBeLessThanOrEqual(BATCH_CHUNK_SIZE * 3);
 	});
 });

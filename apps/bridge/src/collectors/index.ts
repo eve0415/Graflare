@@ -7,6 +7,7 @@ import type { GraphQLCollector, RESTCollector } from './types';
 export const toCollector = (config: DatasetConfig): GraphQLCollector => ({
 	kind: 'graphql',
 	name: config.datasetName,
+	nodeName: config.nodeName,
 	scope: config.scope,
 	alias: buildAlias(config),
 	fragment: buildFragment(config),

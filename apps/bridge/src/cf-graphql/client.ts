@@ -55,6 +55,13 @@ export const classifyError = (error: GraphQLError): ErrorClass => {
 export const isPermissionError = (error: GraphQLError): boolean =>
 	classifyError(error) === 'permission';
 
+const DENIED_FIELD_RE = /does not have access to the field '(\w+)'/;
+
+export const extractDeniedField = (msg: string): string | null => {
+	const match = DENIED_FIELD_RE.exec(msg);
+	return match?.[1] ?? null;
+};
+
 export interface CfGraphQLOptions {
 	debug?: boolean;
 }

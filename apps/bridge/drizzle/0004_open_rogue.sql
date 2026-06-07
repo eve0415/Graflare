@@ -1,0 +1,1 @@
+ALTER TABLE `dataset_status` ADD `attempt_count` integer DEFAULT 0 NOT NULL;

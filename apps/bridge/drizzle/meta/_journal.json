@@ -29,6 +29,13 @@
       "when": 1780793195921,
       "tag": "0003_yielding_bucky",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "6",
+      "when": 1780844364987,
+      "tag": "0004_open_rogue",
+      "breakpoints": true
     }
   ]
 }

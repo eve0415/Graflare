@@ -15,6 +15,7 @@ export interface MetricRow {
 export interface GraphQLCollector {
 	kind: 'graphql';
 	name: string;
+	nodeName: string;
 	scope: 'account' | 'zone';
 	alias: string;
 	fragment: string;

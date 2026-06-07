@@ -1,13 +1,14 @@
 import { and, eq, lt, sql } from 'drizzle-orm';
 import { drizzle } from 'drizzle-orm/d1';
 
-import { cfGraphQL, classifyError } from './cf-graphql/client';
+import { cfGraphQL, classifyError, extractDeniedField } from './cf-graphql/client';
 import type { ErrorClass, GraphQLError, GraphQLResponse } from './cf-graphql/client';
+import type { IntrospectedFields } from './cf-graphql/introspection';
 import { buildBatchedQuery } from './cf-graphql/query-builder';
 import { REST_COLLECTORS, toCollector } from './collectors/index';
 import { REGISTRY } from './collectors/registry';
 import type { GraphQLCollector, MetricRow, RESTCollector } from './collectors/types';
-import { datasetStatus, metrics, syncState } from './db/schema';
+import { datasetStatus, metrics, schemaCache, syncState } from './db/schema';
 import { getEnabledDatasets, getIntrospectedConfigs, runDiscovery, runSchemaDiscovery, shouldRunSchemaDiscovery, shouldRunSettingsDiscovery } from './discovery';
 import { parseZoneIds } from './env';
 import type { BridgeEnv } from './env';
@@ -16,14 +17,12 @@ import { checkTokenPermissions } from './lib/token-check';
 
 const RETENTION_SECONDS = 31 * 24 * 3600;
 const INSERT_CHUNK_SIZE = 100;
+export const BATCH_CHUNK_SIZE = 15;
+const BACKOFF_BASE_S = 300;
+const BACKOFF_CAP_S = 14400;
 
-const RETRY_SECONDS: Record<ErrorClass, number> = {
-	permission: 24 * 3600,
-	validation: 24 * 3600,
-	rate_limit: 5 * 60,
-	server: 15 * 60,
-	unknown: 30 * 60,
-};
+export const computeBackoff = (attempts: number): number =>
+	Math.min(BACKOFF_BASE_S * (2 ** attempts), BACKOFF_CAP_S);
 
 const STATUS_LABELS: Record<ErrorClass, string> = {
 	permission: 'permission_denied',
@@ -37,7 +36,7 @@ interface CollectResult {
 	dataset: string;
 	scope: 'account' | 'zone';
 	scopeId: string;
-	status: 'success' | 'error' | 'skipped' | 'empty';
+	status: 'success' | 'error' | 'skipped' | 'empty' | 'field_stripped';
 	rowCount: number;
 	error: string;
 }
@@ -47,6 +46,7 @@ interface DatasetStatusRow {
 	scope: string;
 	scopeId: string;
 	retryAfter: number;
+	attemptCount: number;
 }
 
 const isSkipped = (statuses: DatasetStatusRow[], name: string, scope: string, scopeId: string, nowSeconds: number): boolean =>
@@ -118,6 +118,16 @@ const updateSyncState = async (
 		});
 };
 
+const getAttemptCount = (
+	statuses: readonly DatasetStatusRow[],
+	name: string,
+	scope: string,
+	scopeId: string,
+): number =>
+	statuses.find(
+		(s) => s.dataset === name && s.scope === scope && s.scopeId === scopeId,
+	)?.attemptCount ?? 0;
+
 const markDatasetStatus = async (
 	db: ReturnType<typeof drizzle>,
 	dataset: string,
@@ -125,15 +135,32 @@ const markDatasetStatus = async (
 	scopeId: string,
 	status: string,
 	lastError: string,
-	retryAfter: number,
+	nowSeconds: number,
+	attemptCount: number,
 ): Promise<void> => {
+	const retryAfter = nowSeconds + computeBackoff(attemptCount);
 	await db
 		.insert(datasetStatus)
-		.values({ dataset, scope, scopeId, status, lastError, retryAfter })
+		.values({ dataset, scope, scopeId, status, lastError, retryAfter, attemptCount })
 		.onConflictDoUpdate({
 			target: [datasetStatus.dataset, datasetStatus.scope, datasetStatus.scopeId],
-			set: { status, lastError, retryAfter },
+			set: { status, lastError, retryAfter, attemptCount },
 		});
+};
+
+const clearDatasetStatus = async (
+	db: ReturnType<typeof drizzle>,
+	dataset: string,
+	scope: string,
+	scopeId: string,
+): Promise<void> => {
+	await db.delete(datasetStatus).where(
+		and(
+			eq(datasetStatus.dataset, dataset),
+			eq(datasetStatus.scope, scope),
+			eq(datasetStatus.scopeId, scopeId),
+		),
+	);
 };
 
 const matchErrorsToAlias = (errors: readonly GraphQLError[], alias: string): GraphQLError[] =>
@@ -141,6 +168,71 @@ const matchErrorsToAlias = (errors: readonly GraphQLError[], alias: string): Gra
 		if (!e.path) return false;
 		return e.path.some((segment) => segment === alias);
 	});
+
+const stripDeniedFieldFromCache = async (
+	db: ReturnType<typeof drizzle>,
+	nodeName: string,
+	scope: string,
+	fieldName: string,
+): Promise<boolean> => {
+	const rows = await db.select().from(schemaCache)
+		.where(and(eq(schemaCache.nodeName, nodeName), eq(schemaCache.scope, scope)))
+		.limit(1);
+
+	const [row] = rows;
+	if (row === undefined) return false;
+
+	const parsed: unknown = JSON.parse(row.schemaJson);
+	if (!isRecord(parsed)) return false;
+
+	const mb: unknown = parsed['metricBlocks'];
+	if (!isRecord(mb)) return false;
+
+	let changed = false;
+	const strip = (block: unknown): string[] => {
+		if (!Array.isArray(block)) return [];
+		const original = block.filter((f): f is string => typeof f === 'string');
+		const filtered = original.filter((f) => f !== fieldName);
+		if (filtered.length !== original.length) changed = true;
+		return filtered;
+	};
+
+	const rawDims: unknown = parsed['dimensionFields'];
+	const dimFields = Array.isArray(rawDims)
+		? rawDims.filter((f): f is string => typeof f === 'string')
+		: [];
+	const newDimFields = dimFields.filter((f) => f !== fieldName);
+	if (newDimFields.length !== dimFields.length) changed = true;
+
+	const newMetricBlocks = {
+		sum: strip(mb['sum']),
+		avg: strip(mb['avg']),
+		max: strip(mb['max']),
+		quantiles: strip(mb['quantiles']),
+	};
+
+	if (!changed) return false;
+
+	const hasMetrics = parsed['hasCount'] === true
+		|| newMetricBlocks.sum.length > 0
+		|| newMetricBlocks.avg.length > 0
+		|| newMetricBlocks.max.length > 0
+		|| newMetricBlocks.quantiles.length > 0;
+
+	if (!hasMetrics) return false;
+
+	const newSchema: IntrospectedFields = {
+		hasCount: parsed['hasCount'] === true,
+		dimensionFields: newDimFields,
+		metricBlocks: newMetricBlocks,
+	};
+
+	await db.update(schemaCache)
+		.set({ schemaJson: JSON.stringify(newSchema) })
+		.where(and(eq(schemaCache.nodeName, nodeName), eq(schemaCache.scope, scope)));
+
+	return true;
+};
 
 const processCollectorResult = async (
 	db: ReturnType<typeof drizzle>,
@@ -151,13 +243,26 @@ const processCollectorResult = async (
 	scopeId: string,
 	nowSeconds: number,
 	fromSeconds: number,
+	statuses: readonly DatasetStatusRow[],
 ): Promise<CollectResult> => {
 	const aliasErrors = matchErrorsToAlias(batchErrors, collector.alias);
 	if (aliasErrors.length > 0) {
 		const errClass = classifyError(aliasErrors[0] ?? { message: '' });
 		if (errClass !== 'unknown') {
 			const errorMsg = aliasErrors.map((e) => e.message).join('; ');
-			await markDatasetStatus(db, collector.name, scope, scopeId, STATUS_LABELS[errClass], errorMsg, nowSeconds + RETRY_SECONDS[errClass]);
+
+			if (errClass === 'permission') {
+				const deniedField = extractDeniedField(errorMsg);
+				if (deniedField !== null) {
+					const stripped = await stripDeniedFieldFromCache(db, collector.nodeName, scope, deniedField);
+					if (stripped) {
+						return { dataset: collector.name, scope, scopeId, status: 'field_stripped', rowCount: 0, error: '' };
+					}
+				}
+			}
+
+			const attempts = getAttemptCount(statuses, collector.name, scope, scopeId) + 1;
+			await markDatasetStatus(db, collector.name, scope, scopeId, STATUS_LABELS[errClass], errorMsg, nowSeconds, attempts);
 			return { dataset: collector.name, scope, scopeId, status: 'error', rowCount: 0, error: errorMsg };
 		}
 	}
@@ -171,6 +276,7 @@ const processCollectorResult = async (
 
 	await insertMetricRows(db, rows);
 	await updateSyncState(db, collector.name, scope, scopeId, nowSeconds);
+	await clearDatasetStatus(db, collector.name, scope, scopeId);
 	return { dataset: collector.name, scope, scopeId, status: 'success', rowCount: rows.length, error: '' };
 };
 
@@ -205,6 +311,7 @@ const processGraphQLBatch = async (
 	fromDate: string,
 	toDate: string,
 	nowSeconds: number,
+	statuses: readonly DatasetStatusRow[],
 ): Promise<CollectResult[]> => {
 	if (collectors.length === 0) return [];
 
@@ -245,29 +352,31 @@ const processGraphQLBatch = async (
 			});
 			const singletonResults = await Promise.all(
 				collectors.map((c) =>
-					processGraphQLBatch(db, env, [c], scope, scopeId, fromTime, toTime, fromDate, toDate, nowSeconds)
+					processGraphQLBatch(db, env, [c], scope, scopeId, fromTime, toTime, fromDate, toDate, nowSeconds, statuses)
 						.then((results) => results[0] ?? fallback(c)),
 				),
 			);
 			return singletonResults;
 		}
 
-		await Promise.all(
-			collectors.map(async (c) => {
+		return Promise.all(
+			collectors.map(async (c): Promise<CollectResult> => {
 				try {
-					await markDatasetStatus(db, c.name, scope, scopeId, STATUS_LABELS[errClass], errorMsg, nowSeconds + RETRY_SECONDS[errClass]);
+					if (errClass === 'permission') {
+						const deniedField = extractDeniedField(errorMsg);
+						if (deniedField !== null) {
+							const stripped = await stripDeniedFieldFromCache(db, c.nodeName, scope, deniedField);
+							if (stripped) {
+								return { dataset: c.name, scope, scopeId, status: 'field_stripped', rowCount: 0, error: '' };
+							}
+						}
+					}
+					const attempts = getAttemptCount(statuses, c.name, scope, scopeId) + 1;
+					await markDatasetStatus(db, c.name, scope, scopeId, STATUS_LABELS[errClass], errorMsg, nowSeconds, attempts);
 				} catch { /* best-effort status update */ }
+				return { dataset: c.name, scope, scopeId, status: 'error', rowCount: 0, error: errorMsg };
 			}),
 		);
-
-		return collectors.map((c) => ({
-			dataset: c.name,
-			scope,
-			scopeId,
-			status: 'error',
-			rowCount: 0,
-			error: errorMsg,
-		}));
 	}
 
 	const scopeNode = scope === 'account' ? 'accounts' : 'zones';
@@ -290,7 +399,7 @@ const processGraphQLBatch = async (
 		collectors.map(async (collector) => {
 			try {
 				const fromSeconds = Math.floor(new Date(fromTime).getTime() / 1000);
-				return await processCollectorResult(db, collector, scopeData, batchErrors, scope, scopeId, nowSeconds, fromSeconds);
+				return await processCollectorResult(db, collector, scopeData, batchErrors, scope, scopeId, nowSeconds, fromSeconds, statuses);
 			} catch (error: unknown) {
 				const errorMsg = error instanceof Error ? error.message : String(error);
 				console.error(JSON.stringify({
@@ -346,12 +455,14 @@ const processOneRESTCollector = async (
 		}
 		await insertMetricRows(db, rows);
 		await updateSyncState(db, collector.name, collector.scope, scopeId, nowSeconds);
+		await clearDatasetStatus(db, collector.name, collector.scope, scopeId);
 		return { dataset: collector.name, scope: collector.scope, scopeId, status: 'success', rowCount: rows.length, error: '' };
 	} catch (error: unknown) {
 		const errorMsg = error instanceof Error ? error.message : String(error);
 		const errClass = classifyError({ message: errorMsg });
 		try {
-			await markDatasetStatus(db, collector.name, collector.scope, scopeId, STATUS_LABELS[errClass], errorMsg, nowSeconds + RETRY_SECONDS[errClass]);
+			const attempts = getAttemptCount(statuses, collector.name, collector.scope, scopeId) + 1;
+			await markDatasetStatus(db, collector.name, collector.scope, scopeId, STATUS_LABELS[errClass], errorMsg, nowSeconds, attempts);
 		} catch { /* best-effort status update */ }
 		console.error(JSON.stringify({
 			level: 'error',
@@ -490,24 +601,26 @@ export const collectMetrics = async (env: BridgeEnv, scheduledTime: number): Pro
 
 	const tasks: Promise<CollectResult[]>[] = [];
 
-	if (activeAccountCollectors.length > 0) {
+	for (let i = 0; i < activeAccountCollectors.length; i += BATCH_CHUNK_SIZE) {
+		const chunk = activeAccountCollectors.slice(i, i + BATCH_CHUNK_SIZE);
 		tasks.push(
 			(async () => {
-				const tv = await buildTimeVars(db, activeAccountCollectors, 'account', env.CF_ACCOUNT_ID, nowSeconds, toTime);
-				return processGraphQLBatch(db, env, activeAccountCollectors, 'account', env.CF_ACCOUNT_ID, tv.fromTime, tv.toTime, tv.fromDate, tv.toDate, nowSeconds);
+				const tv = await buildTimeVars(db, chunk, 'account', env.CF_ACCOUNT_ID, nowSeconds, toTime);
+				return processGraphQLBatch(db, env, chunk, 'account', env.CF_ACCOUNT_ID, tv.fromTime, tv.toTime, tv.fromDate, tv.toDate, nowSeconds, statuses);
 			})(),
 		);
 	}
 
 	for (const zid of zoneIds) {
-		const zoneCollectors = activeZoneCollectors.filter(
+		const perZone = activeZoneCollectors.filter(
 			(c) => !isSkipped(statuses, c.name, 'zone', zid, nowSeconds),
 		);
-		if (zoneCollectors.length > 0) {
+		for (let i = 0; i < perZone.length; i += BATCH_CHUNK_SIZE) {
+			const chunk = perZone.slice(i, i + BATCH_CHUNK_SIZE);
 			tasks.push(
 				(async () => {
-					const tv = await buildTimeVars(db, zoneCollectors, 'zone', zid, nowSeconds, toTime);
-					return processGraphQLBatch(db, env, zoneCollectors, 'zone', zid, tv.fromTime, tv.toTime, tv.fromDate, tv.toDate, nowSeconds);
+					const tv = await buildTimeVars(db, chunk, 'zone', zid, nowSeconds, toTime);
+					return processGraphQLBatch(db, env, chunk, 'zone', zid, tv.fromTime, tv.toTime, tv.fromDate, tv.toDate, nowSeconds, statuses);
 				})(),
 			);
 		}

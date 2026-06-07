@@ -78,6 +78,7 @@ export const datasetStatus = sqliteTable(
 		status: text('status').notNull(),
 		lastError: text('last_error').notNull().default(''),
 		retryAfter: integer('retry_after').notNull().default(0),
+		attemptCount: integer('attempt_count').notNull().default(0),
 	},
 	(table) => [
 		uniqueIndex('dataset_status_pk').on(table.dataset, table.scope, table.scopeId),

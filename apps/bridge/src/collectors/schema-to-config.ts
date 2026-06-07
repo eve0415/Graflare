@@ -3,6 +3,8 @@ import type { IntrospectedFields } from '../cf-graphql/introspection';
 import type { DatasetOverride } from './overrides';
 import type { DatasetConfig } from './registry';
 
+export const MAX_FIELDS = 25;
+
 const TIME_DIM_PRIORITY = [
 	'datetimeMinute',
 	'datetimeFiveMinutes',
@@ -59,23 +61,34 @@ const pickResourceDimension = (
 
 const buildMetrics = (
 	fields: IntrospectedFields,
+	budget: number,
 ): DatasetConfig['metrics'] => {
 	const metrics: { source: 'count' | 'sum' | 'quantiles' | 'avg' | 'max'; field?: string; name?: string }[] = [];
+	let remaining = budget;
 
-	if (fields.hasCount) {
+	if (fields.hasCount && remaining > 0) {
 		metrics.push({ source: 'count', name: 'count' });
+		remaining--;
 	}
 	for (const field of fields.metricBlocks.sum) {
+		if (remaining <= 0) break;
 		metrics.push({ source: 'sum', field });
-	}
-	for (const field of fields.metricBlocks.avg) {
-		metrics.push({ source: 'avg', field });
-	}
-	for (const field of fields.metricBlocks.max) {
-		metrics.push({ source: 'max', field });
+		remaining--;
 	}
 	for (const field of fields.metricBlocks.quantiles) {
+		if (remaining <= 0) break;
 		metrics.push({ source: 'quantiles', field });
+		remaining--;
+	}
+	for (const field of fields.metricBlocks.avg) {
+		if (remaining <= 0) break;
+		metrics.push({ source: 'avg', field });
+		remaining--;
+	}
+	for (const field of fields.metricBlocks.max) {
+		if (remaining <= 0) break;
+		metrics.push({ source: 'max', field });
+		remaining--;
 	}
 
 	return metrics;
@@ -87,20 +100,27 @@ export const schemaToConfig = (
 	fields: IntrospectedFields,
 	override: DatasetOverride | undefined,
 ): DatasetConfig | undefined => {
-	const metrics = buildMetrics(fields);
-	if (metrics.length === 0) return undefined;
-
 	const timeDim = pickTimeDimension(fields.dimensionFields, override);
 	const isDateFilter = timeDim === 'date';
 	const filterField = isDateFilter ? 'date' : (timeDim ?? 'datetime');
 
 	const resourceDim = pickResourceDimension(fields.dimensionFields, timeDim, override);
 
-	const dimKeys = fields.dimensionFields.filter((f) => {
+	const timeDimCost = timeDim === undefined ? 0 : 1;
+	const resourceDimCost = resourceDim === '_all' ? 0 : 1;
+	let remaining = MAX_FIELDS - timeDimCost - resourceDimCost;
+
+	const allDimKeys = fields.dimensionFields.filter((f) => {
 		if (isTimeDimension(f)) return false;
 		if (f === resourceDim && resourceDim !== '_all') return false;
 		return true;
 	});
+
+	const dimKeys = allDimKeys.slice(0, Math.min(remaining, allDimKeys.length));
+	remaining -= dimKeys.length;
+
+	const metrics = buildMetrics(fields, remaining);
+	if (metrics.length === 0) return undefined;
 
 	const orderBy = override?.preferredOrderBy ?? (timeDim === undefined ? 'count_DESC' : `${timeDim}_ASC`);
 

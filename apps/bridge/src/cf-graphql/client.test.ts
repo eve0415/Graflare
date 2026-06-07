@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { classifyError, isPermissionError } from './client';
+import { classifyError, extractDeniedField, isPermissionError } from './client';
 
 describe('classifyError', () => {
 	it('classifies permission-related messages', () => {
@@ -69,5 +69,20 @@ describe('isPermissionError', () => {
 	it('is case-insensitive', () => {
 		expect(isPermissionError({ message: 'PERMISSION DENIED' })).toBe(true);
 		expect(isPermissionError({ message: 'Access Denied' })).toBe(true);
+	});
+});
+
+describe('extractDeniedField', () => {
+	it('extracts field name from CF permission error', () => {
+		expect(extractDeniedField("does not have access to the field 'edgetimetofirstbytems'")).toBe('edgetimetofirstbytems');
+	});
+
+	it('extracts field from longer error messages', () => {
+		expect(extractDeniedField("User does not have access to the field 'someMetric' on this account")).toBe('someMetric');
+	});
+
+	it('returns null for non-matching messages', () => {
+		expect(extractDeniedField('You do not have permission to access this resource')).toBeNull();
+		expect(extractDeniedField('Internal server error')).toBeNull();
 	});
 });
