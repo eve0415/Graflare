@@ -125,17 +125,21 @@ export const alertInstances = sqliteTable(
   table => [uniqueIndex('alert_instances_rule_labels_idx').on(table.ruleId, table.labelsHash)],
 );
 
-export const contactPoints = sqliteTable('contact_points', {
-  id: text('id').primaryKey(),
-  orgId: text('org_id')
-    .notNull()
-    .references(() => organizations.id),
-  name: text('name').notNull(),
-  type: text('type').notNull(),
-  settings: text('settings', { mode: 'json' }).notNull().$type<Record<string, unknown>>(),
-  createdAt: integer('created_at', { mode: 'timestamp_ms' }).notNull(),
-  updatedAt: integer('updated_at', { mode: 'timestamp_ms' }).notNull(),
-});
+export const contactPoints = sqliteTable(
+  'contact_points',
+  {
+    id: text('id').primaryKey(),
+    orgId: text('org_id')
+      .notNull()
+      .references(() => organizations.id),
+    name: text('name').notNull(),
+    type: text('type').notNull(),
+    settings: text('settings', { mode: 'json' }).notNull().$type<Record<string, unknown>>(),
+    createdAt: integer('created_at', { mode: 'timestamp_ms' }).notNull(),
+    updatedAt: integer('updated_at', { mode: 'timestamp_ms' }).notNull(),
+  },
+  table => [uniqueIndex('contact_points_org_name_idx').on(table.orgId, table.name)],
+);
 
 export const notificationPolicies = sqliteTable('notification_policies', {
   id: text('id').primaryKey(),
@@ -173,16 +177,20 @@ export const silences = sqliteTable(
   table => [index('silences_org_ends_idx').on(table.orgId, table.endsAt)],
 );
 
-export const muteTimings = sqliteTable('mute_timings', {
-  id: text('id').primaryKey(),
-  orgId: text('org_id')
-    .notNull()
-    .references(() => organizations.id),
-  name: text('name').notNull(),
-  intervals: text('intervals', { mode: 'json' }).notNull().$type<unknown[]>().default([]),
-  createdAt: integer('created_at', { mode: 'timestamp_ms' }).notNull(),
-  updatedAt: integer('updated_at', { mode: 'timestamp_ms' }).notNull(),
-});
+export const muteTimings = sqliteTable(
+  'mute_timings',
+  {
+    id: text('id').primaryKey(),
+    orgId: text('org_id')
+      .notNull()
+      .references(() => organizations.id),
+    name: text('name').notNull(),
+    intervals: text('intervals', { mode: 'json' }).notNull().$type<unknown[]>().default([]),
+    createdAt: integer('created_at', { mode: 'timestamp_ms' }).notNull(),
+    updatedAt: integer('updated_at', { mode: 'timestamp_ms' }).notNull(),
+  },
+  table => [uniqueIndex('mute_timings_org_name_idx').on(table.orgId, table.name)],
+);
 
 export const annotations = sqliteTable(
   'annotations',
