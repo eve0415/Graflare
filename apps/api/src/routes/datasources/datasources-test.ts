@@ -42,7 +42,16 @@ app.post('/:id/test', sValidator('param', datasourceIdParamSchema, onValidationE
       }
     }
 
-    const res = await fetch(`${ds.url}/api/v1/labels?limit=1`, {
+    const base = new URL(ds.url);
+    base.pathname = base.pathname.replace(/\/$/, '') + '/api/v1/labels';
+    base.searchParams.set('limit', '1');
+    const targetUrl = base.toString();
+
+    if (new URL(targetUrl).origin !== new URL(ds.url).origin) {
+      return c.json({ success: false, error: 'URL origin mismatch', latencyMs: Date.now() - start });
+    }
+
+    const res = await fetch(targetUrl, {
       headers,
       signal: AbortSignal.timeout(ds.queryTimeoutMs),
     });
