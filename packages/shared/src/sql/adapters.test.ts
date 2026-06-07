@@ -2,7 +2,7 @@ import type { PrometheusResponse } from '#schemas/prometheus';
 import type { SqlResponse } from '#schemas/sql';
 import { describe, expect, it } from 'vitest';
 
-import { sqlRowsToSeries, sqlRowsToTable } from './adapters';
+import { sqlRowsToSeries } from './adapters';
 
 const getMatrixResult = (response: PrometheusResponse) => {
 	expect(response.status).toBe('success');
@@ -16,16 +16,6 @@ const getMatrixResult = (response: PrometheusResponse) => {
 	if (!Array.isArray(data.result)) throw new Error('test');
 	return data.result;
 };
-
-describe('sqlRowsToTable', () => {
-	it('returns the response unchanged', () => {
-		const response: SqlResponse = {
-			columns: [{ name: 'ts' }, { name: 'value' }],
-			rows: [[1700000000, 42]],
-		};
-		expect(sqlRowsToTable(response)).toBe(response);
-	});
-});
 
 describe('sqlRowsToSeries', () => {
 	it('pivots rows into matrix result with time column', () => {

@@ -1,8 +1,6 @@
 import type { PrometheusResponse } from '#schemas/prometheus';
 import type { SqlResponse } from '#schemas/sql';
 
-export const sqlRowsToTable = (response: SqlResponse): SqlResponse => response;
-
 export const sqlRowsToSeries = (response: SqlResponse): PrometheusResponse => {
 	if (response.error !== undefined) {
 		return { status: 'error', error: response.error };
