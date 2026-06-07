@@ -724,13 +724,12 @@ export class GraflareAPI extends WorkerEntrypoint<Bindings> {
     if (found !== undefined) {
       try {
         const { parentId: parentFolderId } = found;
-        await this.db
-          .update(folders)
-          .set({ parentId: parentFolderId })
-          .where(and(eq(folders.parentId, id), eq(folders.orgId, orgId)));
-        await this.db.update(dashboards).set({ folderId: parentFolderId }).where(eq(dashboards.folderId, id));
-        await this.db.update(alertRuleGroups).set({ folderId: parentFolderId }).where(eq(alertRuleGroups.folderId, id));
-        await this.db.delete(folders).where(eq(folders.id, id));
+        await this.db.batch([
+          this.db.update(folders).set({ parentId: parentFolderId }).where(and(eq(folders.parentId, id), eq(folders.orgId, orgId))),
+          this.db.update(dashboards).set({ folderId: parentFolderId }).where(and(eq(dashboards.folderId, id), eq(dashboards.orgId, orgId))),
+          this.db.update(alertRuleGroups).set({ folderId: parentFolderId }).where(and(eq(alertRuleGroups.folderId, id), eq(alertRuleGroups.orgId, orgId))),
+          this.db.delete(folders).where(and(eq(folders.id, id), eq(folders.orgId, orgId))),
+        ]);
       } catch (error) {
         console.error('deleteFolder failed:', error);
         throw new Error('Failed to delete folder', { cause: error });
