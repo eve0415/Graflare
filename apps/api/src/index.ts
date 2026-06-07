@@ -494,7 +494,10 @@ export class GraflareAPI extends WorkerEntrypoint<Bindings> {
       const nameIdx = result.columns.findIndex((c) => c.name === 'name');
       const schemaIdx = result.columns.findIndex((c) => c.name === 'schema');
 
-      const tables = result.rows.map((row) => ((((Object.assign({ name: String(row[nameIdx] ?? '') }, schemaIdx >= 0 && row[schemaIdx] !== null && { schema: String(row[schemaIdx]) }))))));
+      const tables = result.rows.map((row) => ({
+        name: String(row[nameIdx] ?? ''),
+        ...(schemaIdx !== -1 && row[schemaIdx] !== null ? { schema: String(row[schemaIdx]) } : {}),
+      }));
 
       return { tables };
     } catch (error) {
@@ -568,7 +571,10 @@ export class GraflareAPI extends WorkerEntrypoint<Bindings> {
 
       const nameIdx = tablesResult.columns.findIndex((c) => c.name === 'name');
       const schemaIdx = tablesResult.columns.findIndex((c) => c.name === 'schema');
-      const tableList = tablesResult.rows.map((row) => (Object.assign({ name: String(row[nameIdx] ?? '') }, schemaIdx >= 0 && row[schemaIdx] !== null && { schema: String(row[schemaIdx]) })));
+      const tableList = tablesResult.rows.map((row) => ({
+        name: String(row[nameIdx] ?? ''),
+        ...(schemaIdx !== -1 && row[schemaIdx] !== null ? { schema: String(row[schemaIdx]) } : {}),
+      }));
 
       const tables: Record<string, { name: string; type: string; nullable: boolean }[]> = {};
       for (const table of tableList) {
@@ -1362,12 +1368,13 @@ export class GraflareAPI extends WorkerEntrypoint<Bindings> {
     return rows.map(r => {
       const { settings } = r;
       if (typeof settings === 'object' && settings?.['type'] === 'webhook' && typeof settings['password'] === 'string' && settings['password'].length > 0) {
-        return Object.assign(r, {
+        return {
+          ...r,
           settings: {
             ...settings,
             password: '******',
           },
-        });
+        };
       }
       return r;
     });

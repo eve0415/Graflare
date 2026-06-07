@@ -165,7 +165,6 @@ export default defineConfig({
     'oxc/no-accumulating-spread': 'error',
     'oxc/no-barrel-file': 'error',
     'oxc/no-const-enum': 'error',
-    'oxc/no-map-spread': 'error',
 
     // --- TypeScript ---
     'typescript/array-type': 'error',
