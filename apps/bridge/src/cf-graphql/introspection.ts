@@ -57,10 +57,10 @@ export const discoverScopeDatasets = async (
 	const response = await cfGraphQL<Record<string, unknown>>(token, query, {});
 	if (response.data === null) return [];
 
-	const typeData: unknown = response.data['__type'];
+	const { __type: typeData } = response.data;
 	if (!isRecord(typeData)) return [];
 
-	const fields: unknown = typeData['fields'];
+	const { fields } = typeData;
 	if (!Array.isArray(fields)) return [];
 
 	const datasets: DatasetNode[] = [];
@@ -68,13 +68,13 @@ export const discoverScopeDatasets = async (
 		if (!isRecord(field)) continue;
 		if (!isDatasetField(field)) continue;
 
-		const name = field['name'];
+		const { name } = field;
 		if (typeof name !== 'string') continue;
 
 		const typeName = unwrapType(field['type']);
 		if (typeName === undefined) continue;
 
-		const args: unknown = field['args'];
+		const { args } = field;
 		const hasFilterArg = Array.isArray(args)
 			&& args.some((a: unknown) => isRecord(a) && a['name'] === 'filter');
 
@@ -87,7 +87,7 @@ export const discoverScopeDatasets = async (
 const extractFieldNames = (data: Record<string, unknown>, key: string): string[] => {
 	const block: unknown = data[key];
 	if (!isRecord(block)) return [];
-	const fields: unknown = block['fields'];
+	const { fields } = block;
 	if (!Array.isArray(fields)) return [];
 	return fields
 		.filter((f: unknown): f is Record<string, unknown> => isRecord(f) && typeof f['name'] === 'string')

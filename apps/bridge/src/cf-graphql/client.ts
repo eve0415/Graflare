@@ -136,5 +136,9 @@ export const cfGraphQL = async <T>(
 		}));
 	}
 
-	return { data: json.data, errors } satisfies GraphQLResponse<T>;
+	const result: GraphQLResponse<T> = { data: json.data };
+	if (errors !== undefined) {
+		result.errors = errors;
+	}
+	return result;
 };

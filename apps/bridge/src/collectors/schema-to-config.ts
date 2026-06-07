@@ -52,16 +52,15 @@ const pickResourceDimension = (
 	override: DatasetOverride | undefined,
 ): string => {
 	if (override?.resourceDimension !== undefined) return override.resourceDimension;
-	const candidates = dimensionFields.filter(
+	return dimensionFields.find(
 		(f) => !isTimeDimension(f) && isResourceLike(f) && f !== timeDim,
-	);
-	return candidates[0] ?? '_all';
+	) ?? '_all';
 };
 
 const buildMetrics = (
 	fields: IntrospectedFields,
 ): DatasetConfig['metrics'] => {
-	const metrics: Array<{ source: 'count' | 'sum' | 'quantiles' | 'avg' | 'max'; field?: string; name?: string }> = [];
+	const metrics: { source: 'count' | 'sum' | 'quantiles' | 'avg' | 'max'; field?: string; name?: string }[] = [];
 
 	if (fields.hasCount) {
 		metrics.push({ source: 'count', name: 'count' });
@@ -103,7 +102,7 @@ export const schemaToConfig = (
 		return true;
 	});
 
-	const orderBy = override?.preferredOrderBy ?? (timeDim !== undefined ? `${timeDim}_ASC` : 'count_DESC');
+	const orderBy = override?.preferredOrderBy ?? (timeDim === undefined ? 'count_DESC' : `${timeDim}_ASC`);
 
 	return {
 		nodeName,

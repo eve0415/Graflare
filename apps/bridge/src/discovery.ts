@@ -2,27 +2,33 @@ import { sql } from 'drizzle-orm';
 import type { drizzle } from 'drizzle-orm/d1';
 
 import { cfGraphQL } from './cf-graphql/client';
+import { discoverScopeDatasets, introspectDatasetFields } from './cf-graphql/introspection';
+import type { IntrospectedFields } from './cf-graphql/introspection';
+import { OVERRIDES } from './collectors/overrides';
 import type { DatasetConfig } from './collectors/registry';
-import { discoveryCache } from './db/schema';
+import { schemaToConfig } from './collectors/schema-to-config';
+import { discoveryCache, schemaCache } from './db/schema';
 import { parseZoneIds } from './env';
 import type { BridgeEnv } from './env';
 import { isRecord } from './lib/typed-access';
 
-const DISCOVERY_REFRESH_SECONDS = 24 * 3600;
+const SETTINGS_REFRESH_SECONDS = 24 * 3600;
+const SCHEMA_REFRESH_SECONDS = 7 * 24 * 3600;
+
+// --- Settings-based availability discovery ---
 
 export const buildDiscoveryQuery = (
-	registry: readonly DatasetConfig[],
+	nodeNames: readonly string[],
 	scope: 'account' | 'zone',
 ): string => {
-	const filtered = registry.filter((c) => c.scope === scope);
-	if (filtered.length === 0) return '';
+	if (nodeNames.length === 0) return '';
 
 	const scopeIdVar = scope === 'account' ? '$accountId' : '$zoneId';
 	const filterKey = scope === 'account' ? 'accountTag' : 'zoneTag';
 	const scopeNode = scope === 'account' ? 'accounts' : 'zones';
 
-	const datasetFields = filtered.map((c) =>
-		`${c.nodeName} { enabled maxPageSize notOlderThan }`,
+	const datasetFields = nodeNames.map((n) =>
+		`${n} { enabled maxPageSize notOlderThan }`,
 	);
 
 	return `query Discovery(${scopeIdVar}: String!) {
@@ -51,7 +57,7 @@ const isSettingsData = (v: unknown): v is SettingsData =>
 	&& 'notOlderThan' in v
 	&& typeof v.notOlderThan === 'number';
 
-const upsertConflictSet = {
+const upsertDiscoveryConflictSet = {
 	isAvailable: sql`excluded.is_available`,
 	maxPageSize: sql`excluded.max_page_size`,
 	notOlderThan: sql`excluded.not_older_than`,
@@ -72,20 +78,20 @@ const upsertDiscoveryEntry = (
 		.values({ nodeName, scope, isAvailable, maxPageSize, notOlderThan, lastCheckedAt })
 		.onConflictDoUpdate({
 			target: [discoveryCache.nodeName, discoveryCache.scope],
-			set: upsertConflictSet,
+			set: upsertDiscoveryConflictSet,
 		});
 
-const processDiscoveryScope = async (
+const processSettingsScope = async (
 	db: ReturnType<typeof drizzle>,
 	env: BridgeEnv,
-	registry: readonly DatasetConfig[],
+	nodeNames: readonly string[],
 	scope: 'account' | 'zone',
 	nowSeconds: number,
 ): Promise<void> => {
-	const scopedConfigs = registry.filter((c) => c.scope === scope);
-	if (scopedConfigs.length === 0) return;
+	const filtered = nodeNames.filter((n) => n.length > 0);
+	if (filtered.length === 0) return;
 
-	const query = buildDiscoveryQuery(registry, scope);
+	const query = buildDiscoveryQuery(filtered, scope);
 	if (query === '') return;
 
 	const scopeIds = scope === 'account'
@@ -117,21 +123,21 @@ const processDiscoveryScope = async (
 		const [first] = narrowed;
 		if (!isRecord(first)) continue;
 
-		const {settings} = first;
+		const { settings } = first;
 		if (!isRecord(settings)) continue;
 
-		for (const config of scopedConfigs) {
-			const settingsData: unknown = settings[config.nodeName];
+		for (const nodeName of filtered) {
+			const settingsData: unknown = settings[nodeName];
 
 			if (isSettingsData(settingsData)) {
 				upserts.push(upsertDiscoveryEntry(
-					db, config.nodeName, scope,
+					db, nodeName, scope,
 					settingsData.enabled, settingsData.maxPageSize, settingsData.notOlderThan,
 					nowSeconds,
 				));
 			} else {
 				upserts.push(upsertDiscoveryEntry(
-					db, config.nodeName, scope,
+					db, nodeName, scope,
 					false, 0, 0, nowSeconds,
 				));
 			}
@@ -141,26 +147,86 @@ const processDiscoveryScope = async (
 	await Promise.all(upserts);
 };
 
+// --- Schema introspection ---
+
+const upsertSchemaConflictSet = {
+	typeName: sql`excluded.type_name`,
+	schemaJson: sql`excluded.schema_json`,
+	lastCheckedAt: sql`excluded.last_checked_at`,
+};
+
+const introspectScope = async (
+	token: string,
+	scope: 'account' | 'zone',
+): Promise<{ nodeName: string; scope: 'account' | 'zone'; typeName: string; fields: IntrospectedFields }[]> => {
+	const datasets = await discoverScopeDatasets(token, scope);
+	const filterable = datasets.filter((d) => d.hasFilterArg);
+
+	const fieldResults = await Promise.all(
+		filterable.map((d) => introspectDatasetFields(token, d.typeName).then((fields) => ({ ...d, scope, fields }))),
+	);
+
+	return fieldResults.filter((r) => r.fields.dimensionFields.length > 0 || r.fields.hasCount);
+};
+
+export const runSchemaDiscovery = async (
+	db: ReturnType<typeof drizzle>,
+	token: string,
+): Promise<void> => {
+	const nowSeconds = Math.floor(Date.now() / 1000);
+
+	const [accountResults, zoneResults] = await Promise.all([
+		introspectScope(token, 'account'),
+		introspectScope(token, 'zone'),
+	]);
+
+	const allResults = [...accountResults, ...zoneResults];
+
+	await Promise.all(
+		allResults.map((r) =>
+			db
+				.insert(schemaCache)
+				.values({
+					nodeName: r.nodeName,
+					scope: r.scope,
+					typeName: r.typeName,
+					schemaJson: JSON.stringify(r.fields),
+					lastCheckedAt: nowSeconds,
+				})
+				.onConflictDoUpdate({
+					target: [schemaCache.nodeName, schemaCache.scope],
+					set: upsertSchemaConflictSet,
+				}),
+		),
+	);
+};
+
+// --- Combined discovery ---
+
 export const runDiscovery = async (
 	db: ReturnType<typeof drizzle>,
 	env: BridgeEnv,
-	registry: readonly DatasetConfig[],
+	configs: readonly DatasetConfig[],
 ): Promise<void> => {
 	const nowSeconds = Math.floor(Date.now() / 1000);
+
+	const accountNodes = configs.filter((c) => c.scope === 'account').map((c) => c.nodeName);
+	const zoneNodes = configs.filter((c) => c.scope === 'zone').map((c) => c.nodeName);
+
 	await Promise.all([
-		processDiscoveryScope(db, env, registry, 'account', nowSeconds),
-		processDiscoveryScope(db, env, registry, 'zone', nowSeconds),
+		processSettingsScope(db, env, accountNodes, 'account', nowSeconds),
+		processSettingsScope(db, env, zoneNodes, 'zone', nowSeconds),
 	]);
 };
 
 export const getEnabledDatasets = async (
 	db: ReturnType<typeof drizzle>,
-	registry: readonly DatasetConfig[],
+	configs: readonly DatasetConfig[],
 ): Promise<DatasetConfig[]> => {
 	const cached = await db.select().from(discoveryCache);
 
 	if (cached.length === 0) {
-		return [...registry];
+		return [...configs];
 	}
 
 	const available = new Set(
@@ -169,14 +235,49 @@ export const getEnabledDatasets = async (
 			.map((c) => `${c.nodeName}:${c.scope}`),
 	);
 
-	return registry.filter((config) => {
+	return configs.filter((config) => {
 		const entry = cached.find((c) => c.nodeName === config.nodeName && c.scope === config.scope);
 		if (entry === undefined) return true;
 		return available.has(`${config.nodeName}:${config.scope}`);
 	});
 };
 
-export const shouldRunDiscovery = async (
+const toStringArray = (v: unknown): string[] =>
+	Array.isArray(v) ? v.filter((f): f is string => typeof f === 'string') : [];
+
+export const getIntrospectedConfigs = async (
+	db: ReturnType<typeof drizzle>,
+): Promise<DatasetConfig[]> => {
+	const rows = await db.select().from(schemaCache);
+	if (rows.length === 0) return [];
+
+	const configs: DatasetConfig[] = [];
+	for (const row of rows) {
+		const parsed: unknown = JSON.parse(row.schemaJson);
+		if (!isRecord(parsed)) continue;
+		const mb: unknown = parsed['metricBlocks'];
+		const metricBlocks = isRecord(mb) ? mb : {};
+		const fields: IntrospectedFields = {
+			hasCount: parsed['hasCount'] === true,
+			dimensionFields: toStringArray(parsed['dimensionFields']),
+			metricBlocks: {
+				sum: toStringArray(metricBlocks['sum']),
+				avg: toStringArray(metricBlocks['avg']),
+				max: toStringArray(metricBlocks['max']),
+				quantiles: toStringArray(metricBlocks['quantiles']),
+			},
+		};
+		const override = OVERRIDES[row.nodeName];
+		const scope = row.scope === 'zone' ? 'zone' : 'account';
+		const config = schemaToConfig(row.nodeName, scope, fields, override);
+		if (config !== undefined) {
+			configs.push(config);
+		}
+	}
+	return configs;
+};
+
+export const shouldRunSettingsDiscovery = async (
 	db: ReturnType<typeof drizzle>,
 	nowSeconds: number,
 ): Promise<boolean> => {
@@ -190,5 +291,22 @@ export const shouldRunDiscovery = async (
 	const [latest] = rows;
 	if (latest === undefined) return true;
 
-	return (nowSeconds - latest.lastCheckedAt) > DISCOVERY_REFRESH_SECONDS;
+	return (nowSeconds - latest.lastCheckedAt) > SETTINGS_REFRESH_SECONDS;
+};
+
+export const shouldRunSchemaDiscovery = async (
+	db: ReturnType<typeof drizzle>,
+	nowSeconds: number,
+): Promise<boolean> => {
+	const rows = await db
+		.select({ lastCheckedAt: schemaCache.lastCheckedAt })
+		.from(schemaCache)
+		.limit(1);
+
+	if (rows.length === 0) return true;
+
+	const [latest] = rows;
+	if (latest === undefined) return true;
+
+	return (nowSeconds - latest.lastCheckedAt) > SCHEMA_REFRESH_SECONDS;
 };

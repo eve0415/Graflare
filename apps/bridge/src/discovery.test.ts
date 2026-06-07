@@ -4,7 +4,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { REGISTRY } from './collectors/registry';
 import { discoveryCache } from './db/schema';
-import { buildDiscoveryQuery, getEnabledDatasets, runDiscovery, shouldRunDiscovery } from './discovery';
+import { buildDiscoveryQuery, getEnabledDatasets, runDiscovery, shouldRunSettingsDiscovery } from './discovery';
 import type { BridgeEnv } from './env';
 
 const db = drizzle(env.DB);
@@ -64,7 +64,8 @@ afterEach(async () => {
 
 describe('buildDiscoveryQuery', () => {
 	it('builds account-scoped query with settings wrapper', () => {
-		const query = buildDiscoveryQuery(REGISTRY, 'account');
+		const nodeNames = REGISTRY.filter((c) => c.scope === 'account').map((c) => c.nodeName);
+		const query = buildDiscoveryQuery(nodeNames, 'account');
 		expect(query).toContain('query Discovery($accountId: String!)');
 		expect(query).toContain('accounts(filter: { accountTag: $accountId })');
 		expect(query).toContain('settings {');
@@ -72,7 +73,8 @@ describe('buildDiscoveryQuery', () => {
 	});
 
 	it('builds zone-scoped query with settings wrapper', () => {
-		const query = buildDiscoveryQuery(REGISTRY, 'zone');
+		const nodeNames = REGISTRY.filter((c) => c.scope === 'zone').map((c) => c.nodeName);
+		const query = buildDiscoveryQuery(nodeNames, 'zone');
 		expect(query).toContain('query Discovery($zoneId: String!)');
 		expect(query).toContain('zones(filter: { zoneTag: $zoneId })');
 		expect(query).toContain('settings {');
@@ -84,9 +86,9 @@ describe('buildDiscoveryQuery', () => {
 	});
 });
 
-describe('shouldRunDiscovery', () => {
+describe('shouldRunSettingsDiscovery', () => {
 	it('returns true when cache is empty', async () => {
-		expect(await shouldRunDiscovery(db, 1000000)).toBe(true);
+		expect(await shouldRunSettingsDiscovery(db, 1000000)).toBe(true);
 	});
 
 	it('returns false when cache is fresh', async () => {
@@ -99,7 +101,7 @@ describe('shouldRunDiscovery', () => {
 			notOlderThan: 0,
 			lastCheckedAt: now - 3600,
 		});
-		expect(await shouldRunDiscovery(db, now)).toBe(false);
+		expect(await shouldRunSettingsDiscovery(db, now)).toBe(false);
 	});
 
 	it('returns true when cache is stale', async () => {
@@ -112,7 +114,7 @@ describe('shouldRunDiscovery', () => {
 			notOlderThan: 0,
 			lastCheckedAt: now - 100000,
 		});
-		expect(await shouldRunDiscovery(db, now)).toBe(true);
+		expect(await shouldRunSettingsDiscovery(db, now)).toBe(true);
 	});
 });
 

@@ -4,10 +4,11 @@ import { drizzle } from 'drizzle-orm/d1';
 import { cfGraphQL, classifyError } from './cf-graphql/client';
 import type { ErrorClass, GraphQLError, GraphQLResponse } from './cf-graphql/client';
 import { buildBatchedQuery } from './cf-graphql/query-builder';
-import { REGISTRY, REST_COLLECTORS, toCollector } from './collectors/index';
+import { REST_COLLECTORS, toCollector } from './collectors/index';
+import { REGISTRY } from './collectors/registry';
 import type { GraphQLCollector, MetricRow, RESTCollector } from './collectors/types';
 import { datasetStatus, metrics, syncState } from './db/schema';
-import { getEnabledDatasets, runDiscovery, shouldRunDiscovery } from './discovery';
+import { getEnabledDatasets, getIntrospectedConfigs, runDiscovery, runSchemaDiscovery, shouldRunSchemaDiscovery, shouldRunSettingsDiscovery } from './discovery';
 import { parseZoneIds } from './env';
 import type { BridgeEnv } from './env';
 import { isRecord } from './lib/typed-access';
@@ -186,7 +187,8 @@ const extractScopeData = (
 	const scopeArray: unknown = viewer[scopeNode];
 	if (!Array.isArray(scopeArray) || scopeArray.length === 0) return null;
 
-	const [first] = scopeArray;
+	const narrowed: unknown[] = scopeArray;
+	const [first] = narrowed;
 	if (!isRecord(first)) return null;
 
 	return first;
@@ -443,19 +445,35 @@ export const collectMetrics = async (env: BridgeEnv, scheduledTime: number): Pro
 		}
 	}
 
-	if (await shouldRunDiscovery(db, nowSeconds)) {
+	if (await shouldRunSchemaDiscovery(db, nowSeconds)) {
 		try {
-			await runDiscovery(db, env, REGISTRY);
+			await runSchemaDiscovery(db, env.CF_API_TOKEN);
+			console.log(JSON.stringify({ level: 'info', event: 'schema_discovery_complete' }));
 		} catch (error: unknown) {
 			console.error(JSON.stringify({
 				level: 'warn',
-				event: 'discovery_failed',
+				event: 'schema_discovery_failed',
 				error: error instanceof Error ? error.message : String(error),
 			}));
 		}
 	}
 
-	const enabledDatasets = await getEnabledDatasets(db, REGISTRY);
+	const introspectedConfigs = await getIntrospectedConfigs(db);
+	const allConfigs = introspectedConfigs.length > 0 ? introspectedConfigs : REGISTRY;
+
+	if (await shouldRunSettingsDiscovery(db, nowSeconds)) {
+		try {
+			await runDiscovery(db, env, allConfigs);
+		} catch (error: unknown) {
+			console.error(JSON.stringify({
+				level: 'warn',
+				event: 'settings_discovery_failed',
+				error: error instanceof Error ? error.message : String(error),
+			}));
+		}
+	}
+
+	const enabledDatasets = await getEnabledDatasets(db, allConfigs);
 	const accountCollectors = enabledDatasets.filter((c) => c.scope === 'account').map((c) => toCollector(c));
 	const zoneCollectors = enabledDatasets.filter((c) => c.scope === 'zone').map((c) => toCollector(c));
 

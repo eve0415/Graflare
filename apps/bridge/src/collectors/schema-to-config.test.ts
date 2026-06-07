@@ -98,7 +98,7 @@ describe('schemaToConfig', () => {
 			metricBlocks: { sum: [], avg: [], max: [], quantiles: [] },
 		};
 
-		expect(schemaToConfig('emptyDataset', 'account', fields, undefined)).toBeUndefined();
+		expect(schemaToConfig('emptyDataset', 'account', fields, OVERRIDES['nonexistent'])).toBeUndefined();
 	});
 
 	it('handles unknown dataset with reasonable defaults', () => {
@@ -113,7 +113,7 @@ describe('schemaToConfig', () => {
 			},
 		};
 
-		const config = schemaToConfig('newFutureDatasetAdaptiveGroups', 'account', fields, undefined);
+		const config = schemaToConfig('newFutureDatasetAdaptiveGroups', 'account', fields, OVERRIDES['nonexistent']);
 		expect(config?.datasetName).toBe('new-future-dataset');
 		expect(config?.resourceDimension).toBe('_all');
 		expect(config?.dimKeys).toContain('someField');
