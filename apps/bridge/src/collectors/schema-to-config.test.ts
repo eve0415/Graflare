@@ -171,6 +171,20 @@ describe('schemaToConfig', () => {
 		expect(sources.lastIndexOf('avg')).toBeLessThan(sources.indexOf('max'));
 	});
 
+	it('prioritizes metrics over dimKeys when dimensions are huge', () => {
+		const extraDims = Array.from({ length: 90 }, (_, i) => `dim${String(i)}`);
+		const fields: IntrospectedFields = {
+			hasCount: true,
+			dimensionFields: ['datetimeMinute', 'scriptName', ...extraDims],
+			metricBlocks: { sum: ['requests', 'bytes'], avg: ['latency'], max: [], quantiles: ['cpuP50'] },
+		};
+
+		const config = schemaToConfig('hugeDimsAdaptive', 'account', fields, OVERRIDES['workersInvocationsAdaptive']);
+		expect(config).toBeDefined();
+		expect(config?.metrics.length).toBeGreaterThan(0);
+		expect(countConfigFields(config)).toBeLessThanOrEqual(MAX_FIELDS);
+	});
+
 	it('does not truncate curated registry configs', () => {
 		for (const registryConfig of REGISTRY) {
 			expect(countConfigFields(registryConfig)).toBeLessThanOrEqual(MAX_FIELDS);

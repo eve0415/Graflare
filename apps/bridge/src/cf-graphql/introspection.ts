@@ -86,13 +86,24 @@ export const discoverScopeDatasets = async (
 	return datasets;
 };
 
-const extractFieldNames = (data: Record<string, unknown>, key: string): string[] => {
+const isObjectType = (type: unknown): boolean => {
+	if (!isRecord(type)) return false;
+	if (type['kind'] === 'OBJECT') return true;
+	if ('ofType' in type) return isObjectType(type['ofType']);
+	return false;
+};
+
+const extractFieldNames = (data: Record<string, unknown>, key: string, excludeObjects = false): string[] => {
 	const block: unknown = data[key];
 	if (!isRecord(block)) return [];
 	const { fields } = block;
 	if (!Array.isArray(fields)) return [];
 	return fields
-		.filter((f: unknown): f is Record<string, unknown> => isRecord(f) && typeof f['name'] === 'string')
+		.filter((f: unknown): f is Record<string, unknown> => {
+			if (!isRecord(f) || typeof f['name'] !== 'string') return false;
+			if (excludeObjects && isObjectType(f['type'])) return false;
+			return true;
+		})
 		.map((f) => String(f['name']));
 };
 
@@ -110,7 +121,7 @@ export const introspectDatasetFields = async (
 
 	const blocks = ['Dimensions', 'Sum', 'Avg', 'Max', 'Quantiles'];
 	const aliases = blocks
-		.map((b) => `${b.toLowerCase()}: __type(name: "${typeName}${b}") { fields { name } }`)
+		.map((b) => `${b.toLowerCase()}: __type(name: "${typeName}${b}") { fields { name type { name kind ofType { name kind } } } }`)
 		.join(' ');
 
 	const query = `{ root: __type(name: "${typeName}") { fields { name type { name kind } } } ${aliases} }`;
@@ -126,10 +137,10 @@ export const introspectDatasetFields = async (
 		hasCount,
 		dimensionFields: extractFieldNames(response.data, 'dimensions'),
 		metricBlocks: {
-			sum: extractFieldNames(response.data, 'sum'),
-			avg: extractFieldNames(response.data, 'avg'),
-			max: extractFieldNames(response.data, 'max'),
-			quantiles: extractFieldNames(response.data, 'quantiles'),
+			sum: extractFieldNames(response.data, 'sum', true),
+			avg: extractFieldNames(response.data, 'avg', true),
+			max: extractFieldNames(response.data, 'max', true),
+			quantiles: extractFieldNames(response.data, 'quantiles', true),
 		},
 	};
 };

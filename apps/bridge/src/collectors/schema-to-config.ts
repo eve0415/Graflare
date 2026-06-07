@@ -116,11 +116,11 @@ export const schemaToConfig = (
 		return true;
 	});
 
-	const dimKeys = allDimKeys.slice(0, Math.min(remaining, allDimKeys.length));
-	remaining -= dimKeys.length;
-
 	const metrics = buildMetrics(fields, remaining);
 	if (metrics.length === 0) return undefined;
+	remaining -= metrics.length;
+
+	const dimKeys = allDimKeys.slice(0, Math.min(remaining, allDimKeys.length));
 
 	const orderBy = override?.preferredOrderBy ?? (timeDim === undefined ? 'count_DESC' : `${timeDim}_ASC`);
 
