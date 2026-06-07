@@ -26,9 +26,15 @@ export const decryptCredentials = async (encrypted: string, keyBase64: string): 
   return new TextDecoder().decode(decrypted);
 };
 
+const keyCache = new Map<string, CryptoKey>();
+
 const importKey = async (keyBase64: string): Promise<CryptoKey> => {
+  const cached = keyCache.get(keyBase64);
+  if (cached !== undefined) return cached;
   const raw = Uint8Array.from(atob(keyBase64), c => c.codePointAt(0) ?? 0);
-  return crypto.subtle.importKey('raw', raw, { name: 'AES-GCM' }, false, ['encrypt', 'decrypt']);
+  const key = await crypto.subtle.importKey('raw', raw, { name: 'AES-GCM' }, false, ['encrypt', 'decrypt']);
+  keyCache.set(keyBase64, key);
+  return key;
 };
 
 export const generateEncryptionKey = (): Promise<string> => {
