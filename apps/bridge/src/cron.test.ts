@@ -1,10 +1,13 @@
 import type { BridgeEnv } from './env';
 
 import { env } from 'cloudflare:workers';
+import { and, eq } from 'drizzle-orm';
+import { drizzle } from 'drizzle-orm/d1';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { REGISTRY } from './collectors/registry';
-import { BATCH_CHUNK_SIZE, collectMetrics, computeBackoff } from './cron';
+import { BATCH_CHUNK_SIZE, collectMetrics, computeBackoff, updateSyncState } from './cron';
+import { syncState } from './db/schema';
 
 const testEnv: BridgeEnv = {
   DB: env.DB,
@@ -472,5 +475,43 @@ describe('batch chunk size', () => {
     const zoneConfigs = REGISTRY.filter(c => c.scope === 'zone');
     expect(accountConfigs.length).toBeLessThanOrEqual(BATCH_CHUNK_SIZE * 3);
     expect(zoneConfigs.length).toBeLessThanOrEqual(BATCH_CHUNK_SIZE * 3);
+  });
+});
+
+describe('updateSyncState (Drizzle upsert)', () => {
+  const DATASET = 'sync-persist-test';
+  const SCOPE = 'account';
+  const SCOPE_ID = 'acct-persist';
+
+  const readRow = async (db: ReturnType<typeof drizzle>) =>
+    db
+      .select()
+      .from(syncState)
+      .where(and(eq(syncState.dataset, DATASET), eq(syncState.scope, SCOPE), eq(syncState.scopeId, SCOPE_ID)));
+
+  afterEach(async () => {
+    await env.DB.prepare('DELETE FROM sync_state WHERE dataset = ?').bind(DATASET).run();
+  });
+
+  it('inserts a new sync_state row when none exists', async () => {
+    const db = drizzle(env.DB);
+
+    await updateSyncState(db, DATASET, SCOPE, SCOPE_ID, 1000);
+
+    const rows = await readRow(db);
+    expect(rows).toHaveLength(1);
+    expect(rows[0]?.lastSyncAt).toBe(1000);
+  });
+
+  it('persists the updated last_sync_at on conflict', async () => {
+    const db = drizzle(env.DB);
+
+    await env.DB.prepare('INSERT INTO sync_state (dataset, scope, scope_id, last_sync_at) VALUES (?, ?, ?, ?)').bind(DATASET, SCOPE, SCOPE_ID, 1000).run();
+
+    await updateSyncState(db, DATASET, SCOPE, SCOPE_ID, 2000);
+
+    const rows = await readRow(db);
+    expect(rows).toHaveLength(1);
+    expect(rows[0]?.lastSyncAt).toBe(2000);
   });
 });
