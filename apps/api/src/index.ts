@@ -52,6 +52,7 @@ import { WorkerEntrypoint } from 'cloudflare:workers';
 import { and, desc, eq, gte, like, lte, sql } from 'drizzle-orm';
 import { Hono } from 'hono';
 
+import { encryptSecret, redactSecret, resolveSecretOnUpdate } from './alerting/contact-point-secrets';
 import { decryptCredentials, encryptCredentials } from './crypto/credentials';
 import { createDb } from './db';
 import {
@@ -1401,19 +1402,7 @@ export class GraflareAPI extends WorkerEntrypoint<Bindings> {
   async listContactPoints(jwt: string) {
     const { orgId } = await this.resolveAuth(jwt);
     const rows = await this.db.select().from(contactPoints).where(eq(contactPoints.orgId, orgId));
-    return rows.map(r => {
-      const { settings } = r;
-      if (typeof settings === 'object' && settings?.['type'] === 'webhook' && typeof settings['password'] === 'string' && settings['password'].length > 0) {
-        return {
-          ...r,
-          settings: {
-            ...settings,
-            password: '******',
-          },
-        };
-      }
-      return r;
-    });
+    return rows.map(r => ({ ...r, settings: redactSecret(r.settings) }));
   }
 
   private async getContactPointCore(orgId: string, id: string) {
@@ -1425,11 +1414,7 @@ export class GraflareAPI extends WorkerEntrypoint<Bindings> {
       .limit(1);
     const row = rows[0] ?? null;
     if (row === null) return null;
-    const { settings } = row;
-    if (typeof settings === 'object' && settings?.['type'] === 'webhook' && typeof settings['password'] === 'string' && settings['password'].length > 0) {
-      return { ...row, settings: { ...settings, password: '******' } };
-    }
-    return row;
+    return { ...row, settings: redactSecret(row.settings) };
   }
 
   async getContactPoint(jwt: string, id: string) {
@@ -1444,10 +1429,7 @@ export class GraflareAPI extends WorkerEntrypoint<Bindings> {
     const now = new Date();
 
     try {
-      let { settings } = parsed;
-      if (parsed.settings.type === 'webhook' && parsed.settings.password.length > 0) {
-        settings = { ...parsed.settings, password: await encryptCredentials(parsed.settings.password, this.env.ENCRYPTION_KEY) };
-      }
+      const settings = await encryptSecret(parsed.settings, this.env.ENCRYPTION_KEY);
 
       await this.db.insert(contactPoints).values({
         id,
@@ -1472,17 +1454,21 @@ export class GraflareAPI extends WorkerEntrypoint<Bindings> {
     const parsed = updateContactPointSchema.parse(input);
     const now = new Date();
 
+    const existingRows = await this.db
+      .select()
+      .from(contactPoints)
+      .where(and(eq(contactPoints.id, id), eq(contactPoints.orgId, orgId)))
+      .limit(1);
+    const existingRow = existingRows[0] ?? null;
+    if (existingRow === null) return null;
+
     const setData: Record<string, unknown> = { updatedAt: now };
     if (parsed.name !== undefined) setData['name'] = parsed.name;
     if (parsed.type !== undefined) setData['type'] = parsed.type;
 
     try {
       if (parsed.settings !== undefined) {
-        let { settings } = parsed;
-        if (parsed.settings.type === 'webhook' && parsed.settings.password.length > 0) {
-          settings = { ...parsed.settings, password: await encryptCredentials(parsed.settings.password, this.env.ENCRYPTION_KEY) };
-        }
-        setData['settings'] = settings;
+        setData['settings'] = await resolveSecretOnUpdate(parsed.settings, existingRow.settings, this.env.ENCRYPTION_KEY);
       }
 
       await this.db
