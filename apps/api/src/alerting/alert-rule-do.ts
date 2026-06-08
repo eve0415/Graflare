@@ -1,6 +1,7 @@
 import type { AlertCondition, AlertInstanceState, AlertQuery, ExecErrState, NoDataState } from '@graflare/shared/schemas/alerting';
 
 import { evaluateCondition } from '@graflare/shared/alerting/evaluate';
+import { labelsMapSchema } from '@graflare/shared/schemas/alerting';
 import { DurableObject } from 'cloudflare:workers';
 
 import { createPrometheusClient } from '../prometheus/factory';
@@ -36,7 +37,7 @@ interface AlertRuleConfig {
   annotations: Record<string, string>;
 }
 
-type InstanceRow = {
+interface InstanceRow extends Record<string, SqlStorageValue> {
   labels_hash: string;
   labels: string;
   state: string;
@@ -46,7 +47,7 @@ type InstanceRow = {
   resolved_at: number | null;
   last_eval_at: number;
   last_notified_at: number | null;
-};
+}
 
 interface Env {
   DB: D1Database;
@@ -57,7 +58,7 @@ interface Env {
 export class AlertRuleDO extends DurableObject<Env> {
   constructor(ctx: DurableObjectState, env: Env) {
     super(ctx, env);
-    void this.ctx.blockConcurrencyWhile(async () => {
+    void this.ctx.blockConcurrencyWhile(() => {
       this.ctx.storage.sql.exec(`
         CREATE TABLE IF NOT EXISTS _sql_schema_migrations (
           id INTEGER PRIMARY KEY,
@@ -88,6 +89,7 @@ export class AlertRuleDO extends DurableObject<Env> {
         `);
         this.ctx.storage.sql.exec('INSERT INTO _sql_schema_migrations (id) VALUES (1)');
       }
+      return Promise.resolve();
     });
   }
 
@@ -176,12 +178,13 @@ export class AlertRuleDO extends DurableObject<Env> {
       }
 
       const seenHashes = new Set<string>();
+      const pending: Promise<void>[] = [];
 
       for (const result of results) {
         seenHashes.add(result.labelsHash);
         const existing = this.ctx.storage.sql.exec<InstanceRow>('SELECT * FROM instances WHERE labels_hash = ?', result.labelsHash).toArray();
 
-        const prev = existing.length > 0 ? existing[0] : null;
+        const prev = existing[0] ?? null;
         const prevStateRaw = prev?.state ?? 'Normal';
         const prevState: AlertInstanceState = isAlertInstanceState(prevStateRaw) ? prevStateRaw : 'Normal';
         const newState = this.transitionState(prevState, result.firing, config.forDurationS, now, prev?.pending_since ?? null);
@@ -215,18 +218,10 @@ export class AlertRuleDO extends DurableObject<Env> {
         }
 
         if (prevState !== newState.state) {
-          await this.syncInstanceToD1(
-            config,
-            result.labelsHash,
-            result.labels,
-            newState.state,
-            String(result.value),
-            newState.firedAt ?? prev?.fired_at ?? null,
-            now,
+          const notify = newState.state === 'Firing' || newState.state === 'Resolved';
+          pending.push(
+            this.syncAndNotify(config, result.labelsHash, result.labels, newState.state, String(result.value), newState.firedAt ?? prev?.fired_at ?? null, now, notify),
           );
-          if (newState.state === 'Firing' || newState.state === 'Resolved') {
-            await this.triggerNotification(config);
-          }
         }
       }
 
@@ -239,11 +234,12 @@ export class AlertRuleDO extends DurableObject<Env> {
             now,
             inst.labels_hash,
           );
-          const labels: Record<string, string> = JSON.parse(inst.labels);
-          await this.syncInstanceToD1(config, inst.labels_hash, labels, 'Resolved', String(inst.value ?? 0), inst.fired_at, now);
-          await this.triggerNotification(config);
+          const labels = labelsMapSchema.parse(JSON.parse(inst.labels));
+          pending.push(this.syncAndNotify(config, inst.labels_hash, labels, 'Resolved', String(inst.value ?? 0), inst.fired_at, now, true));
         }
       }
+
+      await Promise.all(pending);
       await this.ctx.storage.setAlarm(now + config.evalIntervalS * 1000);
     } catch {
       await this.handleError(config, now);
@@ -294,18 +290,35 @@ export class AlertRuleDO extends DurableObject<Env> {
     const targetState: AlertInstanceState = config.noDataState === 'Alerting' ? 'Firing' : 'Normal';
     const allInstances = this.ctx.storage.sql.exec<InstanceRow>('SELECT * FROM instances').toArray();
 
+    const pending: Promise<void>[] = [];
     for (const inst of allInstances) {
       if (inst.state !== targetState) {
         this.ctx.storage.sql.exec('UPDATE instances SET state = ?, last_eval_at = ? WHERE labels_hash = ?', targetState, now, inst.labels_hash);
-        const labels: Record<string, string> = JSON.parse(inst.labels);
-        await this.syncInstanceToD1(config, inst.labels_hash, labels, targetState, String(inst.value ?? 0), inst.fired_at, now);
+        const labels = labelsMapSchema.parse(JSON.parse(inst.labels));
+        pending.push(this.syncInstanceToD1(config, inst.labels_hash, labels, targetState, String(inst.value ?? 0), inst.fired_at, now));
       }
     }
+    await Promise.all(pending);
   }
 
   private async handleError(config: AlertRuleConfig, now: number): Promise<void> {
     if (config.execErrState === 'KeepLastState') return;
     await this.handleNoData({ ...config, noDataState: 'Alerting' }, now);
+  }
+
+  /** Sync one instance to D1, then optionally fire its notification — kept sequential per instance, parallel across instances. */
+  private async syncAndNotify(
+    config: AlertRuleConfig,
+    labelsHash: string,
+    labels: Record<string, string>,
+    state: AlertInstanceState,
+    value: string,
+    activeAt: number | null,
+    evalAt: number,
+    notify: boolean,
+  ): Promise<void> {
+    await this.syncInstanceToD1(config, labelsHash, labels, state, value, activeAt, evalAt);
+    if (notify) await this.triggerNotification(config);
   }
 
   private async syncInstanceToD1(
