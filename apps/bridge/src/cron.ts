@@ -401,26 +401,26 @@ const processGraphQLBatch = async (
 	}
 
 	const batchErrors = response.errors ?? [];
+	const fromSeconds = Math.floor(new Date(fromTime).getTime() / 1000);
 
-	return Promise.all(
-		collectors.map(async (collector) => {
-			try {
-				const fromSeconds = Math.floor(new Date(fromTime).getTime() / 1000);
-				return await processCollectorResult(db, collector, scopeData, batchErrors, scope, scopeId, nowSeconds, fromSeconds, statuses);
-			} catch (error: unknown) {
-				const errorMsg = error instanceof Error ? error.message : String(error);
-				console.error(JSON.stringify({
-					level: 'error',
-					event: 'dataset_process_failed',
-					dataset: collector.name,
-					scope,
-					scopeId,
-					error: errorMsg,
-				}));
-				return { dataset: collector.name, scope, scopeId, status: 'error', rowCount: 0, error: errorMsg };
-			}
-		}),
-	);
+	const results: CollectResult[] = [];
+	for (const collector of collectors) {
+		try {
+			results.push(await processCollectorResult(db, collector, scopeData, batchErrors, scope, scopeId, nowSeconds, fromSeconds, statuses));
+		} catch (error: unknown) {
+			const errorMsg = error instanceof Error ? error.message : String(error);
+			console.error(JSON.stringify({
+				level: 'error',
+				event: 'dataset_process_failed',
+				dataset: collector.name,
+				scope,
+				scopeId,
+				error: errorMsg,
+			}));
+			results.push({ dataset: collector.name, scope, scopeId, status: 'error', rowCount: 0, error: errorMsg });
+		}
+	}
+	return results;
 };
 
 const processOneRESTCollector = async (
@@ -517,21 +517,6 @@ const getSyncStateTime = async (
 	return row === undefined ? defaultTime : row.lastSyncAt;
 };
 
-const runSequentialBatches = async (
-	thunks: (() => Promise<CollectResult[]>)[],
-	index = 0,
-	outcomes: CollectResult[] = [],
-): Promise<CollectResult[]> => {
-	const thunk = thunks[index];
-	if (thunk === undefined) return outcomes;
-	try {
-		const results = await thunk();
-		outcomes.push(...results);
-	} catch (error: unknown) {
-		console.error(JSON.stringify({ level: 'error', event: 'batch_failed', error: error instanceof Error ? error.message : String(error) }));
-	}
-	return runSequentialBatches(thunks, index + 1, outcomes);
-};
 
 const buildTimeVars = async (
 	db: ReturnType<typeof drizzle>,
@@ -622,20 +607,16 @@ export const collectMetrics = async (env: BridgeEnv, scheduledTime: number): Pro
 
 	const toTime = new Date(scheduledTime).toISOString();
 
-	const processChunk = async (
-		chunk: readonly GraphQLCollector[],
-		scope: 'account' | 'zone',
-		scopeId: string,
-	): Promise<CollectResult[]> => {
-		const tv = await buildTimeVars(db, chunk, scope, scopeId, nowSeconds, toTime);
-		return processGraphQLBatch(db, env, chunk, scope, scopeId, tv.fromTime, tv.toTime, tv.fromDate, tv.toDate, nowSeconds, statuses);
-	};
-
-	const tasks: (() => Promise<CollectResult[]>)[] = [];
+	const tasks: Promise<CollectResult[]>[] = [];
 
 	for (let i = 0; i < activeAccountCollectors.length; i += BATCH_CHUNK_SIZE) {
 		const chunk = activeAccountCollectors.slice(i, i + BATCH_CHUNK_SIZE);
-		tasks.push(() => processChunk(chunk, 'account', env.CF_ACCOUNT_ID));
+		tasks.push(
+			(async () => {
+				const tv = await buildTimeVars(db, chunk, 'account', env.CF_ACCOUNT_ID, nowSeconds, toTime);
+				return processGraphQLBatch(db, env, chunk, 'account', env.CF_ACCOUNT_ID, tv.fromTime, tv.toTime, tv.fromDate, tv.toDate, nowSeconds, statuses);
+			})(),
+		);
 	}
 
 	for (const zid of zoneIds) {
@@ -644,16 +625,30 @@ export const collectMetrics = async (env: BridgeEnv, scheduledTime: number): Pro
 		);
 		for (let i = 0; i < perZone.length; i += BATCH_CHUNK_SIZE) {
 			const chunk = perZone.slice(i, i + BATCH_CHUNK_SIZE);
-			tasks.push(() => processChunk(chunk, 'zone', zid));
+			tasks.push(
+				(async () => {
+					const tv = await buildTimeVars(db, chunk, 'zone', zid, nowSeconds, toTime);
+					return processGraphQLBatch(db, env, chunk, 'zone', zid, tv.fromTime, tv.toTime, tv.fromDate, tv.toDate, nowSeconds, statuses);
+				})(),
+			);
 		}
 	}
 
 	if (REST_COLLECTORS.length > 0) {
 		const fromTime = new Date((nowSeconds - 86400) * 1000).toISOString();
-		tasks.push(() => processRESTCollectors(db, env, REST_COLLECTORS, fromTime, toTime, nowSeconds, statuses));
+		tasks.push(processRESTCollectors(db, env, REST_COLLECTORS, fromTime, toTime, nowSeconds, statuses));
 	}
 
-	const outcomes = await runSequentialBatches(tasks);
+	const batchResults = await Promise.allSettled(tasks);
+
+	const outcomes: CollectResult[] = [];
+	for (const r of batchResults) {
+		if (r.status === 'fulfilled') {
+			outcomes.push(...r.value);
+		} else {
+			console.error(JSON.stringify({ level: 'error', event: 'batch_failed', error: r.reason instanceof Error ? r.reason.message : String(r.reason) }));
+		}
+	}
 
 	try {
 		const cutoff = nowSeconds - RETENTION_SECONDS;
