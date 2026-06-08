@@ -1,5 +1,5 @@
 const FNV_PRIME = 16777619;
-const FNV_OFFSET = 0x81_1c_9d_c5;
+const FNV_OFFSET = 0x81_1C_9D_C5;
 const UINT32 = 4294967296;
 
 const toUnsigned32 = (n: number): number => (n < 0 ? n + UINT32 : n);
