@@ -20,6 +20,7 @@ import { DashboardViewSkeleton } from '../-components/dashboard-view-skeleton';
 import { PanelEditor } from '../-components/panel-editor';
 import { PanelActionsProvider } from '../-components/panels/panel-actions-context';
 import { VariableBar } from '../-components/variable-bar';
+import { buildEffectiveValues } from '../-components/variable-defaults';
 import { annotationsQueryOptions, dashboardQueryOptions } from '../-queries';
 import { datasourcesQueryOptions } from '../../datasources/-queries';
 
@@ -90,6 +91,18 @@ const DashboardViewPage = () => {
     if (dashboard === null) return [];
     return parseVariables(dashboard.variables);
   }, [dashboard]);
+
+  // The datasource list (already prefetched by the loader) is needed to seed a `datasource`
+  // variable's default; fetched here rather than read from the cache so a direct load resolves it.
+  const { data: datasources } = useQuery(datasourcesQueryOptions());
+
+  // Merge each variable's computed default under any user selection so panels interpolate against
+  // a real value on first render — `variableValues` starts empty, and the grid reads this map
+  // directly (it doesn't fall back to `current` the way the bar's display does).
+  const effectiveValues = useMemo(
+    () => buildEffectiveValues(dashboardVariables, variableValues, datasources ?? []),
+    [dashboardVariables, variableValues, datasources],
+  );
 
   // Resolve the visible window to epoch MS once per range change (not every render,
   // or `now` would drift the query key and refetch constantly). One fetch per
@@ -232,7 +245,7 @@ const DashboardViewPage = () => {
         saving={saving}
       />
 
-      <VariableBar variables={dashboardVariables} values={variableValues} onChange={handleVariableChange} />
+      <VariableBar variables={dashboardVariables} values={effectiveValues} onChange={handleVariableChange} />
 
       <div className='flex-1 p-4'>
         {editMode && (
@@ -257,7 +270,7 @@ const DashboardViewPage = () => {
               refreshInterval={refetchMs}
               editMode={editMode}
               onLayoutChange={handleLayoutChange}
-              variables={variableValues}
+              variables={effectiveValues}
               annotations={dashboardAnnotations}
             />
           </PanelActionsProvider>
