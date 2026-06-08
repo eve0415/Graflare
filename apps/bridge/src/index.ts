@@ -75,9 +75,9 @@ app.post('/sql', async c => {
 
 export default {
   fetch: app.fetch,
-  async scheduled(event: ScheduledEvent, env: BridgeEnv) {
+  async scheduled(controller: ScheduledController, env: BridgeEnv) {
     try {
-      await collectMetrics(env, event.scheduledTime);
+      await collectMetrics(env, controller.scheduledTime);
     } catch (error: unknown) {
       console.error(
         JSON.stringify({
@@ -88,4 +88,4 @@ export default {
       );
     }
   },
-};
+} satisfies ExportedHandler<BridgeEnv>;

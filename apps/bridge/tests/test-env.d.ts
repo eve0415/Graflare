@@ -9,10 +9,5 @@ declare global {
       CF_ACCOUNT_ID: string;
       BRIDGE_DEBUG: string;
     }
-    interface GlobalProps {
-      mainModule: {
-        default: ExportedHandler<Cloudflare.Env>;
-      };
-    }
   }
 }

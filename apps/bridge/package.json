@@ -12,7 +12,7 @@
     "dev": "localflare wrangler.json --no-open",
     "build": "wrangler deploy --dry-run --outdir dist",
     "test": "vitest run",
-    "generate": "drizzle-kit generate",
+    "generate": "wrangler types && drizzle-kit generate",
     "clean": "rm -rf dist .wrangler",
     "deploy": "wrangler deploy"
   },
