@@ -10,7 +10,9 @@ export interface CommandPaletteTriggerProps {
 // during hydration, then the client snapshot resolves "⌘" on macOS — no hydration mismatch,
 // and no setState-in-effect.
 const subscribeNoop = (): (() => void) => () => {};
-const getIsMacClient = (): boolean => /mac/i.test(navigator.platform);
+// Mirror the hotkey library's detectPlatform (checks platform AND userAgent) so the displayed
+// glyph can't drift from the actual Mod binding.
+const getIsMacClient = (): boolean => /mac/i.test(navigator.platform) || /mac/i.test(navigator.userAgent);
 const getIsMacServer = (): boolean => false;
 
 /**

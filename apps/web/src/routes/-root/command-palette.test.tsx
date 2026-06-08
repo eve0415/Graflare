@@ -50,6 +50,12 @@ const typeInto = (input: HTMLInputElement, value: string) => {
   input.dispatchEvent(new InputEvent('input', { bubbles: true, inputType: 'insertText', data: value }));
 };
 
+// TanStack Hotkeys binds `Mod+K` on `document` and matches modifiers exactly; `Mod` is ⌘ on
+// macOS and Ctrl elsewhere. Fire the platform-correct combo on document to drive the real
+// binding. Computed once at module scope so the test body stays conditional-free.
+const IS_MAC = /mac/i.test(navigator.platform) || /mac/i.test(navigator.userAgent);
+const fireModK = () => fireEvent.keyDown(document, { key: 'k', ctrlKey: !IS_MAC, metaKey: IS_MAC });
+
 const Harness = ({ onOpenChange }: { onOpenChange: (open: boolean) => void }) => {
   const [open, setOpen] = useState(true);
   const handleOpenChange = useCallback(
@@ -158,9 +164,9 @@ describe('command palette', () => {
     });
   });
 
-  it('resets the query when toggled closed with the keyboard shortcut, so it reopens clean', async () => {
-    // Exercises the window keydown listener (the only test that does) and the toggle-close
-    // path: closing via Cmd-K must clear the query like every other close path.
+  it('resets the query when toggled closed with the keyboard shortcut (Mod+K), so it reopens clean', async () => {
+    // The toggle-close path: closing via Mod+K must clear the query like every other close
+    // path (fireModK drives the real document-bound binding — see the module-scope helper).
     renderOpen();
     const input = getSearchInput();
     fireEvent.change(input, { target: { value: 'explore' } });
@@ -168,10 +174,10 @@ describe('command palette', () => {
       // "Alerting" is filtered out by the "explore" query.
       expect(screen.queryByText('Alerting')).toBeNull();
     });
-    // Cmd-K closes (the listener is registered on globalThis; fireEvent wraps in act)...
-    fireEvent.keyDown(globalThis.window, { key: 'k', metaKey: true });
-    // ...and Cmd-K reopens. The Harness mirrors open state, so this round-trips.
-    fireEvent.keyDown(globalThis.window, { key: 'k', metaKey: true });
+    // Mod+K closes...
+    fireModK();
+    // ...and Mod+K reopens. The Harness mirrors open state, so this round-trips.
+    fireModK();
     await waitFor(() => {
       expect(getSearchInput().value).toBe('');
     });

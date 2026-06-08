@@ -2,15 +2,15 @@ import type { CommandDescriptor } from './command-data';
 
 import { Command, CommandEmpty, CommandGroup, CommandGroupLabel, CommandInput, CommandItem, CommandList, CommandStatus } from '@graflare/ui/components/command';
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from '@graflare/ui/components/dialog';
+import { useHotkey } from '@tanstack/react-hotkeys';
 import { useQuery } from '@tanstack/react-query';
 import { useNavigate } from '@tanstack/react-router';
-import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { memo, useCallback, useMemo, useRef, useState } from 'react';
 
 import { dashboardsQueryOptions } from '../dashboards/-queries';
 
 import { assembleCommands } from './command-data';
 import { rankCommands } from './command-filter';
-import { isCommandPaletteShortcut } from './command-shortcut';
 
 // Stable so it isn't recreated per render (react-perf): how Base UI stringifies a command
 // value for its input/announce text.
@@ -71,19 +71,17 @@ export const CommandPalette = ({ open, onOpenChange }: CommandPaletteProps) => {
     [onOpenChange],
   );
 
-  useEffect(() => {
-    const handleKeyDown = (event: KeyboardEvent) => {
-      if (isCommandPaletteShortcut(event)) {
-        event.preventDefault();
-        // Route through handleOpenChange so toggling closed also resets the query.
-        handleOpenChange(!open);
-      }
-    };
-    globalThis.addEventListener('keydown', handleKeyDown);
-    return () => {
-      globalThis.removeEventListener('keydown', handleKeyDown);
-    };
-  }, [open, handleOpenChange]);
+  // Global Cmd/Ctrl+K toggles the palette. `Mod` resolves to ⌘ on macOS and Ctrl elsewhere;
+  // the callback is re-synced each render so it sees the current `open`. `ignoreInputs: false`
+  // keeps it working while focus is in a field, and routing through handleOpenChange means
+  // toggling closed also clears the query.
+  useHotkey(
+    'Mod+K',
+    () => {
+      handleOpenChange(!open);
+    },
+    { preventDefault: true, ignoreInputs: false },
+  );
 
   const commands = useMemo(() => assembleCommands({ navigate, dashboards: dashboards ?? [] }), [navigate, dashboards]);
   const groups = useMemo(() => rankCommands(query, commands), [query, commands]);
