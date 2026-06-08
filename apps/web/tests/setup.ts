@@ -25,6 +25,7 @@ vi.mock('../src/routes/dashboards/-api', () => ({
   listDashboardVersions: () => Promise.resolve([]),
   restoreDashboardVersion: () => Promise.resolve(null),
   importDashboard: () => Promise.resolve({ dashboard: null, warnings: [] }),
+  listAnnotations: () => Promise.resolve([]),
   listFolders: () => Promise.resolve([]),
   createFolder: () => Promise.resolve({ id: 'test-folder', title: 'Test', slug: 'test' }),
   updateFolder: () => Promise.resolve(null),
@@ -84,6 +85,7 @@ vi.mock('../src/routes/dashboards/-queries', () => ({
   dashboardQueryOptions: () => ({ queryKey: ['dashboard'], queryFn: () => Promise.resolve(null) }),
   dashboardVersionsQueryOptions: () => ({ queryKey: ['versions'], queryFn: () => Promise.resolve([]) }),
   foldersQueryOptions: () => ({ queryKey: ['folders'], queryFn: () => Promise.resolve([]) }),
+  annotationsQueryOptions: () => ({ queryKey: ['annotations'], queryFn: () => Promise.resolve([]) }),
 }));
 
 vi.mock('../src/routes/datasources/-queries', () => ({

@@ -1,4 +1,5 @@
 import type { PanelDataResult } from './use-panel-data';
+import type { Annotation } from '@graflare/shared/schemas/annotation';
 import type { HistogramDisplay, Panel } from '@graflare/shared/schemas/panel';
 import type uPlot from 'uplot';
 
@@ -36,6 +37,7 @@ const matrix = (rows: { metric: Record<string, string>; values: [number, number]
 ];
 
 const timeRange = { from: 'now-1h', to: 'now' };
+const noAnnotations: Annotation[] = [];
 
 afterEach(() => {
   cleanup();
@@ -59,7 +61,16 @@ describe('histogram panel', () => {
       error: null,
       refetch: vi.fn<() => void>(),
     });
-    render(<HistogramPanel panel={histogramPanel('short', { bucketCount: 2 })} timeRange={timeRange} refetchInterval={false} width={400} height={300} />);
+    render(
+      <HistogramPanel
+        panel={histogramPanel('short', { bucketCount: 2 })}
+        timeRange={timeRange}
+        refetchInterval={false}
+        width={400}
+        height={300}
+        annotations={noAnnotations}
+      />,
+    );
 
     expect(mockUPlotChart).toHaveBeenCalledTimes(1);
     const props = mockUPlotChart.mock.calls[0]?.[0];
@@ -73,7 +84,9 @@ describe('histogram panel', () => {
 
   it('shows a no-data message and skips the chart when there is no data', () => {
     mockUsePanelData.mockReturnValue({ data: null, isLoading: false, error: null, refetch: vi.fn<() => void>() });
-    render(<HistogramPanel panel={histogramPanel('short')} timeRange={timeRange} refetchInterval={false} width={400} height={300} />);
+    render(
+      <HistogramPanel panel={histogramPanel('short')} timeRange={timeRange} refetchInterval={false} width={400} height={300} annotations={noAnnotations} />,
+    );
 
     expect(screen.getByText('No data')).toBeDefined();
     expect(mockUPlotChart).not.toHaveBeenCalled();

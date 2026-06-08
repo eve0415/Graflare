@@ -1,11 +1,14 @@
+import type { Annotation } from '@graflare/shared/schemas/annotation';
 import type { Panel } from '@graflare/shared/schemas/panel';
 import type uPlot from 'uplot';
 
 import { formatValue } from '@graflare/shared/format/value-format';
+import { resolveTime } from '@graflare/shared/time/resolve';
 import { useMemo } from 'react';
 
 import { QueryResultTable, formatPrometheusToTable } from '../../../-root/query-result-table';
 
+import { annotationMarkers } from './annotations-plugin';
 import { extractResultSeries } from './panel-data-extract';
 import { UPlotPanel } from './uplot-panel';
 import { usePanelQuery } from './use-panel-query';
@@ -16,12 +19,18 @@ interface TimeSeriesPanelProps {
   refetchInterval: number | false;
   width: number;
   height: number;
+  annotations: readonly Annotation[];
 }
 
-export const TimeSeriesPanel = ({ panel, timeRange, refetchInterval, width, height }: TimeSeriesPanelProps) => {
+export const TimeSeriesPanel = ({ panel, timeRange, refetchInterval, width, height, annotations }: TimeSeriesPanelProps) => {
   const { data, isLoading, error, handleRetry } = usePanelQuery(panel, timeRange, refetchInterval);
 
   const chartResult = useMemo(() => extractResultSeries(data), [data]);
+
+  const markers = useMemo(
+    () => annotationMarkers(annotations, resolveTime(timeRange.from), resolveTime(timeRange.to)),
+    [annotations, timeRange.from, timeRange.to],
+  );
 
   const chartData = useMemo((): uPlot.AlignedData => {
     if (chartResult.length === 0) return [[]];
@@ -90,6 +99,15 @@ export const TimeSeriesPanel = ({ panel, timeRange, refetchInterval, width, heig
   const dataTable = useMemo(() => <QueryResultTable data={tableData} />, [tableData]);
 
   return (
-    <UPlotPanel panel={panel} data={chartData} options={chartOptions} isLoading={isLoading} error={error} onRetry={handleRetry} dataTableContent={dataTable} />
+    <UPlotPanel
+      panel={panel}
+      data={chartData}
+      options={chartOptions}
+      isLoading={isLoading}
+      error={error}
+      onRetry={handleRetry}
+      dataTableContent={dataTable}
+      annotationMarkers={markers}
+    />
   );
 };

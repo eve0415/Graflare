@@ -1,3 +1,4 @@
+import type { Annotation } from '@graflare/shared/schemas/annotation';
 import type { Panel } from '@graflare/shared/schemas/panel';
 
 import { render } from '@testing-library/react';
@@ -22,6 +23,7 @@ const tablePanel = (expr: string): Panel => ({
 });
 
 const timeRange = { from: 'now-1h', to: 'now' };
+const noAnnotations: Annotation[] = [];
 
 afterEach(() => {
   vi.mocked(TablePanel).mockClear();
@@ -37,6 +39,7 @@ describe('panel-renderer', () => {
         width={100}
         height={100}
         variables={new Map([['job', 'node']])}
+        annotations={noAnnotations}
       />,
     );
     const props = vi.mocked(TablePanel).mock.calls[0]?.[0];
@@ -45,7 +48,17 @@ describe('panel-renderer', () => {
 
   it('leaves the original panel queries raw so editing/saving is unaffected', () => {
     const panel = tablePanel('up{job="$job"}');
-    render(<PanelRenderer panel={panel} timeRange={timeRange} refetchInterval={false} width={100} height={100} variables={new Map([['job', 'node']])} />);
+    render(
+      <PanelRenderer
+        panel={panel}
+        timeRange={timeRange}
+        refetchInterval={false}
+        width={100}
+        height={100}
+        variables={new Map([['job', 'node']])}
+        annotations={noAnnotations}
+      />,
+    );
     expect(panel.queries[0]?.expr).toBe('up{job="$job"}');
   });
 });

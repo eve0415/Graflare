@@ -1,4 +1,5 @@
 import type { PanelDataResult } from './use-panel-data';
+import type { Annotation } from '@graflare/shared/schemas/annotation';
 import type { Panel } from '@graflare/shared/schemas/panel';
 import type uPlot from 'uplot';
 
@@ -35,6 +36,7 @@ const matrix = (rows: { metric: Record<string, string>; values: [number, number]
 ];
 
 const timeRange = { from: 'now-1h', to: 'now' };
+const noAnnotations: Annotation[] = [];
 
 afterEach(() => {
   cleanup();
@@ -58,7 +60,7 @@ describe('bar-chart panel', () => {
       error: null,
       refetch: vi.fn<() => void>(),
     });
-    render(<BarChartPanel panel={barChartPanel('short')} timeRange={timeRange} refetchInterval={false} width={400} height={300} />);
+    render(<BarChartPanel panel={barChartPanel('short')} timeRange={timeRange} refetchInterval={false} width={400} height={300} annotations={noAnnotations} />);
 
     expect(mockUPlotChart).toHaveBeenCalledTimes(1);
     const props = mockUPlotChart.mock.calls[0]?.[0];
@@ -70,7 +72,7 @@ describe('bar-chart panel', () => {
 
   it('shows a no-data message and skips the chart when there is no data', () => {
     mockUsePanelData.mockReturnValue({ data: null, isLoading: false, error: null, refetch: vi.fn<() => void>() });
-    render(<BarChartPanel panel={barChartPanel('short')} timeRange={timeRange} refetchInterval={false} width={400} height={300} />);
+    render(<BarChartPanel panel={barChartPanel('short')} timeRange={timeRange} refetchInterval={false} width={400} height={300} annotations={noAnnotations} />);
 
     expect(screen.getByText('No data')).toBeDefined();
     expect(mockUPlotChart).not.toHaveBeenCalled();

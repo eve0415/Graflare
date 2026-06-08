@@ -1,3 +1,4 @@
+import { annotationSchema } from '@graflare/shared/schemas/annotation';
 import {
   createDashboardSchema,
   dashboardListQuerySchema,
@@ -12,6 +13,15 @@ import { env } from 'cloudflare:workers';
 import * as z from 'zod/mini';
 
 import { getAccessJwt } from '../../lib/auth';
+
+// `from`/`to` are epoch MILLISECONDS: the API's listAnnotations builds its bounds
+// with `new Date(from)`, which interprets the number as ms. (Callers resolve the
+// dashboard time range to epoch seconds, so they must multiply by 1000.)
+const annotationsInputSchema = z.object({
+  dashboardId: z.uuid(),
+  from: z.int(),
+  to: z.int(),
+});
 
 export const listDashboards = createServerFn({ method: 'GET' })
   .inputValidator(z.optional(dashboardListQuerySchema))
@@ -103,6 +113,32 @@ export const importDashboard = createServerFn({ method: 'POST' })
     const result = await env.API.importDashboard(getAccessJwt(), data);
     const dashboard = result.dashboard === null ? null : { id: result.dashboard.id, title: result.dashboard.title };
     return { dashboard, warnings: result.warnings };
+  });
+
+export const listAnnotations = createServerFn({ method: 'GET' })
+  .inputValidator(annotationsInputSchema)
+  .handler(async ({ data: { dashboardId, from, to } }) => {
+    const rows = await env.API.listAnnotations(getAccessJwt(), { dashboardId, from, to });
+    // The RPC returns Drizzle rows: `time`/`timeEnd`/`createdAt` are Dates and the
+    // optional columns are `null`. Re-shape to the shared schema's contract — epoch
+    // ms numbers, optionals as `undefined` not `null` — and parse to drop the
+    // Disposable brand that createServerFn's serialization check rejects.
+    return rows.map(r =>
+      annotationSchema.parse({
+        id: r.id,
+        orgId: r.orgId,
+        dashboardId: r.dashboardId ?? undefined,
+        panelId: r.panelId ?? undefined,
+        alertRuleId: r.alertRuleId ?? undefined,
+        time: r.time.getTime(),
+        timeEnd: r.timeEnd === null ? undefined : r.timeEnd.getTime(),
+        text: r.text,
+        tags: r.tags,
+        prevState: r.prevState ?? undefined,
+        newState: r.newState ?? undefined,
+        createdAt: r.createdAt.getTime(),
+      }),
+    );
   });
 
 export const listFolders = createServerFn({ method: 'GET' }).handler(async () => {

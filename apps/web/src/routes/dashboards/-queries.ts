@@ -1,6 +1,6 @@
 import { queryOptions } from '@tanstack/react-query';
 
-import { getDashboard, listDashboardVersions, listDashboards, listFolders } from './-api';
+import { getDashboard, listAnnotations, listDashboardVersions, listDashboards, listFolders } from './-api';
 
 const STALE_30S = 30 * 1000;
 const STALE_5M = 5 * 60 * 1000;
@@ -29,4 +29,14 @@ export const foldersQueryOptions = () =>
     queryKey: ['folders'],
     queryFn: () => listFolders(),
     staleTime: STALE_5M,
+  });
+
+// `from`/`to` are epoch MILLISECONDS bounding the dashboard's visible window. They
+// belong in the key so panning/zooming the time range refetches; resolve them once
+// per range selection at the call site (not every render) to keep the key stable.
+export const annotationsQueryOptions = (dashboardId: string, from: number, to: number) =>
+  queryOptions({
+    queryKey: ['annotations', dashboardId, from, to],
+    queryFn: () => listAnnotations({ data: { dashboardId, from, to } }),
+    staleTime: STALE_30S,
   });

@@ -1,10 +1,12 @@
+import type { Annotation } from '@graflare/shared/schemas/annotation';
 import type { Panel } from '@graflare/shared/schemas/panel';
 import type { Variable } from '@graflare/shared/schemas/variable';
 
 import { panelSchema } from '@graflare/shared/schemas/panel';
 import { variableSchema } from '@graflare/shared/schemas/variable';
+import { resolveTime } from '@graflare/shared/time/resolve';
 import { Button } from '@graflare/ui/components/button';
-import { useQueryClient, useSuspenseQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient, useSuspenseQuery } from '@tanstack/react-query';
 import { createFileRoute } from '@tanstack/react-router';
 import { Plus } from 'lucide-react';
 import { useCallback, useMemo, useState } from 'react';
@@ -17,8 +19,14 @@ import { DashboardViewSkeleton } from '../-components/dashboard-view-skeleton';
 import { PanelEditor } from '../-components/panel-editor';
 import { PanelActionsProvider } from '../-components/panels/panel-actions-context';
 import { VariableBar } from '../-components/variable-bar';
-import { dashboardQueryOptions } from '../-queries';
+import { annotationsQueryOptions, dashboardQueryOptions } from '../-queries';
 import { datasourcesQueryOptions } from '../../datasources/-queries';
+
+const MS_PER_SECOND = 1000;
+
+// Stable empty fallback so the `annotations` prop keeps a constant identity while
+// the query is still loading (a fresh `[]` each render would churn the grid).
+const EMPTY_ANNOTATIONS: readonly Annotation[] = [];
 
 type RefreshInterval = '5s' | '10s' | '30s' | '1m' | '5m' | '15m' | '30m' | '1h' | 'off';
 
@@ -80,6 +88,16 @@ const DashboardViewPage = () => {
     if (dashboard === null) return [];
     return parseVariables(dashboard.variables);
   }, [dashboard]);
+
+  // Resolve the visible window to epoch MS once per range change (not every render,
+  // or `now` would drift the query key and refetch constantly). One fetch per
+  // dashboard view, threaded to the chart panels like `variables`.
+  const annotationWindow = useMemo(
+    () => ({ from: resolveTime(timeRange.from) * MS_PER_SECOND, to: resolveTime(timeRange.to) * MS_PER_SECOND }),
+    [timeRange.from, timeRange.to],
+  );
+  const { data: annotations } = useQuery(annotationsQueryOptions(id, annotationWindow.from, annotationWindow.to));
+  const dashboardAnnotations = annotations ?? EMPTY_ANNOTATIONS;
 
   const handleEditToggle = useCallback(() => {
     setEditMode(prev => {
@@ -229,6 +247,7 @@ const DashboardViewPage = () => {
               editMode={editMode}
               onLayoutChange={handleLayoutChange}
               variables={variableValues}
+              annotations={dashboardAnnotations}
             />
           </PanelActionsProvider>
         )}

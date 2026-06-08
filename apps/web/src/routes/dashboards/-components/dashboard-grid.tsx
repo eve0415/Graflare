@@ -1,3 +1,4 @@
+import type { Annotation } from '@graflare/shared/schemas/annotation';
 import type { Panel } from '@graflare/shared/schemas/panel';
 import type { Layout } from 'react-grid-layout';
 
@@ -16,13 +17,14 @@ interface DashboardGridProps {
   editMode: boolean;
   onLayoutChange?: (panels: Panel[]) => void;
   variables: ReadonlyMap<string, string | string[]>;
+  annotations: readonly Annotation[];
 }
 
 const ROW_HEIGHT = 30;
 const COLS = 24;
 const GRID_CONFIG = { cols: COLS, rowHeight: ROW_HEIGHT };
 
-export const DashboardGrid = ({ panels, timeRange, refreshInterval, editMode, onLayoutChange, variables }: DashboardGridProps) => {
+export const DashboardGrid = ({ panels, timeRange, refreshInterval, editMode, onLayoutChange, variables, annotations }: DashboardGridProps) => {
   const layout = useMemo(
     () =>
       panels.map(p => ({
@@ -73,6 +75,7 @@ export const DashboardGrid = ({ panels, timeRange, refreshInterval, editMode, on
             width={panel.gridPos.w * (ROW_HEIGHT + 10)}
             height={panel.gridPos.h * ROW_HEIGHT}
             variables={variables}
+            annotations={annotations}
           />
         </div>
       ))}

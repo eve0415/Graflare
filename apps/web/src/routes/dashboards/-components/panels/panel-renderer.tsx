@@ -1,3 +1,4 @@
+import type { Annotation } from '@graflare/shared/schemas/annotation';
 import type { Panel } from '@graflare/shared/schemas/panel';
 
 import { interpolateQueries } from '@graflare/shared/variables/interpolate';
@@ -24,17 +25,28 @@ interface PanelRendererProps {
   width: number;
   height: number;
   variables: ReadonlyMap<string, string | string[]>;
+  annotations: readonly Annotation[];
 }
 
-export const PanelRenderer = ({ panel, timeRange, refetchInterval, width, height, variables }: PanelRendererProps) => {
+export const PanelRenderer = ({ panel, timeRange, refetchInterval, width, height, variables, annotations }: PanelRendererProps) => {
   // Interpolate dashboard variables into the queries at render time. The panel's
   // own queries keep their raw `$var` form (editing/saving is unaffected); only
   // the copy handed to the data hook is templated.
   const resolvedPanel = useMemo(() => ({ ...panel, queries: interpolateQueries(panel.queries, variables) }), [panel, variables]);
 
+  // Only the time-based chart panels overlay annotations; other panel types ignore them.
   switch (resolvedPanel.type) {
     case 'timeseries':
-      return <TimeSeriesPanel panel={resolvedPanel} timeRange={timeRange} refetchInterval={refetchInterval} width={width} height={height} />;
+      return (
+        <TimeSeriesPanel
+          panel={resolvedPanel}
+          timeRange={timeRange}
+          refetchInterval={refetchInterval}
+          width={width}
+          height={height}
+          annotations={annotations}
+        />
+      );
     case 'stat':
       return <StatPanel panel={resolvedPanel} timeRange={timeRange} refetchInterval={refetchInterval} />;
     case 'table':
@@ -44,11 +56,15 @@ export const PanelRenderer = ({ panel, timeRange, refetchInterval, width, height
     case 'bargauge':
       return <BarGaugePanel panel={resolvedPanel} timeRange={timeRange} refetchInterval={refetchInterval} />;
     case 'barchart':
-      return <BarChartPanel panel={resolvedPanel} timeRange={timeRange} refetchInterval={refetchInterval} width={width} height={height} />;
+      return (
+        <BarChartPanel panel={resolvedPanel} timeRange={timeRange} refetchInterval={refetchInterval} width={width} height={height} annotations={annotations} />
+      );
     case 'pie':
       return <PiePanel panel={resolvedPanel} timeRange={timeRange} refetchInterval={refetchInterval} />;
     case 'histogram':
-      return <HistogramPanel panel={resolvedPanel} timeRange={timeRange} refetchInterval={refetchInterval} width={width} height={height} />;
+      return (
+        <HistogramPanel panel={resolvedPanel} timeRange={timeRange} refetchInterval={refetchInterval} width={width} height={height} annotations={annotations} />
+      );
     case 'heatmap':
       return <HeatmapPanel panel={resolvedPanel} timeRange={timeRange} refetchInterval={refetchInterval} width={width} height={height} />;
     case 'state-timeline':
