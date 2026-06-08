@@ -15,6 +15,7 @@ import { createPrometheusClient } from '../prometheus/factory';
 
 import { config as configTable, instances } from './do-schema';
 import * as doSchema from './do-schema';
+import { noDataTransition } from './no-data-transition';
 
 const RULE_CONFIG_KEY = 'rule_config';
 
@@ -304,21 +305,21 @@ export class AlertRuleDO extends DurableObject<Env> {
   }
 
   private async handleNoData(config: AlertRuleConfig, now: number): Promise<void> {
-    if (config.noDataState === 'KeepLastState') return;
-
-    const targetState: AlertInstanceState = config.noDataState === 'Alerting' ? 'Firing' : 'Normal';
-    // Escalating to Firing (noData/error → Alerting) is a real alert and must notify,
-    // exactly like the normal-evaluation firing path. Going to Normal stays silent.
-    const notify = targetState === 'Firing';
     const allInstances = this.db.select().from(instances).all();
 
     const pending: Promise<void>[] = [];
     for (const inst of allInstances) {
-      if (inst.state !== targetState) {
-        this.db.update(instances).set({ state: targetState, lastEvalAt: now }).where(eq(instances.labelsHash, inst.labelsHash)).run();
-        const labels = labelsMapSchema.parse(JSON.parse(inst.labels));
-        pending.push(this.syncAndNotify(config, inst.labelsHash, labels, targetState, String(inst.value ?? 0), inst.firedAt, now, notify));
-      }
+      const currentState: AlertInstanceState = isAlertInstanceState(inst.state) ? inst.state : 'Normal';
+      const transition = noDataTransition(config.noDataState, currentState);
+      if (transition === null) continue;
+
+      this.db
+        .update(instances)
+        .set({ state: transition.state, resolvedAt: transition.state === 'Resolved' ? now : inst.resolvedAt, lastEvalAt: now })
+        .where(eq(instances.labelsHash, inst.labelsHash))
+        .run();
+      const labels = labelsMapSchema.parse(JSON.parse(inst.labels));
+      pending.push(this.syncAndNotify(config, inst.labelsHash, labels, transition.state, String(inst.value ?? 0), inst.firedAt, now, transition.notify));
     }
     await Promise.all(pending);
   }
