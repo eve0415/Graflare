@@ -14,7 +14,7 @@ const TEST_ORG_ID = 'org-test-123';
 const TEST_ENCRYPTION_KEY = btoa(String.fromCodePoint(...crypto.getRandomValues(new Uint8Array(32))));
 
 const testBindings: AppEnv['Bindings'] = {
-  DB: env.DB,
+  ...env,
   ENCRYPTION_KEY: TEST_ENCRYPTION_KEY,
   ACCESS_TEAM_DOMAIN: 'test-team',
   ACCESS_AUD: 'test-aud',
@@ -48,7 +48,8 @@ const readBody = async (
     Array.isArray(body.tags)
   ) {
     const folderId = 'folderId' in body && typeof body.folderId === 'string' ? body.folderId : null;
-    return { id: body.id, title: body.title, slug: body.slug, version: body.version, tags: body.tags, folderId };
+    const tags = body.tags.filter((t): t is string => typeof t === 'string');
+    return { id: body.id, title: body.title, slug: body.slug, version: body.version, tags, folderId };
   }
   throw new Error('unexpected dashboard response shape');
 };
@@ -98,7 +99,7 @@ const readFullBody = async (
       title: body.title,
       slug: body.slug,
       version: body.version,
-      tags: body.tags,
+      tags: body.tags.filter((t): t is string => typeof t === 'string'),
       folderId,
       panels: body.panels,
       variables: body.variables,

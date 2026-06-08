@@ -10,7 +10,7 @@ const UUID = '550e8400-e29b-41d4-a716-446655440000';
 const TEST_ENCRYPTION_KEY = btoa(String.fromCodePoint(...crypto.getRandomValues(new Uint8Array(32))));
 
 const testBindings: AppEnv['Bindings'] = {
-  DB: env.DB,
+  ...env,
   ENCRYPTION_KEY: TEST_ENCRYPTION_KEY,
   ACCESS_TEAM_DOMAIN: 'test-team',
   ACCESS_AUD: 'test-aud',

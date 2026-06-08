@@ -12,7 +12,7 @@ import { alertInstanceRoutes } from './alert-instances';
 const TEST_ORG_ID = 'org-test-123';
 
 const testBindings: AppEnv['Bindings'] = {
-  DB: env.DB,
+  ...env,
   ENCRYPTION_KEY: btoa(String.fromCodePoint(...crypto.getRandomValues(new Uint8Array(32)))),
   ACCESS_TEAM_DOMAIN: 'test-team',
   ACCESS_AUD: 'test-aud',
@@ -30,6 +30,11 @@ const createApp = () => {
 };
 
 const req = (path: string) => new Request(`http://localhost${path}`);
+
+const readArray = (value: unknown): unknown[] => {
+  if (!Array.isArray(value)) throw new Error('expected array');
+  return value;
+};
 
 describe('alert-instance routes', () => {
   let testRuleId: string;
@@ -93,8 +98,7 @@ describe('alert-instance routes', () => {
     const app = createApp();
     const res = await app.request(req('/'), {}, testBindings);
     expect(res.status).toBe(200);
-    const body: unknown = await res.json();
-    if (!Array.isArray(body)) throw new Error('expected array');
+    const body = readArray(await res.json());
     expect(body).toHaveLength(1);
     expect(body[0]).toHaveProperty('state', 'Firing');
   });
@@ -114,8 +118,7 @@ describe('alert-instance routes', () => {
     const app = createApp();
     const res = await app.request(req(`/?ruleId=${testRuleId}`), {}, testBindings);
     expect(res.status).toBe(200);
-    const body: unknown = await res.json();
-    if (!Array.isArray(body)) throw new Error('expected array');
+    const body = readArray(await res.json());
     expect(body).toHaveLength(1);
 
     const emptyRes = await app.request(req(`/?ruleId=${crypto.randomUUID()}`), {}, testBindings);
@@ -139,8 +142,7 @@ describe('alert-instance routes', () => {
     expect(await firingRes.json()).toEqual([]);
 
     const normalRes = await app.request(req('/?state=Normal'), {}, testBindings);
-    const body: unknown = await normalRes.json();
-    if (!Array.isArray(body)) throw new Error('expected array');
+    const body = readArray(await normalRes.json());
     expect(body).toHaveLength(1);
   });
 });
