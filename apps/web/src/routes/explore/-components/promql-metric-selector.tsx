@@ -14,8 +14,7 @@ interface PromqlMetricSelectorProps {
 
 export const PromqlMetricSelector = ({ datasourceId, value, onChange }: PromqlMetricSelectorProps) => {
   const metricsQuery = useQuery(metricsQueryOptions(datasourceId));
-  const metrics = metricsQuery.data?.metrics ?? [];
-  const metricItems = useMemo(() => metrics.map(m => ({ value: m, label: m })), [metrics]);
+  const metricItems = useMemo(() => (metricsQuery.data?.metrics ?? []).map(m => ({ value: m, label: m })), [metricsQuery.data?.metrics]);
   const hasError = metricsQuery.data?.error !== undefined;
 
   const handleInputChange = useCallback(

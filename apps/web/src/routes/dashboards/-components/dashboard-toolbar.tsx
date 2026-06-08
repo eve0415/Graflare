@@ -55,8 +55,8 @@ export const DashboardToolbar = ({
   saving,
 }: DashboardToolbarProps) => {
   const handleRefreshChange = useCallback(
-    (val: string) => {
-      if (isRefreshInterval(val)) onRefreshIntervalChange(val);
+    (val: string | null) => {
+      if (val !== null && isRefreshInterval(val)) onRefreshIntervalChange(val);
     },
     [onRefreshIntervalChange],
   );

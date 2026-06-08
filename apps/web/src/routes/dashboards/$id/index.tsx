@@ -120,7 +120,7 @@ const DashboardViewPage = () => {
       type: 'timeseries',
       title: 'New Panel',
       description: '',
-      queries: [{ refId: 'A', expr: '', legendFormat: '' }],
+      queries: [{ refId: 'A', expr: '', legendFormat: '', format: 'time_series' }],
       gridPos: { x: 0, y: 0, w: 12, h: 8 },
       thresholds: [],
       displayOptions: {},

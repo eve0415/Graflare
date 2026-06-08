@@ -237,7 +237,7 @@ const NewMuteTimingPage = () => {
       intervals: prev.intervals.map((interval, i) => {
         if (i !== intervalIndex) return interval;
         const has = interval.weekdays.includes(day);
-        return { ...interval, weekdays: has ? interval.weekdays.filter(d => d !== day) : [...interval.weekdays, day].sort() };
+        return { ...interval, weekdays: has ? interval.weekdays.filter(d => d !== day) : [...interval.weekdays, day].sort((a, b) => a - b) };
       }),
     }));
   }, []);

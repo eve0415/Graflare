@@ -27,10 +27,8 @@ interface LabelRowProps {
 const LabelRow = ({ datasourceId, metric, matcher, onChange, onRemove }: LabelRowProps) => {
   const labelsQuery = useQuery(labelsQueryOptions(datasourceId, metric));
   const valuesQuery = useQuery(labelValuesQueryOptions(datasourceId, matcher.label, metric));
-  const labels = labelsQuery.data?.labels ?? [];
-  const labelItems = useMemo(() => labels.map(l => ({ value: l, label: l })), [labels]);
-  const values = valuesQuery.data?.values ?? [];
-  const valueItems = useMemo(() => values.map(v => ({ value: v, label: v })), [values]);
+  const labelItems = useMemo(() => (labelsQuery.data?.labels ?? []).map(l => ({ value: l, label: l })), [labelsQuery.data?.labels]);
+  const valueItems = useMemo(() => (valuesQuery.data?.values ?? []).map(v => ({ value: v, label: v })), [valuesQuery.data?.values]);
   const labelsError = labelsQuery.data?.error !== undefined;
   const valuesError = valuesQuery.data?.error !== undefined;
 

@@ -159,10 +159,13 @@ export const SqlBuilder = ({ datasourceId, state, onStateChange }: SqlBuilderPro
   const tablesQuery = useQuery(tablesQueryOptions(datasourceId));
   const columnsQuery = useQuery(columnsQueryOptions(datasourceId, state.table));
 
-  const tables = tablesQuery.data?.tables ?? [];
-  const tableItems = useMemo(() => tables.map(t => ({ value: t.name, label: t.schema === undefined ? t.name : `${t.schema}.${t.name}` })), [tables]);
+  const tableItems = useMemo(
+    () => (tablesQuery.data?.tables ?? []).map(t => ({ value: t.name, label: t.schema === undefined ? t.name : `${t.schema}.${t.name}` })),
+    [tablesQuery.data?.tables],
+  );
   const columnNames = useMemo(() => (columnsQuery.data?.columns ?? []).map(c => c.name), [columnsQuery.data?.columns]);
   const columnItems = useMemo(() => columnNames.map(c => ({ value: c, label: c })), [columnNames]);
+  const timeColumnItems = useMemo(() => [{ value: '', label: 'None' }, ...columnItems], [columnItems]);
   const hasError = tablesQuery.data?.error !== undefined || columnsQuery.data?.error !== undefined;
 
   const updateField = useCallback(
@@ -331,7 +334,7 @@ export const SqlBuilder = ({ datasourceId, state, onStateChange }: SqlBuilderPro
       {/* Time column */}
       <div className='flex items-center gap-2'>
         <Label className='w-24 shrink-0 text-xs font-medium'>Time column</Label>
-        <Select value={state.timeColumn} onValueChange={handleTimeColumnChange} items={[{ value: '', label: 'None' }, ...columnItems]}>
+        <Select value={state.timeColumn} onValueChange={handleTimeColumnChange} items={timeColumnItems}>
           <SelectTrigger aria-label='Time column' className='w-40'>
             <SelectValue placeholder='None' />
           </SelectTrigger>

@@ -23,8 +23,8 @@ export const VariableBar = ({ variables, values, onChange }: VariableBarProps) =
 
 const VariableSelect = ({ variable, value, onChange }: { variable: Variable; value: string; onChange: (name: string, value: string) => void }) => {
   const handleChange = useCallback(
-    (val: string) => {
-      onChange(variable.name, val);
+    (val: string | null) => {
+      if (val !== null) onChange(variable.name, val);
     },
     [onChange, variable.name],
   );

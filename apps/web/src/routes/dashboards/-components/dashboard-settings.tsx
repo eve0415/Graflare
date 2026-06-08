@@ -100,6 +100,7 @@ export const DashboardSettings = ({ open, onClose, dashboardId, title, descripti
               <Label htmlFor='settings-description'>Description</Label>
               <textarea
                 id='settings-description'
+                aria-label='Dashboard description'
                 className='border-border bg-background w-full rounded-md border p-2 text-sm'
                 rows={3}
                 value={draftDescription}

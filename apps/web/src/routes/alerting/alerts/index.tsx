@@ -66,7 +66,7 @@ const AlertInstancesPage = () => {
                   <Badge variant={stateVariant(inst.state)}>{inst.state}</Badge>
                 </TableCell>
                 <TableCell className='text-muted-foreground text-sm'>{inst.value}</TableCell>
-                <TableCell className='text-muted-foreground text-sm'>{new Date(inst.lastEvalAt * 1000).toLocaleString()}</TableCell>
+                <TableCell className='text-muted-foreground text-sm'>{inst.lastEvalAt.toLocaleString()}</TableCell>
               </TableRow>
             ))}
           </TableBody>

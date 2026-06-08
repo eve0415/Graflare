@@ -1,3 +1,4 @@
+import type { PanelDataResult } from './use-panel-data';
 import type { Panel } from '@graflare/shared/schemas/panel';
 
 import { useCallback, useMemo } from 'react';
@@ -13,34 +14,36 @@ interface TablePanelProps {
   refetchInterval: number | false;
 }
 
-export const TablePanel = ({ panel, timeRange, refetchInterval }: TablePanelProps) => {
-  const { data, isLoading, error, refetch } = usePanelData(panel.datasourceId, panel.queries, timeRange, refetchInterval);
+const toTableData = (data: PanelDataResult[] | null | undefined): { columns: string[]; rows: string[][] } => {
+  if (data === null || data === undefined) return { columns: [], rows: [] };
 
-  const tableData = useMemo(() => {
-    if (data === null || data === undefined) return { columns: [], rows: [] };
-
-    for (const res of data) {
-      if ('columns' in res && 'rows' in res && !('status' in res)) {
-        return {
-          columns: res.columns.map(c => c.name),
-          rows: res.rows.map(row => row.map(v => (v === null ? '' : String(v)))),
-        };
-      }
+  for (const res of data) {
+    if ('columns' in res && 'rows' in res && !('status' in res)) {
+      return {
+        columns: res.columns.map(c => c.name),
+        rows: res.rows.map(row => row.map(v => (v === null ? '' : String(v)))),
+      };
     }
+  }
 
-    const allResults: { metric: Record<string, string>; values?: [number, string][]; value?: [number, string] }[] = [];
-    for (const res of data) {
-      if ('status' in res && res.status === 'success' && res.data !== undefined && 'result' in res.data && Array.isArray(res.data.result)) {
-        for (const r of res.data.result) {
-          if (typeof r === 'object' && r !== null && 'metric' in r) {
-            allResults.push(r);
-          }
+  const allResults: { metric: Record<string, string>; values?: [number, string][]; value?: [number, string] }[] = [];
+  for (const res of data) {
+    if ('status' in res && res.status === 'success' && res.data !== undefined && 'result' in res.data && Array.isArray(res.data.result)) {
+      for (const r of res.data.result) {
+        if (typeof r === 'object' && r !== null && 'metric' in r) {
+          allResults.push(r);
         }
       }
     }
+  }
 
-    return formatPrometheusToTable(allResults);
-  }, [data]);
+  return formatPrometheusToTable(allResults);
+};
+
+export const TablePanel = ({ panel, timeRange, refetchInterval }: TablePanelProps) => {
+  const { data, isLoading, error, refetch } = usePanelData(panel.datasourceId, panel.queries, timeRange, refetchInterval);
+
+  const tableData = useMemo(() => toTableData(data), [data]);
 
   const handleRetry = useCallback(() => {
     void refetch();

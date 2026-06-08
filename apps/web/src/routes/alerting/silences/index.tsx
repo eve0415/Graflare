@@ -22,7 +22,7 @@ const SilencesPage = () => {
   const router = useRouter();
   const [deleting, setDeleting] = useState<string | null>(null);
 
-  const [now] = useState(() => Date.now() / 1000);
+  const [now] = useState(() => Date.now());
 
   const handleDelete = useCallback(
     (id: string) => {
@@ -44,7 +44,7 @@ const SilencesPage = () => {
     () =>
       silences.map(silence => ({
         ...silence,
-        isActive: silence.startsAt <= now && silence.endsAt > now,
+        isActive: silence.startsAt.getTime() <= now && silence.endsAt.getTime() > now,
         onDelete: () => {
           handleDelete(silence.id);
         },
@@ -88,7 +88,7 @@ const SilencesPage = () => {
                   ))}
                 </div>
                 <div className='text-muted-foreground text-xs'>
-                  {new Date(row.startsAt * 1000).toLocaleString()} &mdash; {new Date(row.endsAt * 1000).toLocaleString()}
+                  {row.startsAt.toLocaleString()} &mdash; {row.endsAt.toLocaleString()}
                   {row.createdBy !== '' && <> | Created by {row.createdBy}</>}
                 </div>
               </CardContent>

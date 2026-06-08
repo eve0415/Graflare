@@ -171,6 +171,7 @@ const ImportPage = () => {
         </label>
         <textarea
           id='json-input'
+          aria-label='Dashboard JSON'
           className='border-border bg-background h-48 w-full rounded-md border p-3 font-mono text-sm'
           value={jsonText}
           onChange={handleTextChange}

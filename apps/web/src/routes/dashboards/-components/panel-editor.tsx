@@ -53,7 +53,7 @@ export const PanelEditor = ({ panel, open, onClose, onSave }: PanelEditorProps) 
   );
 
   const handleTypeChange = useCallback(
-    (val: string) => {
+    (val: string | null) => {
       if (val === 'timeseries' || val === 'stat' || val === 'table' || val === 'gauge') {
         updateField('type', val);
       }
@@ -63,7 +63,7 @@ export const PanelEditor = ({ panel, open, onClose, onSave }: PanelEditorProps) 
 
   const addQuery = useCallback(() => {
     const refId = String.fromCodePoint(65 + draft.queries.length);
-    const newQuery: PanelQuery = { refId, expr: '', legendFormat: '' };
+    const newQuery: PanelQuery = { refId, expr: '', legendFormat: '', format: 'time_series' };
     updateField('queries', [...draft.queries, newQuery]);
   }, [draft.queries, updateField]);
 

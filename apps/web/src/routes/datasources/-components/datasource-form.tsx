@@ -17,7 +17,7 @@ interface DatasourceFormData {
   id?: string;
   name: string;
   type: DatasourceType;
-  dialect?: DatasourceDialect;
+  dialect?: DatasourceDialect | undefined;
   url: string;
   authType: AuthType;
   queryTimeoutMs: number;
