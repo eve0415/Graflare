@@ -335,9 +335,9 @@ export default defineConfig({
         'react-hooks-js/gating': 'error',
       },
     },
-    // shadcn/ui components — generated code; relax rules that fight it.
+    // shadcn/ui — vendored source (added via `shadcn add`); relax rules that fight generated code.
     {
-      files: ['packages/ui/src/components/**/*.tsx'],
+      files: ['packages/ui/src/**/*.ts', 'packages/ui/src/**/*.tsx'],
       rules: {
         'func-style': 'off',
         'import/no-self-import': 'off',
@@ -350,11 +350,19 @@ export default defineConfig({
         'typescript/no-unsafe-argument': 'off',
         'typescript/no-unsafe-call': 'off',
         'typescript/no-unsafe-return': 'off',
+        'typescript/strict-boolean-expressions': 'off',
         'prefer-destructuring': 'off',
         'import/no-default-export': 'off',
+        'no-negated-condition': 'off',
+        'no-param-reassign': 'off',
+        'react/button-has-type': 'off',
+        'unicorn/no-document-cookie': 'off',
+        'react-hooks-js/set-state-in-effect': 'off',
         // shadcn primitives are generic wrappers; label/control association
         // happens at the call site (htmlFor/id), which this rule can't see.
         'jsx-a11y/label-has-associated-control': 'off',
+        // shadcn breadcrumb's current-page item uses role="link" + aria-disabled by design.
+        'jsx-a11y/prefer-tag-over-role': 'off',
       },
     },
     // TanStack route files legitimately default-export.
@@ -400,6 +408,15 @@ export default defineConfig({
         'vitest/require-to-throw-message': 'error',
         'vitest/valid-describe-callback': 'error',
         'vitest/valid-expect': 'error',
+      },
+    },
+    // The metrics-ingestion bridge processes collectors sequentially on purpose:
+    // concurrent D1 writes cause contention (see the cron chunking/backoff history),
+    // so await-in-loop is the intended pattern in the collector loop, not an oversight.
+    {
+      files: ['apps/bridge/src/cron.ts'],
+      rules: {
+        'no-await-in-loop': 'off',
       },
     },
   ],
