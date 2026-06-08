@@ -1,0 +1,1 @@
+ALTER TABLE `datasources` ADD `cache_ttl` integer DEFAULT 0 NOT NULL;

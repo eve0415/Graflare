@@ -31,6 +31,7 @@ export const datasources = sqliteTable('datasources', {
   authType: text('auth_type').notNull().default('none'),
   credentials: text('credentials'),
   queryTimeoutMs: integer('query_timeout_ms').notNull().default(30000),
+  cacheTtl: integer('cache_ttl').notNull().default(0),
   createdAt: integer('created_at', { mode: 'timestamp_ms' }).notNull(),
   updatedAt: integer('updated_at', { mode: 'timestamp_ms' }).notNull(),
 });

@@ -28,6 +28,9 @@ export const datasourceSchema = z.object({
   url: z.url().check(z.maxLength(2048)),
   authType: datasourceAuthType,
   queryTimeoutMs: z._default(z.int().check(z.minimum(1000), z.maximum(120000)), 30000),
+  // Per-datasource query-result cache TTL in seconds. 0 disables caching for
+  // this datasource (query live every time); capped at one day.
+  cacheTtl: z._default(z.int().check(z.minimum(0), z.maximum(86400)), 0),
   createdAt: z.int(),
   updatedAt: z.int(),
 });
