@@ -1,4 +1,4 @@
-interface AlertEmailData {
+export interface AlertEmailData {
   ruleName: string;
   state: 'Firing' | 'Resolved';
   labels: Record<string, string>;
@@ -8,7 +8,7 @@ interface AlertEmailData {
   externalURL: string;
 }
 
-export function renderAlertEmailHtml(alerts: AlertEmailData[]): string {
+export const renderAlertEmailHtml = (alerts: AlertEmailData[]): string => {
   const hasFiring = alerts.some(a => a.state === 'Firing');
   const statusColor = hasFiring ? '#dc2626' : '#16a34a';
   const statusText = hasFiring ? 'FIRING' : 'RESOLVED';
@@ -58,9 +58,9 @@ export function renderAlertEmailHtml(alerts: AlertEmailData[]): string {
   </div>
 </body>
 </html>`;
-}
+};
 
-export function renderAlertEmailText(alerts: AlertEmailData[]): string {
+export const renderAlertEmailText = (alerts: AlertEmailData[]): string => {
   const hasFiring = alerts.some(a => a.state === 'Firing');
   const lines = [`[${hasFiring ? 'FIRING' : 'RESOLVED'}] Graflare Alert`, ''];
 
@@ -77,8 +77,6 @@ export function renderAlertEmailText(alerts: AlertEmailData[]): string {
   }
 
   return lines.join('\n');
-}
+};
 
-function escapeHtml(s: string): string {
-  return s.replaceAll('&', '&amp;').replaceAll('<', '&lt;').replaceAll('>', '&gt;').replaceAll('"', '&quot;');
-}
+const escapeHtml = (s: string): string => s.replaceAll('&', '&amp;').replaceAll('<', '&lt;').replaceAll('>', '&gt;').replaceAll('"', '&quot;');

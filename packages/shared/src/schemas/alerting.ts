@@ -71,3 +71,8 @@ export const muteTimeIntervalSchema = z.object({
   timezone: z._default(z.string().check(z.maxLength(64)), 'UTC'),
 });
 export type MuteTimeInterval = z.infer<typeof muteTimeIntervalSchema>;
+
+// Array forms, prebuilt here so non-zod packages (the API worker) can `.parse()` JSON columns.
+export const labelMatchersSchema = z.array(labelMatcherSchema);
+export const muteTimeIntervalsSchema = z.array(muteTimeIntervalSchema);
+export const stringListSchema = z.array(z.string());

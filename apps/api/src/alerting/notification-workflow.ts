@@ -1,35 +1,25 @@
-import type { LabelMatcher } from '@graflare/shared/schemas/alerting';
+import type { ContactPointSettings } from '@graflare/shared/schemas/alerting';
+import type { WorkflowEvent, WorkflowStep } from 'cloudflare:workers';
+import type { AlertEmailData } from './templates/alert-email';
 
-import { matchLabels } from '@graflare/shared/alerting/matchers';
 import { isMuted } from '@graflare/shared/alerting/mute-check';
+import { matchLabels } from '@graflare/shared/alerting/matchers';
 import { buildWebhookPayload } from '@graflare/shared/alerting/webhook-payload';
+import { contactPointSettingsSchema, labelMatchersSchema, labelsMapSchema, muteTimeIntervalsSchema, stringListSchema } from '@graflare/shared/schemas/alerting';
 import { WorkflowEntrypoint } from 'cloudflare:workers';
 
 import { decryptCredentials } from '../crypto/credentials';
 
 import { renderAlertEmailHtml, renderAlertEmailText } from './templates/alert-email';
 
-function parseStringArray(v: unknown): string[] {
-  return Array.isArray(v) ? v.filter((s): s is string => typeof s === 'string') : [];
-}
-
-function parseStringRecord(v: unknown): Record<string, string> {
-  if (typeof v !== 'object' || v === null) return {};
-  const result: Record<string, string> = {};
-  for (const [key, val] of Object.entries(v)) {
-    if (typeof val === 'string') result[key] = val;
+/** Parse a JSON string against a zod schema, falling back to a default on any error. */
+const parseJson = <T>(schema: { parse: (value: unknown) => T }, raw: string, fallback: T): T => {
+  try {
+    return schema.parse(JSON.parse(raw));
+  } catch {
+    return fallback;
   }
-  return result;
-}
-
-function parseUnknownRecord(v: unknown): Record<string, unknown> {
-  if (typeof v !== 'object' || v === null) return {};
-  const result: Record<string, unknown> = {};
-  for (const [key, val] of Object.entries(v)) {
-    result[key] = val;
-  }
-  return result;
-}
+};
 
 interface NotificationWorkflowParams {
   orgId: string;
@@ -84,13 +74,7 @@ interface Env {
 }
 
 export class NotificationWorkflow extends WorkflowEntrypoint<Env, NotificationWorkflowParams> {
-  override async run(
-    event: Readonly<{ payload: Readonly<NotificationWorkflowParams>; timestamp: Date; instanceId: string; workflowName: string }>,
-    step: {
-      do: <T>(name: string, configOrCb: unknown, cb?: unknown) => Promise<T>;
-      sleep: (name: string, duration: string) => Promise<void>;
-    },
-  ): Promise<void> {
+  override async run(event: Readonly<WorkflowEvent<NotificationWorkflowParams>>, step: WorkflowStep): Promise<void> {
     const params = event.payload;
 
     const policy = await step.do<{ contactPointId: string | null; groupWaitS: number; muteTimingIds: string[] }>('resolve-policy', async () => {
@@ -103,7 +87,7 @@ export class NotificationWorkflow extends WorkflowEntrypoint<Env, NotificationWo
 
       for (const p of policies) {
         if (p.parent_id === null) continue;
-        const matchers: LabelMatcher[] = JSON.parse(p.matchers);
+        const matchers = parseJson(labelMatchersSchema, p.matchers, []);
         if (matchers.length > 0 && matchLabels(matchers, params.ruleLabels)) {
           matched = p;
           if (p.continue_matching === 0) break;
@@ -117,7 +101,7 @@ export class NotificationWorkflow extends WorkflowEntrypoint<Env, NotificationWo
       return {
         contactPointId: matched.contact_point_id,
         groupWaitS: matched.group_wait_s,
-        muteTimingIds: parseStringArray(JSON.parse(matched.mute_timing_ids)),
+        muteTimingIds: parseJson(stringListSchema, matched.mute_timing_ids, []),
       };
     });
 
@@ -138,7 +122,7 @@ export class NotificationWorkflow extends WorkflowEntrypoint<Env, NotificationWo
 
         return rows.results.map(r => ({
           labelsHash: r.labels_hash,
-          labels: parseStringRecord(JSON.parse(r.labels)),
+          labels: parseJson(labelsMapSchema, r.labels, {}),
           state: r.state,
           value: r.value,
           activeAt: r.active_at,
@@ -154,10 +138,7 @@ export class NotificationWorkflow extends WorkflowEntrypoint<Env, NotificationWo
         .bind(params.orgId, now, now)
         .all<SilenceRow>();
 
-      const silenceMatchers = silenceRows.results.map(r => {
-        const parsed: unknown = JSON.parse(r.matchers);
-        return Array.isArray(parsed) ? parsed : [];
-      });
+      const silenceMatchers = silenceRows.results.map(r => parseJson(labelMatchersSchema, r.matchers, []));
 
       return alerts.filter(a => {
         const allLabels = { ...params.ruleLabels, ...a.labels };
@@ -176,28 +157,29 @@ export class NotificationWorkflow extends WorkflowEntrypoint<Env, NotificationWo
         .all<MuteTimingRow>();
 
       const now = new Date();
-      return !muteRows.results.some(r => {
-        const intervals: unknown = JSON.parse(r.intervals);
-        return Array.isArray(intervals) && isMuted(intervals, now);
-      });
+      return !muteRows.results.some(r => isMuted(parseJson(muteTimeIntervalsSchema, r.intervals, []), now));
     });
 
     if (!shouldDeliver) return;
 
-    const contactPoint = await step.do<{ name: string; type: string; settings: Record<string, unknown> } | null>('load-contact-point', async () => {
+    const contactPoint = await step.do<{ name: string; settings: ContactPointSettings } | null>('load-contact-point', async () => {
       const rows = await this.env.DB.prepare('SELECT id, name, type, settings FROM contact_points WHERE id = ?')
         .bind(policy.contactPointId)
         .all<ContactPointRow>();
 
       const [row] = rows.results;
       if (row === undefined) return null;
-      return { name: row.name, type: row.type, settings: parseUnknownRecord(JSON.parse(row.settings)) };
+      const settings = parseJson<ContactPointSettings | null>(contactPointSettingsSchema, row.settings, null);
+      if (settings === null) return null;
+      return { name: row.name, settings };
     });
 
     if (contactPoint === null) return;
 
+    const { settings } = contactPoint;
+
     await step.do('deliver', { retries: { limit: 5, delay: '10 seconds', backoff: 'exponential' } }, async () => {
-      if (contactPoint.type === 'webhook') {
+      if (settings.type === 'webhook') {
         const payloadAlerts = filteredAlerts.map(a => ({
           state: a.state,
           labels: { ...params.ruleLabels, ...a.labels },
@@ -210,32 +192,26 @@ export class NotificationWorkflow extends WorkflowEntrypoint<Env, NotificationWo
 
         const payload = buildWebhookPayload(payloadAlerts, contactPoint.name, params.externalURL);
 
-        let url = '';
-        if (typeof contactPoint.settings['url'] === 'string') ({ url } = contactPoint.settings);
-        const method = typeof contactPoint.settings['method'] === 'string' ? contactPoint.settings['method'] : 'POST';
-
         const headers: Record<string, string> = { 'Content-Type': 'application/json' };
 
-        if (typeof contactPoint.settings['password'] === 'string' && contactPoint.settings['password'].length > 0) {
-          const decryptedPass = await decryptCredentials(contactPoint.settings['password'], this.env.ENCRYPTION_KEY);
-          const username = typeof contactPoint.settings['username'] === 'string' ? contactPoint.settings['username'] : '';
-          headers['Authorization'] = `Basic ${btoa(`${username}:${decryptedPass}`)}`;
+        if (settings.password.length > 0) {
+          const decryptedPass = await decryptCredentials(settings.password, this.env.ENCRYPTION_KEY);
+          headers['Authorization'] = `Basic ${btoa(`${settings.username}:${decryptedPass}`)}`;
         }
 
-        const res = await fetch(url, { method, headers, body: JSON.stringify(payload) });
+        const res = await fetch(settings.url, { method: settings.method, headers, body: JSON.stringify(payload) });
         if (!res.ok) {
           throw new Error(`Webhook delivery failed: ${res.status}`);
         }
-      } else if (contactPoint.type === 'email') {
-        const { addresses } = contactPoint.settings;
-        if (!Array.isArray(addresses) || addresses.length === 0) return;
+      } else {
+        if (settings.addresses.length === 0) return;
 
-        const emailAlerts = filteredAlerts.map(a => ({
+        const emailAlerts: AlertEmailData[] = filteredAlerts.map(a => ({
           ruleName: params.ruleName,
           state: a.state === 'Firing' ? 'Firing' : 'Resolved',
           labels: { ...params.ruleLabels, ...a.labels },
           value: a.value,
-          startsAt: a.activeAt !== null ? new Date(a.activeAt).toISOString() : 'N/A',
+          startsAt: a.activeAt === null ? 'N/A' : new Date(a.activeAt).toISOString(),
           externalURL: params.externalURL,
         }));
 
@@ -245,7 +221,7 @@ export class NotificationWorkflow extends WorkflowEntrypoint<Env, NotificationWo
         const subject = `[${hasFiring ? 'FIRING' : 'RESOLVED'}] ${params.ruleName}`;
 
         await this.env.EMAIL.send({
-          to: addresses.map((a: string) => ({ email: a })),
+          to: settings.addresses,
           from: { email: 'alerts@graflare.dev', name: 'Graflare Alerts' },
           subject,
           html,
@@ -255,25 +231,14 @@ export class NotificationWorkflow extends WorkflowEntrypoint<Env, NotificationWo
     });
 
     await step.do('create-annotations', async () => {
-      for (const a of filteredAlerts) {
+      const stmts = filteredAlerts.map(a => {
         const prevState = a.state === 'Firing' ? 'Normal' : 'Firing';
-        await this.env.DB.prepare(
+        return this.env.DB.prepare(
           `INSERT INTO annotations (id, org_id, alert_rule_id, time, text, tags, prev_state, new_state, created_at)
            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-        )
-          .bind(
-            crypto.randomUUID(),
-            params.orgId,
-            params.ruleId,
-            Date.now(),
-            `${params.ruleName}: ${a.state}`,
-            JSON.stringify(['alert']),
-            prevState,
-            a.state,
-            Date.now(),
-          )
-          .run();
-      }
+        ).bind(crypto.randomUUID(), params.orgId, params.ruleId, Date.now(), `${params.ruleName}: ${a.state}`, JSON.stringify(['alert']), prevState, a.state, Date.now());
+      });
+      if (stmts.length > 0) await this.env.DB.batch(stmts);
     });
   }
 }
