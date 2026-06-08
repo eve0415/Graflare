@@ -13,7 +13,7 @@ const PANEL_KIND_MAP: Record<string, string> = {
   piechart: 'pie',
 };
 
-const SUPPORTED_TYPES = new Set(['timeseries', 'stat', 'table', 'gauge', 'bargauge', 'barchart', 'pie', 'histogram', 'text']);
+const SUPPORTED_TYPES = new Set(['timeseries', 'stat', 'table', 'gauge', 'bargauge', 'barchart', 'pie', 'histogram', 'heatmap', 'text']);
 
 // Grafana's text panel `mode` is one of code/text/html/markdown; we render only markdown
 // or sanitized html, so anything other than 'html' clamps to 'markdown'. Mirrors the
@@ -94,6 +94,7 @@ export const importV2 = (json: Record<string, unknown>): ImportResult => {
       panelType !== 'barchart' &&
       panelType !== 'pie' &&
       panelType !== 'histogram' &&
+      panelType !== 'heatmap' &&
       panelType !== 'text'
     )
       continue;

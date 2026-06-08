@@ -3,7 +3,7 @@ import * as z from 'zod/mini';
 import { fieldConfigSchema } from './field-config';
 import { thresholdsSchema } from './threshold';
 
-export const panelTypeSchema = z.enum(['timeseries', 'stat', 'table', 'gauge', 'bargauge', 'barchart', 'pie', 'histogram', 'text']);
+export const panelTypeSchema = z.enum(['timeseries', 'stat', 'table', 'gauge', 'bargauge', 'barchart', 'pie', 'histogram', 'heatmap', 'text']);
 
 export type PanelType = z.infer<typeof panelTypeSchema>;
 
@@ -99,6 +99,18 @@ export const histogramDisplaySchema = z.object({
 
 export type HistogramDisplay = z.infer<typeof histogramDisplaySchema>;
 
+// Heatmap: a 2D density grid (x = time buckets, y = value buckets, cell = sample
+// count). `xBuckets`/`yBuckets` size the grid; `colorScheme` picks the cell color ramp.
+// Minimal + defaulted, mirroring the other panels — extra controls (axis scaling, fixed
+// domains) can be added as further defaulted keys without breaking stored panels.
+export const heatmapDisplaySchema = z.object({
+  xBuckets: z._default(z.int().check(z.minimum(2), z.maximum(200)), 20),
+  yBuckets: z._default(z.int().check(z.minimum(2), z.maximum(100)), 10),
+  colorScheme: z._default(z.enum(['blues', 'greens', 'reds', 'turbo']), 'blues'),
+});
+
+export type HeatmapDisplay = z.infer<typeof heatmapDisplaySchema>;
+
 // Text: author-written panel content with no data query. `content` holds the source
 // string (Markdown, or HTML when `mode` is 'html'); `mode` selects how it is parsed.
 // Both are rendered through react-markdown with rehype-sanitize ON, so author HTML is
@@ -119,6 +131,7 @@ export const displayOptionsSchema = z.object({
   barchart: z.optional(barChartDisplaySchema),
   pie: z.optional(pieDisplaySchema),
   histogram: z.optional(histogramDisplaySchema),
+  heatmap: z.optional(heatmapDisplaySchema),
   text: z.optional(textDisplaySchema),
 });
 

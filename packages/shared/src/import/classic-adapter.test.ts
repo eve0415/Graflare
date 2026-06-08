@@ -139,6 +139,12 @@ describe('importClassic', () => {
       expect(result.warnings).toEqual([]);
     });
 
+    it('keeps "heatmap" as "heatmap"', () => {
+      const result = importClassic({ ...minimalDashboard, panels: [makePanel('heatmap')] });
+      expect(result.dashboard.panels[0]?.type).toBe('heatmap');
+      expect(result.warnings).toEqual([]);
+    });
+
     it('keeps "text" as "text"', () => {
       const result = importClassic({ ...minimalDashboard, panels: [makePanel('text')] });
       expect(result.dashboard.panels[0]?.type).toBe('text');
@@ -176,8 +182,8 @@ describe('importClassic', () => {
         ...minimalDashboard,
         panels: [
           {
-            type: 'heatmap',
-            title: 'My Heatmap',
+            type: 'state-timeline',
+            title: 'My Timeline',
             targets: [{ refId: 'A', expr: 'up' }],
             gridPos: { x: 0, y: 0, w: 12, h: 8 },
             fieldConfig: { defaults: { thresholds: { steps: [] } } },
@@ -187,7 +193,7 @@ describe('importClassic', () => {
 
       expect(result.dashboard.panels).toHaveLength(1);
       expect(result.dashboard.panels[0]?.type).toBe('stat');
-      expect(result.warnings).toEqual(['Unsupported panel type "heatmap" (panel "My Heatmap") — converted to placeholder stat panel']);
+      expect(result.warnings).toEqual(['Unsupported panel type "state-timeline" (panel "My Timeline") — converted to placeholder stat panel']);
     });
 
     it('uses fallback panel name when title is empty', () => {
@@ -195,7 +201,7 @@ describe('importClassic', () => {
         ...minimalDashboard,
         panels: [
           {
-            type: 'heatmap',
+            type: 'state-timeline',
             title: '',
             targets: [],
             gridPos: { x: 0, y: 0, w: 12, h: 8 },
@@ -204,7 +210,7 @@ describe('importClassic', () => {
         ],
       });
 
-      expect(result.warnings).toEqual(['Unsupported panel type "heatmap" (panel "Panel 0") — converted to placeholder stat panel']);
+      expect(result.warnings).toEqual(['Unsupported panel type "state-timeline" (panel "Panel 0") — converted to placeholder stat panel']);
     });
 
     it('falls through PANEL_TYPE_MAP for unknown types', () => {
@@ -273,8 +279,8 @@ describe('importClassic', () => {
             title: 'Row',
             panels: [
               {
-                type: 'heatmap',
-                title: 'Nested Heatmap',
+                type: 'state-timeline',
+                title: 'Nested Timeline',
                 targets: [],
                 gridPos: { x: 0, y: 0, w: 12, h: 8 },
                 fieldConfig: { defaults: { thresholds: { steps: [] } } },
@@ -289,7 +295,7 @@ describe('importClassic', () => {
 
       expect(result.dashboard.panels).toHaveLength(1);
       expect(result.dashboard.panels[0]?.type).toBe('stat');
-      expect(result.warnings[0]).toContain('heatmap');
+      expect(result.warnings[0]).toContain('state-timeline');
     });
   });
 
@@ -781,7 +787,7 @@ describe('importClassic', () => {
             fieldConfig: { defaults: { thresholds: { steps: [] } } },
           },
           {
-            type: 'heatmap',
+            type: 'state-timeline',
             title: 'Unsupported',
             targets: [],
             gridPos: { x: 0, y: 25, w: 12, h: 8 },
@@ -796,7 +802,7 @@ describe('importClassic', () => {
       expect(result.dashboard.panels.map(p => p.type)).toEqual(['timeseries', 'stat', 'table', 'gauge', 'timeseries', 'stat']);
       expect(result.dashboard.panels.map(p => p.id)).toEqual(['panel-0', 'panel-1', 'panel-2', 'panel-3', 'panel-4', 'panel-5']);
       expect(result.warnings).toHaveLength(1);
-      expect(result.warnings[0]).toContain('heatmap');
+      expect(result.warnings[0]).toContain('state-timeline');
     });
   });
 });
