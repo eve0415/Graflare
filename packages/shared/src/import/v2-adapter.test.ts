@@ -133,6 +133,12 @@ describe('importV2', () => {
       expect(result.dashboard.panels[0]?.type).toBe('gauge');
     });
 
+    it('supports BarGauge panels (case-insensitive)', () => {
+      const result = importV2(makeV2({ a: { kind: 'BarGauge' } }));
+      expect(result.dashboard.panels[0]?.type).toBe('bargauge');
+      expect(result.warnings).toEqual([]);
+    });
+
     it('converts unsupported type to stat with warning', () => {
       const result = importV2(makeV2({ hm: { kind: 'Heatmap' } }));
 

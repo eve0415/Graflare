@@ -106,9 +106,10 @@ describe('importClassic', () => {
       expect(result.dashboard.panels[0]?.type).toBe('gauge');
     });
 
-    it('maps "bargauge" to "gauge"', () => {
+    it('keeps "bargauge" as "bargauge"', () => {
       const result = importClassic({ ...minimalDashboard, panels: [makePanel('bargauge')] });
-      expect(result.dashboard.panels[0]?.type).toBe('gauge');
+      expect(result.dashboard.panels[0]?.type).toBe('bargauge');
+      expect(result.warnings).toEqual([]);
     });
   });
 

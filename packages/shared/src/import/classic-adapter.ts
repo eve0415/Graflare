@@ -14,10 +14,10 @@ const PANEL_TYPE_MAP: Record<string, string> = {
   table: 'table',
   'table-old': 'table',
   gauge: 'gauge',
-  bargauge: 'gauge',
+  bargauge: 'bargauge',
 };
 
-const SUPPORTED_TYPES = new Set(['timeseries', 'stat', 'table', 'gauge']);
+const SUPPORTED_TYPES = new Set(['timeseries', 'stat', 'table', 'gauge', 'bargauge']);
 
 const mapQueries = (targets: GrafanaPanel['targets'], baseIndex: number): PanelQuery[] =>
   targets.map((t, i) => ({
@@ -73,7 +73,7 @@ const convertPanel = (gp: GrafanaBasePanel, index: number, warnings: string[]): 
   }
 
   const panelType = supported ? mapped : 'stat';
-  if (panelType !== 'timeseries' && panelType !== 'stat' && panelType !== 'table' && panelType !== 'gauge') {
+  if (panelType !== 'timeseries' && panelType !== 'stat' && panelType !== 'table' && panelType !== 'gauge' && panelType !== 'bargauge') {
     return null;
   }
 

@@ -3,7 +3,7 @@ import * as z from 'zod/mini';
 import { fieldConfigSchema } from './field-config';
 import { thresholdsSchema } from './threshold';
 
-export const panelTypeSchema = z.enum(['timeseries', 'stat', 'table', 'gauge']);
+export const panelTypeSchema = z.enum(['timeseries', 'stat', 'table', 'gauge', 'bargauge']);
 
 export type PanelType = z.infer<typeof panelTypeSchema>;
 
@@ -60,11 +60,22 @@ export const gaugeDisplaySchema = z.object({
 
 export type GaugeDisplay = z.infer<typeof gaugeDisplaySchema>;
 
+// Bar gauge: one labelled bar per series, filled by (value-min)/(max-min). min/max
+// live in fieldConfig.defaults (the shared single home), so they're absent here.
+// displayMode mirrors Grafana's basic/gradient/lcd fills; kept minimal + defaulted.
+export const barGaugeDisplaySchema = z.object({
+  orientation: z._default(z.enum(['horizontal', 'vertical']), 'horizontal'),
+  displayMode: z._default(z.enum(['basic', 'gradient', 'lcd']), 'gradient'),
+});
+
+export type BarGaugeDisplay = z.infer<typeof barGaugeDisplaySchema>;
+
 export const displayOptionsSchema = z.object({
   timeseries: z.optional(timeseriesDisplaySchema),
   stat: z.optional(statDisplaySchema),
   table: z.optional(tableDisplaySchema),
   gauge: z.optional(gaugeDisplaySchema),
+  bargauge: z.optional(barGaugeDisplaySchema),
 });
 
 export type DisplayOptions = z.infer<typeof displayOptionsSchema>;
