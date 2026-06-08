@@ -4,7 +4,7 @@ import { describe, expect, it } from 'vitest';
 
 import { buildWebhookPayload } from './webhook-payload';
 
-const must = <T,>(v: T | undefined): T => {
+const must = <T>(v: T | undefined): T => {
   if (v === undefined) throw new Error('expected defined');
   return v;
 };

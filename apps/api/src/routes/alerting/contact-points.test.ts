@@ -46,7 +46,9 @@ const readId = (value: unknown): string => {
 };
 
 /** Asserts the value is a webhook settings object and returns its password. */
-const webhookPassword = (settings: { type: 'email'; addresses: string[] } | { type: 'webhook'; url: string; method: 'POST' | 'PUT'; username: string; password: string } | undefined): string => {
+const webhookPassword = (
+  settings: { type: 'email'; addresses: string[] } | { type: 'webhook'; url: string; method: 'POST' | 'PUT'; username: string; password: string } | undefined,
+): string => {
   if (settings?.type !== 'webhook') throw new Error('expected webhook settings');
   return settings.password;
 };

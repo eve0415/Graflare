@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 
 import { FUNCTION_CATALOG, catalogByName } from './catalog';
 
-const must = <T,>(v: T | undefined): T => {
+const must = <T>(v: T | undefined): T => {
   if (v === undefined) throw new Error('expected defined');
   return v;
 };

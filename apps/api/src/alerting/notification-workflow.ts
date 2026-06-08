@@ -1,9 +1,9 @@
+import type { AlertEmailData } from './templates/alert-email';
 import type { ContactPointSettings } from '@graflare/shared/schemas/alerting';
 import type { WorkflowEvent, WorkflowStep } from 'cloudflare:workers';
-import type { AlertEmailData } from './templates/alert-email';
 
-import { isMuted } from '@graflare/shared/alerting/mute-check';
 import { matchLabels } from '@graflare/shared/alerting/matchers';
+import { isMuted } from '@graflare/shared/alerting/mute-check';
 import { buildWebhookPayload } from '@graflare/shared/alerting/webhook-payload';
 import { contactPointSettingsSchema, labelMatchersSchema, labelsMapSchema, muteTimeIntervalsSchema, stringListSchema } from '@graflare/shared/schemas/alerting';
 import { WorkflowEntrypoint } from 'cloudflare:workers';
@@ -236,7 +236,17 @@ export class NotificationWorkflow extends WorkflowEntrypoint<Env, NotificationWo
         return this.env.DB.prepare(
           `INSERT INTO annotations (id, org_id, alert_rule_id, time, text, tags, prev_state, new_state, created_at)
            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-        ).bind(crypto.randomUUID(), params.orgId, params.ruleId, Date.now(), `${params.ruleName}: ${a.state}`, JSON.stringify(['alert']), prevState, a.state, Date.now());
+        ).bind(
+          crypto.randomUUID(),
+          params.orgId,
+          params.ruleId,
+          Date.now(),
+          `${params.ruleName}: ${a.state}`,
+          JSON.stringify(['alert']),
+          prevState,
+          a.state,
+          Date.now(),
+        );
       });
       if (stmts.length > 0) await this.env.DB.batch(stmts);
     });

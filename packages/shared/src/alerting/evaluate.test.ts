@@ -4,7 +4,7 @@ import { describe, expect, it } from 'vitest';
 
 import { evaluateCondition } from './evaluate';
 
-const must = <T,>(v: T | undefined): T => {
+const must = <T>(v: T | undefined): T => {
   if (v === undefined) throw new Error('expected defined');
   return v;
 };

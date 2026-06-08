@@ -1,4 +1,12 @@
-import type { AlertCondition, AlertQuery, ContactPointSettings, ExecErrState, LabelMatcher, MuteTimeInterval, NoDataState } from '@graflare/shared/schemas/alerting';
+import type {
+  AlertCondition,
+  AlertQuery,
+  ContactPointSettings,
+  ExecErrState,
+  LabelMatcher,
+  MuteTimeInterval,
+  NoDataState,
+} from '@graflare/shared/schemas/alerting';
 import type { Panel } from '@graflare/shared/schemas/panel';
 import type { Variable } from '@graflare/shared/schemas/variable';
 

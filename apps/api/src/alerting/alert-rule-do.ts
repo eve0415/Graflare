@@ -220,7 +220,16 @@ export class AlertRuleDO extends DurableObject<Env> {
         if (prevState !== newState.state) {
           const notify = newState.state === 'Firing' || newState.state === 'Resolved';
           pending.push(
-            this.syncAndNotify(config, result.labelsHash, result.labels, newState.state, String(result.value), newState.firedAt ?? prev?.fired_at ?? null, now, notify),
+            this.syncAndNotify(
+              config,
+              result.labelsHash,
+              result.labels,
+              newState.state,
+              String(result.value),
+              newState.firedAt ?? prev?.fired_at ?? null,
+              now,
+              notify,
+            ),
           );
         }
       }
