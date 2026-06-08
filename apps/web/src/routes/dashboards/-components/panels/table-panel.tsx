@@ -8,6 +8,7 @@ import { useCallback, useMemo } from 'react';
 
 import { QueryResultTable, formatPrometheusToTable } from '../../../-root/query-result-table';
 
+import { extractResultSeries } from './panel-data-extract';
 import { PanelFrame } from './panel-frame';
 import { usePanelData } from './use-panel-data';
 
@@ -20,6 +21,8 @@ interface TablePanelProps {
 const toTableData = (data: PanelDataResult[] | null | undefined): { columns: string[]; rows: string[][] } => {
   if (data === null || data === undefined) return { columns: [], rows: [] };
 
+  // A SQL data source returns its own columns/rows shape (no `status`); render it
+  // directly. Prometheus responses fall through to the shared series extraction.
   for (const res of data) {
     if ('columns' in res && 'rows' in res && !('status' in res)) {
       return {
@@ -29,18 +32,7 @@ const toTableData = (data: PanelDataResult[] | null | undefined): { columns: str
     }
   }
 
-  const allResults: { metric: Record<string, string>; values?: [number, string][]; value?: [number, string] }[] = [];
-  for (const res of data) {
-    if ('status' in res && res.status === 'success' && res.data !== undefined && 'result' in res.data && Array.isArray(res.data.result)) {
-      for (const r of res.data.result) {
-        if (typeof r === 'object' && r !== null && 'metric' in r) {
-          allResults.push(r);
-        }
-      }
-    }
-  }
-
-  return formatPrometheusToTable(allResults);
+  return formatPrometheusToTable(extractResultSeries(data));
 };
 
 export const TablePanel = ({ panel, timeRange, refetchInterval }: TablePanelProps) => {

@@ -1,3 +1,4 @@
+import type { ResultSeries } from './panel-data-extract';
 import type { PanelDataResult } from './use-panel-data';
 import type { FieldConfigDefaults } from '@graflare/shared/schemas/field-config';
 import type { PanelQuery } from '@graflare/shared/schemas/panel';
@@ -6,12 +7,11 @@ import type uPlotNs from 'uplot';
 import { formatValue } from '@graflare/shared/format/value-format';
 import uPlot from 'uplot';
 
-// A single plotted series: its label set plus the per-bucket samples. Mirrors the
-// extraction the time-series panel does, kept pure so it carries the test weight.
-export interface BarChartSeries {
-  metric: Record<string, string>;
-  values?: [number, string][];
-}
+import { extractResultSeries } from './panel-data-extract';
+
+// A single plotted series: its label set plus the per-bucket samples. An instant
+// `value` may ride along (shared `ResultSeries` shape); bar charts read `values`.
+export type BarChartSeries = ResultSeries;
 
 interface BuildBarChartOptionsArgs {
   series: BarChartSeries[];
@@ -27,24 +27,10 @@ interface BuildBarChartOptionsArgs {
 const BAR_SIZE: [factor: number, max: number] = [0.6, 60];
 
 /**
- * Reduce panel query results to one series per result row. Pure: no DOM. Error
- * results and non-object rows are skipped, matching the time-series extraction.
+ * Reduce panel query results to one series per result row. Pure: no DOM. Error and
+ * non-prometheus responses are skipped via the shared `extractResultSeries`.
  */
-export const barChartSeries = (data: PanelDataResult[] | null | undefined): BarChartSeries[] => {
-  if (data === null || data === undefined) return [];
-
-  const series: BarChartSeries[] = [];
-  for (const res of data) {
-    if (!('status' in res)) continue;
-    if (res.status !== 'success' || res.data === undefined || !('result' in res.data) || !Array.isArray(res.data.result)) continue;
-    for (const row of res.data.result) {
-      if (typeof row === 'object' && row !== null && 'metric' in row) {
-        series.push('values' in row ? { metric: row.metric, values: row.values } : { metric: row.metric });
-      }
-    }
-  }
-  return series;
-};
+export const barChartSeries = (data: PanelDataResult[] | null | undefined): BarChartSeries[] => extractResultSeries(data);
 
 /**
  * Build uPlot AlignedData: `[timestamps, ...perSeriesValues]`. The bucket axis is

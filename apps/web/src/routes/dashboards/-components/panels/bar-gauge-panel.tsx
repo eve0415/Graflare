@@ -7,6 +7,7 @@ import { applyValueMappings } from '@graflare/shared/format/value-mappings';
 import { useCallback, useMemo } from 'react';
 
 import { barGaugeSegments } from './bar-gauge-data';
+import { getThresholdColor } from './panel-data-extract';
 import { PanelFrame } from './panel-frame';
 import { usePanelData } from './use-panel-data';
 
@@ -17,14 +18,6 @@ interface BarGaugePanelProps {
 }
 
 const DEFAULT_BAR_COLOR = '#4ade80';
-
-const getThresholdColor = (value: number, thresholds: { value: number; color: string }[]): string => {
-  const sorted = [...thresholds].sort((a, b) => b.value - a.value);
-  for (const t of sorted) {
-    if (value >= t.value) return t.color;
-  }
-  return DEFAULT_BAR_COLOR;
-};
 
 interface BarGaugeRowProps {
   segment: BarGaugeSegment;
@@ -40,7 +33,7 @@ const BarGaugeRow = ({ segment, min, max, defaults, thresholds, vertical }: BarG
   // matching the stat panel's precedence.
   const mapping = useMemo(() => applyValueMappings(segment.value, defaults.mappings), [segment.value, defaults.mappings]);
   const displayText = mapping?.text ?? formatValue(segment.value, defaults);
-  const fillColor = mapping?.color ?? (thresholds.length > 0 ? getThresholdColor(segment.value, thresholds) : DEFAULT_BAR_COLOR);
+  const fillColor = mapping?.color ?? (thresholds.length > 0 ? getThresholdColor(segment.value, thresholds, DEFAULT_BAR_COLOR) : DEFAULT_BAR_COLOR);
 
   // The coloured fill is layered over a `<meter>` whose own bar is made
   // transparent (same trick as gauge-panel), so the threshold colour shows while

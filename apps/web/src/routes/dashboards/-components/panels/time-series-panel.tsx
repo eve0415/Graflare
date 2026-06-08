@@ -7,6 +7,7 @@ import { useCallback, useMemo } from 'react';
 import { QueryResultTable, formatPrometheusToTable } from '../../../-root/query-result-table';
 import { UPlotChart } from '../../../-root/uplot-chart';
 
+import { extractResultSeries } from './panel-data-extract';
 import { PanelFrame } from './panel-frame';
 import { usePanelData } from './use-panel-data';
 
@@ -21,25 +22,10 @@ interface TimeSeriesPanelProps {
 export const TimeSeriesPanel = ({ panel, timeRange, refetchInterval, width, height }: TimeSeriesPanelProps) => {
   const { data, isLoading, error, refetch } = usePanelData(panel.datasourceId, panel.queries, timeRange, refetchInterval);
 
-  const chartResult = useMemo(() => {
-    if (data === null || data === undefined) return null;
-
-    const allResults: { metric: Record<string, string>; values?: [number, string][] }[] = [];
-    for (const res of data) {
-      if (!('status' in res)) continue;
-      if (res.status === 'success' && res.data !== undefined && 'result' in res.data && Array.isArray(res.data.result)) {
-        for (const r of res.data.result) {
-          if (typeof r === 'object' && r !== null && 'metric' in r) {
-            allResults.push(r);
-          }
-        }
-      }
-    }
-    return allResults;
-  }, [data]);
+  const chartResult = useMemo(() => extractResultSeries(data), [data]);
 
   const chartData = useMemo((): uPlot.AlignedData => {
-    if (chartResult === null || chartResult.length === 0) return [[]];
+    if (chartResult.length === 0) return [[]];
 
     const [first] = chartResult;
     if (first?.values === undefined) return [[]];
@@ -66,7 +52,7 @@ export const TimeSeriesPanel = ({ panel, timeRange, refetchInterval, width, heig
       axes: [{}, { values: formatYTicks }],
       series: [
         {},
-        ...(chartResult ?? []).map((r, i) => ({
+        ...chartResult.map((r, i) => ({
           label: r.metric.__name__ ?? panel.queries[i]?.legendFormat ?? `Series ${String(i + 1)}`,
           stroke: `hsl(${String(i * 60)}, 70%, 50%)`,
           width: panel.displayOptions.timeseries?.lineWidth ?? 1,
@@ -101,10 +87,7 @@ export const TimeSeriesPanel = ({ panel, timeRange, refetchInterval, width, heig
     };
   }, [width, height, chartResult, panel]);
 
-  const tableData = useMemo(() => {
-    if (chartResult === null) return { columns: [], rows: [] };
-    return formatPrometheusToTable(chartResult);
-  }, [chartResult]);
+  const tableData = useMemo(() => formatPrometheusToTable(chartResult), [chartResult]);
 
   const handleRetry = useCallback(() => {
     void refetch();

@@ -4,6 +4,7 @@ import { formatValue } from '@graflare/shared/format/value-format';
 import { applyValueMappings } from '@graflare/shared/format/value-mappings';
 import { useCallback, useMemo } from 'react';
 
+import { firstScalar, getThresholdColor } from './panel-data-extract';
 import { PanelFrame } from './panel-frame';
 import { usePanelData } from './use-panel-data';
 
@@ -13,37 +14,12 @@ interface StatPanelProps {
   refetchInterval: number | false;
 }
 
-const getThresholdColor = (value: number, thresholds: { value: number; color: string }[]): string => {
-  const sorted = [...thresholds].sort((a, b) => b.value - a.value);
-  for (const t of sorted) {
-    if (value >= t.value) return t.color;
-  }
-  return 'var(--color-foreground)';
-};
-
 export const StatPanel = ({ panel, timeRange, refetchInterval }: StatPanelProps) => {
   const { data, isLoading, error, refetch } = usePanelData(panel.datasourceId, panel.queries, timeRange, refetchInterval);
 
-  const value = useMemo(() => {
-    if (data === null || data === undefined) return null;
-
-    for (const res of data) {
-      if (!('status' in res)) continue;
-      if (res.status !== 'success' || res.data === undefined || !('result' in res.data)) continue;
-      const results = res.data.result;
-      if (!Array.isArray(results) || results.length === 0) continue;
-      const [first] = results;
-      if (typeof first !== 'object' || first === null) continue;
-      if ('value' in first && Array.isArray(first.value) && first.value.length >= 2) {
-        return String(first.value[1]);
-      }
-      if ('values' in first && Array.isArray(first.values) && first.values.length > 0) {
-        const last = first.values.at(-1);
-        if (Array.isArray(last) && last.length >= 2) return String(last[1]);
-      }
-    }
-    return null;
-  }, [data]);
+  // Latest scalar of the first series, kept as the raw token (stat displays the
+  // string verbatim when it isn't numeric).
+  const value = useMemo(() => firstScalar(data), [data]);
 
   const handleRetry = useCallback(() => {
     void refetch();
@@ -63,7 +39,7 @@ export const StatPanel = ({ panel, timeRange, refetchInterval }: StatPanelProps)
   const displayText = mapping?.text ?? (isNumeric ? formatValue(numericValue, defaults) : (value ?? '—'));
 
   // Color precedence: mapping color > threshold color > default.
-  const thresholdColor = isNumeric && panel.thresholds.length > 0 ? getThresholdColor(numericValue, panel.thresholds) : undefined;
+  const thresholdColor = isNumeric && panel.thresholds.length > 0 ? getThresholdColor(numericValue, panel.thresholds, 'var(--color-foreground)') : undefined;
   const effectiveColor = mapping?.color ?? thresholdColor;
 
   const valueStyle = useMemo(
