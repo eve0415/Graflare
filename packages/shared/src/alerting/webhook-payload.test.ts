@@ -4,6 +4,11 @@ import { describe, expect, it } from 'vitest';
 
 import { buildWebhookPayload } from './webhook-payload';
 
+const must = <T,>(v: T | undefined): T => {
+  if (v === undefined) throw new Error('expected defined');
+  return v;
+};
+
 const firingAlert: AlertForPayload = {
   state: 'Firing',
   labels: { alertname: 'HighCPU', severity: 'critical', job: 'api' },
@@ -30,7 +35,7 @@ describe('buildWebhookPayload', () => {
     const payload = buildWebhookPayload([firingAlert], 'default-receiver', 'http://localhost');
     expect(payload.status).toBe('firing');
     expect(payload.alerts).toHaveLength(1);
-    expect(payload.alerts[0].status).toBe('firing');
+    expect(must(payload.alerts[0]).status).toBe('firing');
     expect(payload.receiver).toBe('default-receiver');
     expect(payload.externalURL).toBe('http://localhost');
   });
@@ -38,7 +43,7 @@ describe('buildWebhookPayload', () => {
   it('builds resolved payload', () => {
     const payload = buildWebhookPayload([resolvedAlert], 'default-receiver', 'http://localhost');
     expect(payload.status).toBe('resolved');
-    expect(payload.alerts[0].endsAt).toBeTruthy();
+    expect(must(payload.alerts[0]).endsAt).toBeTruthy();
   });
 
   it('mixed firing + resolved = firing status', () => {
@@ -72,11 +77,11 @@ describe('buildWebhookPayload', () => {
 
   it('alert values contain numeric value', () => {
     const payload = buildWebhookPayload([firingAlert], 'r', 'http://x');
-    expect(payload.alerts[0].values).toEqual({ value: 95 });
+    expect(must(payload.alerts[0]).values).toEqual({ value: 95 });
   });
 
   it('fingerprint is preserved', () => {
     const payload = buildWebhookPayload([firingAlert], 'r', 'http://x');
-    expect(payload.alerts[0].fingerprint).toBe('abc123');
+    expect(must(payload.alerts[0]).fingerprint).toBe('abc123');
   });
 });

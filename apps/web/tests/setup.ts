@@ -1,3 +1,5 @@
+import type { ReactNode } from 'react';
+
 import { vi } from 'vitest';
 
 Object.defineProperty(globalThis, 'matchMedia', {
@@ -68,7 +70,7 @@ vi.mock('../src/lib/introspection', () => ({
   listLabelValues: () => Promise.resolve({ values: [] }),
 }));
 
-const MockGrid = ({ children }: { children: React.ReactNode }) => children;
+const MockGrid = ({ children }: { children: ReactNode }): ReactNode => children;
 vi.mock('react-grid-layout', () => ({
   default: MockGrid,
   Responsive: MockGrid,
