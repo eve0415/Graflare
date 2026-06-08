@@ -5,7 +5,7 @@ export default defineConfig({
   // `react-hooks` is a reserved plugin name in oxlint, so the JS plugin
   // (React Compiler + hooks rules) must be aliased.
   jsPlugins: [{ name: 'react-hooks-js', specifier: 'eslint-plugin-react-hooks' }],
-  ignorePatterns: ['**/dist', '**/.output', '**/.vinxi', '**/.wrangler', '**/.localflare', '**/drizzle', '**/worker-configuration.d.ts', '**/routeTree.gen.ts'],
+  ignorePatterns: ['**/dist', '**/.output', '**/.vinxi', '**/.wrangler', '**/.localflare', '**/.claude', '**/.agents', '**/drizzle', '**/worker-configuration.d.ts', '**/routeTree.gen.ts'],
   options: {
     typeAware: true,
     typeCheck: true,
