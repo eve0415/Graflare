@@ -3,7 +3,7 @@ import * as z from 'zod/mini';
 import { fieldConfigSchema } from './field-config';
 import { thresholdsSchema } from './threshold';
 
-export const panelTypeSchema = z.enum(['timeseries', 'stat', 'table', 'gauge', 'bargauge']);
+export const panelTypeSchema = z.enum(['timeseries', 'stat', 'table', 'gauge', 'bargauge', 'barchart']);
 
 export type PanelType = z.infer<typeof panelTypeSchema>;
 
@@ -70,12 +70,22 @@ export const barGaugeDisplaySchema = z.object({
 
 export type BarGaugeDisplay = z.infer<typeof barGaugeDisplaySchema>;
 
+// Bar chart: categorical/time bars via uPlot's bars path-builder. Minimal +
+// defaulted; stacking maps to uPlot bands, orientation to the axis swap.
+export const barChartDisplaySchema = z.object({
+  orientation: z._default(z.enum(['horizontal', 'vertical']), 'vertical'),
+  stacking: z._default(z.enum(['none', 'normal']), 'none'),
+});
+
+export type BarChartDisplay = z.infer<typeof barChartDisplaySchema>;
+
 export const displayOptionsSchema = z.object({
   timeseries: z.optional(timeseriesDisplaySchema),
   stat: z.optional(statDisplaySchema),
   table: z.optional(tableDisplaySchema),
   gauge: z.optional(gaugeDisplaySchema),
   bargauge: z.optional(barGaugeDisplaySchema),
+  barchart: z.optional(barChartDisplaySchema),
 });
 
 export type DisplayOptions = z.infer<typeof displayOptionsSchema>;

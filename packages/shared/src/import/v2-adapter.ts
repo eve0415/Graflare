@@ -6,7 +6,7 @@ import type { ImportResult } from './types';
 
 import { grafanaV2Schema } from '../schemas/grafana-v2';
 
-const SUPPORTED_TYPES = new Set(['timeseries', 'stat', 'table', 'gauge', 'bargauge']);
+const SUPPORTED_TYPES = new Set(['timeseries', 'stat', 'table', 'gauge', 'bargauge', 'barchart']);
 
 const mapV2Queries = (el: V2Element): PanelQuery[] =>
   el.spec.data.queries.map((q, i) => ({
@@ -73,7 +73,15 @@ export const importV2 = (json: Record<string, unknown>): ImportResult => {
     }
 
     const panelType = supported ? rawType : 'stat';
-    if (panelType !== 'timeseries' && panelType !== 'stat' && panelType !== 'table' && panelType !== 'gauge' && panelType !== 'bargauge') continue;
+    if (
+      panelType !== 'timeseries' &&
+      panelType !== 'stat' &&
+      panelType !== 'table' &&
+      panelType !== 'gauge' &&
+      panelType !== 'bargauge' &&
+      panelType !== 'barchart'
+    )
+      continue;
 
     const layoutItem = layoutMap.get(key);
     const gridPos = {

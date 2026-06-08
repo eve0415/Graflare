@@ -111,6 +111,12 @@ describe('importClassic', () => {
       expect(result.dashboard.panels[0]?.type).toBe('bargauge');
       expect(result.warnings).toEqual([]);
     });
+
+    it('keeps "barchart" as "barchart"', () => {
+      const result = importClassic({ ...minimalDashboard, panels: [makePanel('barchart')] });
+      expect(result.dashboard.panels[0]?.type).toBe('barchart');
+      expect(result.warnings).toEqual([]);
+    });
   });
 
   describe('unsupported panel types', () => {

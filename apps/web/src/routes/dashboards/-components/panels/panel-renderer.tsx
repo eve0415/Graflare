@@ -3,6 +3,7 @@ import type { Panel } from '@graflare/shared/schemas/panel';
 import { interpolateQueries } from '@graflare/shared/variables/interpolate';
 import { useMemo } from 'react';
 
+import { BarChartPanel } from './bar-chart-panel';
 import { BarGaugePanel } from './bar-gauge-panel';
 import { GaugePanel } from './gauge-panel';
 import { PanelFrame } from './panel-frame';
@@ -36,6 +37,8 @@ export const PanelRenderer = ({ panel, timeRange, refetchInterval, width, height
       return <GaugePanel panel={resolvedPanel} timeRange={timeRange} refetchInterval={refetchInterval} />;
     case 'bargauge':
       return <BarGaugePanel panel={resolvedPanel} timeRange={timeRange} refetchInterval={refetchInterval} />;
+    case 'barchart':
+      return <BarChartPanel panel={resolvedPanel} timeRange={timeRange} refetchInterval={refetchInterval} width={width} height={height} />;
     default:
       return (
         <PanelFrame title={resolvedPanel.title}>
