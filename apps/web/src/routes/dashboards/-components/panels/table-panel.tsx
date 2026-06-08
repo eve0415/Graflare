@@ -1,6 +1,9 @@
+import type { CellRenderer } from '../../../-root/query-result-table';
 import type { PanelDataResult } from './use-panel-data';
 import type { Panel } from '@graflare/shared/schemas/panel';
 
+import { formatValue } from '@graflare/shared/format/value-format';
+import { applyValueMappings } from '@graflare/shared/format/value-mappings';
 import { useCallback, useMemo } from 'react';
 
 import { QueryResultTable, formatPrometheusToTable } from '../../../-root/query-result-table';
@@ -49,9 +52,26 @@ export const TablePanel = ({ panel, timeRange, refetchInterval }: TablePanelProp
     void refetch();
   }, [refetch]);
 
+  // Column-level field config (defaults only — no per-column overrides yet): map
+  // a cell, else format numeric cells; label cells (non-numeric) fall through raw.
+  const { defaults } = panel.fieldConfig;
+  const renderCell = useCallback<CellRenderer>(
+    (cell): { text: string; color?: string } => {
+      const mapping = applyValueMappings(cell, defaults.mappings);
+      if (mapping !== null) {
+        const text = mapping.text ?? cell;
+        return mapping.color === undefined ? { text } : { text, color: mapping.color };
+      }
+      const num = Number(cell);
+      if (cell.trim() !== '' && Number.isFinite(num)) return { text: formatValue(num, defaults) };
+      return { text: cell };
+    },
+    [defaults],
+  );
+
   return (
     <PanelFrame title={panel.title} panelId={panel.id} loading={isLoading} error={error instanceof Error ? error.message : null} onRetry={handleRetry}>
-      <QueryResultTable data={tableData} />
+      <QueryResultTable data={tableData} renderCell={renderCell} />
     </PanelFrame>
   );
 };

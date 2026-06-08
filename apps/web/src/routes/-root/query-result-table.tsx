@@ -1,13 +1,32 @@
+import type { CSSProperties } from 'react';
+
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@graflare/ui/components/table';
+import { useMemo } from 'react';
+
+// Optional per-cell transform: panels use it to format numeric cells and apply
+// value-mapping text/color. Absent = render the raw string (the Explore default).
+export type CellRenderer = (cell: string, rowIndex: number, colIndex: number) => { text: string; color?: string };
 
 interface QueryResultTableProps {
   data: {
     columns: string[];
     rows: string[][];
   };
+  renderCell?: CellRenderer;
 }
 
-export const QueryResultTable = ({ data }: QueryResultTableProps) => {
+// Leaf cell: the style object is built here from primitive props so the parent's
+// map scope never passes a freshly-created object down (react-perf).
+const DataCell = ({ text, color }: { text: string; color: string | undefined }) => {
+  const style = useMemo<CSSProperties | undefined>(() => (color === undefined ? undefined : { color }), [color]);
+  return (
+    <TableCell className='font-mono text-xs' style={style}>
+      {text}
+    </TableCell>
+  );
+};
+
+export const QueryResultTable = ({ data, renderCell }: QueryResultTableProps) => {
   const { columns, rows } = data;
 
   if (columns.length === 0) {
@@ -27,11 +46,10 @@ export const QueryResultTable = ({ data }: QueryResultTableProps) => {
         <TableBody>
           {rows.map((row, i) => (
             <TableRow key={String(i)}>
-              {row.map((cell, j) => (
-                <TableCell key={`${String(i)}-${String(j)}`} className='font-mono text-xs'>
-                  {cell}
-                </TableCell>
-              ))}
+              {row.map((cell, j) => {
+                const rendered = renderCell?.(cell, i, j);
+                return <DataCell key={`${String(i)}-${String(j)}`} text={rendered?.text ?? cell} color={rendered?.color} />;
+              })}
             </TableRow>
           ))}
         </TableBody>

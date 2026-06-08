@@ -1,5 +1,7 @@
 import type { Panel } from '@graflare/shared/schemas/panel';
 
+import { formatValue } from '@graflare/shared/format/value-format';
+import { applyValueMappings } from '@graflare/shared/format/value-mappings';
 import { useCallback, useMemo } from 'react';
 
 import { PanelFrame } from './panel-frame';
@@ -47,29 +49,45 @@ export const StatPanel = ({ panel, timeRange, refetchInterval }: StatPanelProps)
     void refetch();
   }, [refetch]);
 
-  const numericValue = value === null ? 0 : Number(value);
+  const { defaults } = panel.fieldConfig;
+  const numericValue = value === null ? Number.NaN : Number(value);
+  const isNumeric = Number.isFinite(numericValue);
   const colorMode = panel.displayOptions.stat?.colorMode ?? 'value';
   const textSize = panel.displayOptions.stat?.textSize ?? 48;
-  const thresholdColor = panel.thresholds.length > 0 ? getThresholdColor(numericValue, panel.thresholds) : undefined;
+
+  // One pass over the mappings; both the displayed text and the color derive from it.
+  const mapping = useMemo(() => applyValueMappings(value, defaults.mappings), [value, defaults.mappings]);
+
+  // Display: a matching mapping's text wins; else format numeric values; else keep
+  // the raw Prometheus token (or em-dash) — never a formatted unit on a non-number.
+  const displayText = mapping?.text ?? (isNumeric ? formatValue(numericValue, defaults) : (value ?? '—'));
+
+  // Color precedence: mapping color > threshold color > default.
+  const thresholdColor = isNumeric && panel.thresholds.length > 0 ? getThresholdColor(numericValue, panel.thresholds) : undefined;
+  const effectiveColor = mapping?.color ?? thresholdColor;
 
   const valueStyle = useMemo(
     () => ({
       fontSize: `${String(textSize)}px`,
-      color: colorMode === 'value' && thresholdColor !== undefined ? thresholdColor : undefined,
+      color: colorMode === 'value' && effectiveColor !== undefined ? effectiveColor : undefined,
     }),
-    [textSize, colorMode, thresholdColor],
+    [textSize, colorMode, effectiveColor],
   );
 
   const bgStyle = useMemo(() => {
-    if (colorMode !== 'background' || thresholdColor === undefined) return;
-    return { backgroundColor: thresholdColor, color: 'white' };
-  }, [colorMode, thresholdColor]);
+    if (colorMode !== 'background' || effectiveColor === undefined) return;
+    return { backgroundColor: effectiveColor, color: 'white' };
+  }, [colorMode, effectiveColor]);
 
   return (
     <PanelFrame title={panel.title} panelId={panel.id} loading={isLoading} error={error instanceof Error ? error.message : null} onRetry={handleRetry}>
-      <output className='flex h-full items-center justify-center rounded' style={bgStyle} aria-label={`${panel.title}: ${value ?? 'no data'}`}>
+      <output
+        className='flex h-full items-center justify-center rounded'
+        style={bgStyle}
+        aria-label={`${panel.title}: ${value === null ? 'no data' : displayText}`}
+      >
         <span className='font-semibold tabular-nums' style={valueStyle}>
-          {value ?? '—'}
+          {value === null ? '—' : displayText}
         </span>
       </output>
     </PanelFrame>

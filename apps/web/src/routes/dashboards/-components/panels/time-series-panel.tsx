@@ -1,6 +1,7 @@
 import type { Panel } from '@graflare/shared/schemas/panel';
 import type uPlot from 'uplot';
 
+import { formatValue } from '@graflare/shared/format/value-format';
 import { useCallback, useMemo } from 'react';
 
 import { QueryResultTable, formatPrometheusToTable } from '../../../-root/query-result-table';
@@ -52,10 +53,17 @@ export const TimeSeriesPanel = ({ panel, timeRange, refetchInterval, width, heig
   const chartOptions = useMemo((): uPlot.Options => {
     const thresholdBands: uPlot.Band[] = [];
     const sorted = [...panel.thresholds].sort((a, b) => a.value - b.value);
+    const { defaults } = panel.fieldConfig;
+
+    // y-axis tick formatting only — uPlot's DynamicValues hook over the y splits.
+    // Tooltip/legend and value-mappings (which don't apply to a continuous series)
+    // are intentionally left alone. Index 0 = x/time axis (default), index 1 = y.
+    const formatYTicks: uPlot.Axis.DynamicValues = (_u, splits) => splits.map(v => formatValue(v, defaults));
 
     return {
       width: Math.max(100, width - 16),
       height: Math.max(80, height - 60),
+      axes: [{}, { values: formatYTicks }],
       series: [
         {},
         ...(chartResult ?? []).map((r, i) => ({

@@ -1,5 +1,7 @@
 import type { Panel } from '@graflare/shared/schemas/panel';
 
+import { formatValue } from '@graflare/shared/format/value-format';
+import { applyValueMappings } from '@graflare/shared/format/value-mappings';
 import { useCallback, useMemo } from 'react';
 
 import { PanelFrame } from './panel-frame';
@@ -56,8 +58,10 @@ export const GaugePanel = ({ panel, timeRange, refetchInterval }: GaugePanelProp
     return null;
   }, [data]);
 
-  const min = panel.displayOptions.gauge?.min ?? 0;
-  const max = panel.displayOptions.gauge?.max ?? 100;
+  // Field config is the single home for the gauge range now.
+  const { defaults } = panel.fieldConfig;
+  const min = defaults.min ?? 0;
+  const max = defaults.max ?? 100;
   const showMarkers = panel.displayOptions.gauge?.showThresholdMarkers !== false;
 
   const normalizedValue = value === null ? min : Math.max(min, Math.min(max, value));
@@ -68,7 +72,13 @@ export const GaugePanel = ({ panel, timeRange, refetchInterval }: GaugePanelProp
     void refetch();
   }, [refetch]);
 
-  const thresholdColor = value !== null && panel.thresholds.length > 0 ? getThresholdColor(value, panel.thresholds) : '#4ade80';
+  // One pass over the mappings feeds both the center readout text and its color.
+  const mapping = useMemo(() => applyValueMappings(value, defaults.mappings), [value, defaults.mappings]);
+  const centerText = mapping?.text ?? (value === null ? '—' : formatValue(value, defaults));
+  const minLabel = formatValue(min, defaults);
+  const maxLabel = formatValue(max, defaults);
+
+  const thresholdColor = mapping?.color ?? (value !== null && panel.thresholds.length > 0 ? getThresholdColor(value, panel.thresholds) : '#4ade80');
 
   const arcs = useMemo(() => {
     if (panel.thresholds.length === 0 || !showMarkers) {
@@ -103,7 +113,7 @@ export const GaugePanel = ({ panel, timeRange, refetchInterval }: GaugePanelProp
         min={min}
         max={max}
         value={value ?? undefined}
-        aria-label={`${panel.title}: ${value === null ? 'no data' : String(value)}`}
+        aria-label={`${panel.title}: ${value === null ? 'no data' : centerText}`}
       >
         <svg viewBox='0 0 200 130' className='w-full max-w-48'>
           {arcs.map((arc, i) => (
@@ -111,13 +121,13 @@ export const GaugePanel = ({ panel, timeRange, refetchInterval }: GaugePanelProp
           ))}
           {value !== null && <path d={describeArc(-90, angle, 80)} fill='none' stroke={thresholdColor} strokeWidth='12' strokeLinecap='round' />}
           <text x='100' y='105' textAnchor='middle' className='fill-foreground text-2xl font-semibold'>
-            {value === null ? '—' : String(Math.round(value * 100) / 100)}
+            {centerText}
           </text>
           <text x='20' y='125' textAnchor='middle' className='fill-muted-foreground text-xs'>
-            {String(min)}
+            {minLabel}
           </text>
           <text x='180' y='125' textAnchor='middle' className='fill-muted-foreground text-xs'>
-            {String(max)}
+            {maxLabel}
           </text>
         </svg>
       </meter>
