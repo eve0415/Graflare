@@ -27,6 +27,7 @@ app.get('/', async c => {
       url: datasources.url,
       authType: datasources.authType,
       queryTimeoutMs: datasources.queryTimeoutMs,
+      cacheTtl: datasources.cacheTtl,
       createdAt: datasources.createdAt,
       updatedAt: datasources.updatedAt,
     })
@@ -51,6 +52,7 @@ app.get('/:id', sValidator('param', datasourceIdParamSchema, onValidationError),
       url: datasources.url,
       authType: datasources.authType,
       queryTimeoutMs: datasources.queryTimeoutMs,
+      cacheTtl: datasources.cacheTtl,
       createdAt: datasources.createdAt,
       updatedAt: datasources.updatedAt,
     })
@@ -141,6 +143,7 @@ app.put('/:id', sValidator('param', datasourceIdParamSchema, onValidationError),
       url: datasources.url,
       authType: datasources.authType,
       queryTimeoutMs: datasources.queryTimeoutMs,
+      cacheTtl: datasources.cacheTtl,
       createdAt: datasources.createdAt,
       updatedAt: datasources.updatedAt,
     })

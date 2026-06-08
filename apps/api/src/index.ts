@@ -53,6 +53,7 @@ import { and, desc, eq, gte, like, lte, sql } from 'drizzle-orm';
 import { Hono } from 'hono';
 
 import { encryptSecret, redactSecret, resolveSecretOnUpdate } from './alerting/contact-point-secrets';
+import { CacheApiStore, cachedProxyQuery } from './cache/query-cache';
 import { decryptCredentials, encryptCredentials } from './crypto/credentials';
 import { createDb } from './db';
 import {
@@ -179,6 +180,7 @@ export class GraflareAPI extends WorkerEntrypoint<Bindings> {
         url: datasources.url,
         authType: datasources.authType,
         queryTimeoutMs: datasources.queryTimeoutMs,
+        cacheTtl: datasources.cacheTtl,
         createdAt: datasources.createdAt,
         updatedAt: datasources.updatedAt,
       })
@@ -198,6 +200,7 @@ export class GraflareAPI extends WorkerEntrypoint<Bindings> {
         url: datasources.url,
         authType: datasources.authType,
         queryTimeoutMs: datasources.queryTimeoutMs,
+        cacheTtl: datasources.cacheTtl,
         createdAt: datasources.createdAt,
         updatedAt: datasources.updatedAt,
       })
@@ -397,41 +400,49 @@ export class GraflareAPI extends WorkerEntrypoint<Bindings> {
       return { status: 'error', errorType: 'not_found', error: 'Data source not found' };
     }
 
-    const headers: Record<string, string> = { 'Content-Type': 'application/x-www-form-urlencoded' };
+    // The live upstream call. `cachedProxyQuery` may step-align `params` (snapping
+    // start/end) before invoking this, so the URL/body built here is bucketed too.
+    // The allowlist + origin assertion + credential attachment stay entirely
+    // inside this run — caching is purely additive AFTER auth/ownership.
+    const runLive = async (queryParams: Record<string, string>): Promise<PrometheusResponse> => {
+      const headers: Record<string, string> = { 'Content-Type': 'application/x-www-form-urlencoded' };
 
-    try {
-      const base = new URL(ds.url);
-      base.pathname = base.pathname.replace(/\/$/, '') + endpoint;
-      const isPost = endpoint.includes('/query');
+      try {
+        const base = new URL(ds.url);
+        base.pathname = base.pathname.replace(/\/$/, '') + endpoint;
+        const isPost = endpoint.includes('/query');
 
-      const targetUrl = isPost ? base.toString() : `${base.toString()}?${new URLSearchParams(params).toString()}`;
+        const targetUrl = isPost ? base.toString() : `${base.toString()}?${new URLSearchParams(queryParams).toString()}`;
 
-      if (new URL(targetUrl).origin !== base.origin) {
-        return { status: 'error', errorType: 'bad_request', error: 'URL origin mismatch' };
-      }
-
-      // Attach credentials only after confirming the target origin matches the datasource.
-      if (ds.credentials) {
-        const creds = datasourceCredentialsSchema.parse(JSON.parse(await decryptCredentials(ds.credentials, this.env.ENCRYPTION_KEY)));
-        if (ds.authType === 'basic' && creds.username !== undefined && creds.password !== undefined) {
-          headers['Authorization'] = `Basic ${btoa(`${creds.username}:${creds.password}`)}`;
-        } else if (ds.authType === 'bearer' && creds.token !== undefined) {
-          headers['Authorization'] = `Bearer ${creds.token}`;
+        if (new URL(targetUrl).origin !== base.origin) {
+          return { status: 'error', errorType: 'bad_request', error: 'URL origin mismatch' };
         }
+
+        // Attach credentials only after confirming the target origin matches the datasource.
+        if (ds.credentials) {
+          const creds = datasourceCredentialsSchema.parse(JSON.parse(await decryptCredentials(ds.credentials, this.env.ENCRYPTION_KEY)));
+          if (ds.authType === 'basic' && creds.username !== undefined && creds.password !== undefined) {
+            headers['Authorization'] = `Basic ${btoa(`${creds.username}:${creds.password}`)}`;
+          } else if (ds.authType === 'bearer' && creds.token !== undefined) {
+            headers['Authorization'] = `Bearer ${creds.token}`;
+          }
+        }
+
+        const res = await fetch(targetUrl, {
+          method: isPost ? 'POST' : 'GET',
+          headers,
+          ...(isPost && { body: new URLSearchParams(queryParams).toString() }),
+          signal: AbortSignal.timeout(ds.queryTimeoutMs),
+        });
+
+        return prometheusResponseSchema.parse(await res.json());
+      } catch (error) {
+        const message = error instanceof Error ? error.message : 'Query failed';
+        return { status: 'error', errorType: 'timeout', error: message };
       }
+    };
 
-      const res = await fetch(targetUrl, {
-        method: isPost ? 'POST' : 'GET',
-        headers,
-        ...(isPost && { body: new URLSearchParams(params).toString() }),
-        signal: AbortSignal.timeout(ds.queryTimeoutMs),
-      });
-
-      return prometheusResponseSchema.parse(await res.json());
-    } catch (error) {
-      const message = error instanceof Error ? error.message : 'Query failed';
-      return { status: 'error', errorType: 'timeout', error: message };
-    }
+    return cachedProxyQuery(new CacheApiStore(caches.default), { orgId, datasourceId, endpoint, params, cacheTtl: ds.cacheTtl }, runLive);
   }
 
   // --- SQL RPC ---
