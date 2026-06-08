@@ -1,12 +1,13 @@
 import type { Panel } from '@graflare/shared/schemas/panel';
+import type { Layout } from 'react-grid-layout';
 
 import { useMemo } from 'react';
-import RGL from 'react-grid-layout';
+import RGL, { verticalCompactor } from 'react-grid-layout';
 import 'react-grid-layout/css/styles.css';
 
 import { PanelRenderer } from './panels/panel-renderer';
 
-const ResponsiveGridLayout = RGL;
+const GridLayout = RGL;
 
 interface DashboardGridProps {
   panels: Panel[];
@@ -18,6 +19,7 @@ interface DashboardGridProps {
 
 const ROW_HEIGHT = 30;
 const COLS = 24;
+const GRID_CONFIG = { cols: COLS, rowHeight: ROW_HEIGHT };
 
 export const DashboardGrid = ({ panels, timeRange, refreshInterval, editMode, onLayoutChange }: DashboardGridProps) => {
   const layout = useMemo(
@@ -32,9 +34,9 @@ export const DashboardGrid = ({ panels, timeRange, refreshInterval, editMode, on
     [panels],
   );
 
-  const handleLayoutChange = useMemo(() => {
-    if (onLayoutChange === undefined) return;
-    return (newLayout: { i: string; x: number; y: number; w: number; h: number }[]) => {
+  const handleLayoutChange = useMemo(
+    () => (newLayout: Layout) => {
+      if (onLayoutChange === undefined) return;
       const updated = panels.map(p => {
         const layoutItem = newLayout.find(l => l.i === p.id);
         if (layoutItem === undefined) return p;
@@ -44,18 +46,21 @@ export const DashboardGrid = ({ panels, timeRange, refreshInterval, editMode, on
         };
       });
       onLayoutChange(updated);
-    };
-  }, [panels, onLayoutChange]);
+    },
+    [panels, onLayoutChange],
+  );
+
+  const dragConfig = useMemo(() => ({ enabled: editMode }), [editMode]);
+  const resizeConfig = useMemo(() => ({ enabled: editMode }), [editMode]);
 
   return (
-    <ResponsiveGridLayout
+    <GridLayout
       layout={layout}
-      cols={COLS}
-      rowHeight={ROW_HEIGHT}
       width={1200}
-      isDraggable={editMode}
-      isResizable={editMode}
-      compactType='vertical'
+      gridConfig={GRID_CONFIG}
+      compactor={verticalCompactor}
+      dragConfig={dragConfig}
+      resizeConfig={resizeConfig}
       onLayoutChange={handleLayoutChange}
     >
       {panels.map((panel, index) => (
@@ -69,6 +74,6 @@ export const DashboardGrid = ({ panels, timeRange, refreshInterval, editMode, on
           />
         </div>
       ))}
-    </ResponsiveGridLayout>
+    </GridLayout>
   );
 };
