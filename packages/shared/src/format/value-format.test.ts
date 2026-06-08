@@ -19,27 +19,51 @@ describe('formatValue', () => {
     });
   });
 
-  describe('none / short (SI-ish suffixes)', () => {
-    it('leaves small magnitudes plain', () => {
+  describe('no unit / none / unknown (raw passthrough, never SI-scaled)', () => {
+    it('shows the number as-is for the empty unit — a port/year/id is not mangled', () => {
       expect(formatValue(42, cfg())).toBe('42');
+      expect(formatValue(1500, cfg())).toBe('1500');
+      expect(formatValue(8080, cfg())).toBe('8080');
+      expect(formatValue(2026, cfg())).toBe('2026');
       expect(formatValue(0, cfg())).toBe('0');
-      expect(formatValue(-7, cfg())).toBe('-7');
+      expect(formatValue(-1500, cfg())).toBe('-1500');
     });
 
-    it('appends k/M/G/T for large magnitudes (step 1000)', () => {
-      expect(formatValue(1500, cfg())).toBe('1.5K');
-      expect(formatValue(2_500_000, cfg())).toBe('2.5M');
-      expect(formatValue(3_000_000_000, cfg())).toBe('3G');
-      expect(formatValue(4_200_000_000_000, cfg())).toBe('4.2T');
-    });
-
-    it('short behaves like none', () => {
-      expect(formatValue(1500, cfg({ unit: 'short' }))).toBe('1.5K');
+    it("'none' is a synonym for the empty unit", () => {
+      expect(formatValue(1500, cfg({ unit: 'none' }))).toBe('1500');
       expect(formatValue(42, cfg({ unit: 'none' }))).toBe('42');
     });
 
+    it('an unknown unit id passes through raw too', () => {
+      expect(formatValue(1500, cfg({ unit: 'not-a-real-unit' }))).toBe('1500');
+    });
+
+    it('preserves small non-zero values — no false zeros (auto decimals)', () => {
+      expect(formatValue(0.0001, cfg())).toBe('0.0001');
+      expect(formatValue(0.5, cfg())).toBe('0.5');
+    });
+
+    it('honors explicit decimals on a raw passthrough', () => {
+      expect(formatValue(1234, cfg({ decimals: 2 }))).toBe('1234.00');
+      expect(formatValue(8080, cfg({ decimals: 0 }))).toBe('8080');
+    });
+  });
+
+  describe('short (opt-in SI-ish suffixes)', () => {
+    it('leaves small magnitudes plain', () => {
+      expect(formatValue(42, cfg({ unit: 'short' }))).toBe('42');
+      expect(formatValue(-7, cfg({ unit: 'short' }))).toBe('-7');
+    });
+
+    it('appends k/M/G/T for large magnitudes (step 1000)', () => {
+      expect(formatValue(1500, cfg({ unit: 'short' }))).toBe('1.5K');
+      expect(formatValue(2_500_000, cfg({ unit: 'short' }))).toBe('2.5M');
+      expect(formatValue(3_000_000_000, cfg({ unit: 'short' }))).toBe('3G');
+      expect(formatValue(4_200_000_000_000, cfg({ unit: 'short' }))).toBe('4.2T');
+    });
+
     it('handles negative large magnitudes', () => {
-      expect(formatValue(-1500, cfg())).toBe('-1.5K');
+      expect(formatValue(-1500, cfg({ unit: 'short' }))).toBe('-1.5K');
     });
   });
 
@@ -165,14 +189,8 @@ describe('formatValue', () => {
       expect(formatValue(50, cfg({ unit: 'percent', decimals: 2 }))).toBe('50.00%');
     });
 
-    it('decimals on none/short', () => {
-      expect(formatValue(1234, cfg({ decimals: 2 }))).toBe('1.23K');
-    });
-  });
-
-  describe('unknown unit id falls back to plain number', () => {
-    it('formats as a number when the unit is not in the catalog', () => {
-      expect(formatValue(1500, cfg({ unit: 'not-a-real-unit' }))).toBe('1.5K');
+    it('decimals on short', () => {
+      expect(formatValue(1234, cfg({ unit: 'short', decimals: 2 }))).toBe('1.23K');
     });
   });
 

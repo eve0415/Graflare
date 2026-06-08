@@ -54,7 +54,8 @@ const D_LADDER: DurationUnit = { kind: 'duration', factors: [], suffixes: ['day'
 
 // The unit registry. Adding a unit is a data-only change here. Keyed by Grafana id.
 const UNITS: Record<string, UnitDef> = {
-  none: { kind: 'scaled', step: 1000, suffixes: SI_SUFFIXES, space: false },
+  // '' and 'none' are intentionally absent — they fall through to the raw passthrough
+  // in formatValue (no magnitude scaling). 'short' is the opt-in SI-scaled number.
   short: { kind: 'scaled', step: 1000, suffixes: SI_SUFFIXES, space: false },
   bytes: { kind: 'scaled', step: 1024, suffixes: IEC_BYTE, space: true },
   decbytes: { kind: 'scaled', step: 1000, suffixes: SI_BYTE, space: true },
@@ -172,9 +173,11 @@ export const formatValue = (value: number, config: FieldConfigDefaults): string 
   if (!Number.isFinite(value)) return NON_FINITE;
 
   const unit = UNITS[config.unit];
-  // Unknown or empty unit id -> plain SI-ish number (same as none/short).
+  // No unit ('' / 'none') or an unknown id -> raw passthrough: never magnitude-scale,
+  // so ports/years/ids/small ratios show as-is. Honor explicit decimals; auto
+  // (undefined) keeps full precision via String so small values don't collapse to 0.
   if (unit === undefined) {
-    return formatScaled(value, { kind: 'scaled', step: 1000, suffixes: SI_SUFFIXES, space: false }, config.decimals);
+    return config.decimals === undefined ? String(value) : value.toFixed(config.decimals);
   }
 
   switch (unit.kind) {

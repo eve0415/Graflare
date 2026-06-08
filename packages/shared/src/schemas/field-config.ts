@@ -51,7 +51,7 @@ export const makeValueMapping = (type: ValueMappingType, result: MappingResult):
 // (not the whole panel) so a future per-field override can resolve to the same
 // shape and reuse the formatter unchanged.
 export const fieldConfigDefaults = z.object({
-  unit: z._default(z.string().check(z.maxLength(64)), ''), // unit id, '' = none/short
+  unit: z._default(z.string().check(z.maxLength(64)), ''), // unit id, '' = none (raw, no scaling)
   decimals: z.optional(z.int().check(z.minimum(0), z.maximum(10))), // undefined = auto
   min: z.optional(z.number()), // undefined = auto
   max: z.optional(z.number()),
