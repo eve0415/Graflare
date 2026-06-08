@@ -14,7 +14,7 @@ const createApp = () => {
 };
 
 const testBindings: AppEnv['Bindings'] = {
-  DB: env.DB,
+  ...env,
   ENCRYPTION_KEY: 'test-key',
   ACCESS_TEAM_DOMAIN: 'test-team',
   ACCESS_AUD: 'test-aud',
@@ -63,6 +63,11 @@ describe('access middleware', () => {
   });
 });
 
+const asError = (value: unknown): Error => {
+  if (!(value instanceof Error)) throw new TypeError('expected Error instance');
+  return value;
+};
+
 const makeFakeJwt = (overrides: Record<string, unknown> = {}) => {
   const header = btoa(JSON.stringify({ alg: 'RS256', kid: 'test-kid' }));
   const payload = btoa(
@@ -84,34 +89,34 @@ describe('verifyJwt issuer normalization', () => {
     const jwt = makeFakeJwt();
     const err = await verifyJwt(jwt, 'test-team').catch((error: unknown) => error);
     expect(err).toBeInstanceOf(Error);
-    expect((err as Error).message).not.toContain('Bad issuer');
+    expect(asError(err).message).not.toContain('Bad issuer');
   });
 
   it('accepts full domain (team.cloudflareaccess.com)', async () => {
     const jwt = makeFakeJwt();
     const err = await verifyJwt(jwt, 'test-team.cloudflareaccess.com').catch((error: unknown) => error);
     expect(err).toBeInstanceOf(Error);
-    expect((err as Error).message).not.toContain('Bad issuer');
+    expect(asError(err).message).not.toContain('Bad issuer');
   });
 
   it('accepts full URL (https://team.cloudflareaccess.com)', async () => {
     const jwt = makeFakeJwt();
     const err = await verifyJwt(jwt, 'https://test-team.cloudflareaccess.com').catch((error: unknown) => error);
     expect(err).toBeInstanceOf(Error);
-    expect((err as Error).message).not.toContain('Bad issuer');
+    expect(asError(err).message).not.toContain('Bad issuer');
   });
 
   it('rejects mismatched issuer with descriptive message', async () => {
     const jwt = makeFakeJwt();
     const err = await verifyJwt(jwt, 'wrong-team').catch((error: unknown) => error);
     expect(err).toBeInstanceOf(Error);
-    expect((err as Error).message).toBe('Bad issuer: expected https://wrong-team.cloudflareaccess.com, got https://test-team.cloudflareaccess.com');
+    expect(asError(err).message).toBe('Bad issuer: expected https://wrong-team.cloudflareaccess.com, got https://test-team.cloudflareaccess.com');
   });
 
   it('rejects mismatched audience with descriptive message', async () => {
     const jwt = makeFakeJwt();
     const err = await verifyJwt(jwt, 'test-team', 'wrong-aud').catch((error: unknown) => error);
     expect(err).toBeInstanceOf(Error);
-    expect((err as Error).message).toBe('Bad audience: expected wrong-aud, got ["test-aud"]');
+    expect(asError(err).message).toBe('Bad audience: expected wrong-aud, got ["test-aud"]');
   });
 });

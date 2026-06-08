@@ -13,7 +13,7 @@ const TEST_ORG_ID = 'org-test-123';
 const TEST_ENCRYPTION_KEY = btoa(String.fromCodePoint(...crypto.getRandomValues(new Uint8Array(32))));
 
 const testBindings: AppEnv['Bindings'] = {
-  DB: env.DB,
+  ...env,
   ENCRYPTION_KEY: TEST_ENCRYPTION_KEY,
   ACCESS_TEAM_DOMAIN: 'test-team',
   ACCESS_AUD: 'test-aud',
@@ -37,6 +37,60 @@ const json = (body: unknown): RequestInit => ({
   headers: { 'Content-Type': 'application/json' },
   body: JSON.stringify(body),
 });
+
+const readId = (value: unknown): string => {
+  if (typeof value !== 'object' || value === null || !('id' in value) || typeof value.id !== 'string') {
+    throw new Error('bad shape: missing string id');
+  }
+  return value.id;
+};
+
+/** Asserts the value is a webhook settings object and returns its password. */
+const webhookPassword = (settings: { type: 'email'; addresses: string[] } | { type: 'webhook'; url: string; method: 'POST' | 'PUT'; username: string; password: string } | undefined): string => {
+  if (settings?.type !== 'webhook') throw new Error('expected webhook settings');
+  return settings.password;
+};
+
+/** Returns the password field from a webhook contact-point response body. */
+const readWebhookPassword = async (res: Response): Promise<string> => {
+  const body: unknown = await res.json();
+  if (
+    typeof body !== 'object' ||
+    body === null ||
+    !('settings' in body) ||
+    typeof body.settings !== 'object' ||
+    body.settings === null ||
+    !('password' in body.settings) ||
+    typeof body.settings.password !== 'string'
+  ) {
+    throw new Error('bad response shape: missing settings.password string');
+  }
+  return body.settings.password;
+};
+
+const parseJsonArray = async (res: Response): Promise<unknown[]> => {
+  const body: unknown = await res.json();
+  if (!Array.isArray(body)) throw new Error('expected array');
+  return body.map((item): unknown => item);
+};
+
+/** Returns the settings.password from the first item in an array response. */
+const readFirstWebhookPassword = async (res: Response): Promise<string> => {
+  const items = await parseJsonArray(res);
+  const [first] = items;
+  if (
+    typeof first !== 'object' ||
+    first === null ||
+    !('settings' in first) ||
+    typeof first.settings !== 'object' ||
+    first.settings === null ||
+    !('password' in first.settings) ||
+    typeof first.settings.password !== 'string'
+  ) {
+    throw new Error('bad array item shape: missing settings.password string');
+  }
+  return first.settings.password;
+};
 
 describe('contact-point routes', () => {
   beforeEach(async () => {
@@ -79,19 +133,15 @@ describe('contact-point routes', () => {
       testBindings,
     );
     expect(res.status).toBe(201);
-    const body: unknown = await res.json();
-    if (typeof body !== 'object' || body === null || !('settings' in body)) throw new Error('bad shape');
-    const { settings } = body;
-    if (typeof settings !== 'object' || settings === null) throw new Error('bad settings');
-    expect(settings).toHaveProperty('password', '******');
+    const password = await readWebhookPassword(res);
+    expect(password).toBe('******');
 
     const db = createDb(env.DB);
     const rows = await db.select().from(contactPoints);
     const [row] = rows;
-    const dbSettings = row?.settings;
-    if (typeof dbSettings !== 'object' || dbSettings === null) throw new Error('bad db settings');
-    expect(dbSettings['password']).not.toBe('my-secret');
-    expect(dbSettings['password']).not.toBe('******');
+    const storedPassword = webhookPassword(row?.settings);
+    expect(storedPassword).not.toBe('my-secret');
+    expect(storedPassword).not.toBe('******');
   });
 
   it('lists contact points with redacted credentials', async () => {
@@ -111,10 +161,8 @@ describe('contact-point routes', () => {
 
     const res = await app.request(req('/'), {}, testBindings);
     expect(res.status).toBe(200);
-    const body: unknown = await res.json();
-    if (!Array.isArray(body) || body.length === 0) throw new Error('expected array');
-    const { settings } = body[0];
-    expect(settings.password).toBe('******');
+    const password = await readFirstWebhookPassword(res);
+    expect(password).toBe('******');
   });
 
   it('gets a contact point by id', async () => {
@@ -124,10 +172,9 @@ describe('contact-point routes', () => {
       {},
       testBindings,
     );
-    const created: unknown = await createRes.json();
-    if (typeof created !== 'object' || created === null || !('id' in created)) throw new Error('bad shape');
+    const id = readId(await createRes.json());
 
-    const res = await app.request(req(`/${created.id}`), {}, testBindings);
+    const res = await app.request(req(`/${id}`), {}, testBindings);
     expect(res.status).toBe(200);
     const body: unknown = await res.json();
     expect(body).toHaveProperty('name', 'Get Test');
@@ -140,11 +187,10 @@ describe('contact-point routes', () => {
       {},
       testBindings,
     );
-    const created: unknown = await createRes.json();
-    if (typeof created !== 'object' || created === null || !('id' in created)) throw new Error('bad shape');
+    const id = readId(await createRes.json());
 
     const res = await app.request(
-      req(`/${created.id}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name: 'After' }) }),
+      req(`/${id}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name: 'After' }) }),
       {},
       testBindings,
     );
@@ -160,10 +206,9 @@ describe('contact-point routes', () => {
       {},
       testBindings,
     );
-    const created: unknown = await createRes.json();
-    if (typeof created !== 'object' || created === null || !('id' in created)) throw new Error('bad shape');
+    const id = readId(await createRes.json());
 
-    const res = await app.request(req(`/${created.id}`, { method: 'DELETE' }), {}, testBindings);
+    const res = await app.request(req(`/${id}`, { method: 'DELETE' }), {}, testBindings);
     expect(res.status).toBe(204);
   });
 });

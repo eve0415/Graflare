@@ -12,7 +12,7 @@ import { muteTimingRoutes } from './mute-timings';
 const TEST_ORG_ID = 'org-test-123';
 
 const testBindings: AppEnv['Bindings'] = {
-  DB: env.DB,
+  ...env,
   ENCRYPTION_KEY: btoa(String.fromCodePoint(...crypto.getRandomValues(new Uint8Array(32)))),
   ACCESS_TEAM_DOMAIN: 'test-team',
   ACCESS_AUD: 'test-aud',
@@ -36,6 +36,13 @@ const json = (body: unknown): RequestInit => ({
   headers: { 'Content-Type': 'application/json' },
   body: JSON.stringify(body),
 });
+
+const readId = (value: unknown): string => {
+  if (typeof value !== 'object' || value === null || !('id' in value) || typeof value.id !== 'string') {
+    throw new Error('bad shape: missing string id');
+  }
+  return value.id;
+};
 
 describe('mute-timing routes', () => {
   beforeEach(async () => {
@@ -72,10 +79,9 @@ describe('mute-timing routes', () => {
   it('gets a mute timing by id', async () => {
     const app = createApp();
     const createRes = await app.request(req('/', json({ name: 'Get Test' })), {}, testBindings);
-    const created: unknown = await createRes.json();
-    if (typeof created !== 'object' || created === null || !('id' in created)) throw new Error('bad shape');
+    const id = readId(await createRes.json());
 
-    const res = await app.request(req(`/${created.id}`), {}, testBindings);
+    const res = await app.request(req(`/${id}`), {}, testBindings);
     expect(res.status).toBe(200);
     const body: unknown = await res.json();
     expect(body).toHaveProperty('name', 'Get Test');
@@ -84,11 +90,10 @@ describe('mute-timing routes', () => {
   it('updates a mute timing', async () => {
     const app = createApp();
     const createRes = await app.request(req('/', json({ name: 'Before' })), {}, testBindings);
-    const created: unknown = await createRes.json();
-    if (typeof created !== 'object' || created === null || !('id' in created)) throw new Error('bad shape');
+    const id = readId(await createRes.json());
 
     const res = await app.request(
-      req(`/${created.id}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name: 'After' }) }),
+      req(`/${id}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name: 'After' }) }),
       {},
       testBindings,
     );
@@ -100,10 +105,9 @@ describe('mute-timing routes', () => {
   it('deletes a mute timing', async () => {
     const app = createApp();
     const createRes = await app.request(req('/', json({ name: 'Delete Me' })), {}, testBindings);
-    const created: unknown = await createRes.json();
-    if (typeof created !== 'object' || created === null || !('id' in created)) throw new Error('bad shape');
+    const id = readId(await createRes.json());
 
-    const res = await app.request(req(`/${created.id}`, { method: 'DELETE' }), {}, testBindings);
+    const res = await app.request(req(`/${id}`, { method: 'DELETE' }), {}, testBindings);
     expect(res.status).toBe(204);
   });
 });
