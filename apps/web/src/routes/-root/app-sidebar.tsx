@@ -12,17 +12,9 @@ import {
   SidebarRail,
 } from '@graflare/ui/components/sidebar';
 import { Link, useLocation } from '@tanstack/react-router';
-import { Bell, Compass, Database, Import, LayoutDashboard } from 'lucide-react';
 
+import { navItems } from './nav-items';
 import { ThemeToggle } from './theme-toggle';
-
-const navItems = [
-  { to: '/dashboards', label: 'Dashboards', icon: LayoutDashboard },
-  { to: '/explore', label: 'Explore', icon: Compass },
-  { to: '/alerting', label: 'Alerting', icon: Bell },
-  { to: '/datasources', label: 'Data Sources', icon: Database },
-  { to: '/import', label: 'Import', icon: Import },
-] as const;
 
 export const AppSidebar = () => {
   const location = useLocation();
