@@ -9,6 +9,8 @@ import { useCallback, useState } from 'react';
 
 import { createSilence } from '../-api';
 
+import { toEpoch } from './-datetime';
+
 type MatchOperator = '=' | '!=' | '=~' | '!~';
 
 interface Matcher {
@@ -96,11 +98,6 @@ interface FormState {
   endsAt: string;
   comment: string;
 }
-
-const toEpoch = (dt: string): number => {
-  const ms = new Date(dt).getTime();
-  return Number.isNaN(ms) ? 0 : Math.floor(ms / 1000);
-};
 
 const nowIso = () => {
   const d = new Date();
