@@ -9,7 +9,7 @@
     ]
   },
   "scripts": {
-    "dev": "localflare wrangler.json --no-open",
+    "dev": "localflare wrangler.json --no-open --port 8788 -- --inspector-port 9231",
     "build": "wrangler deploy --dry-run --outdir dist",
     "test": "vitest run",
     "generate": "wrangler types && drizzle-kit generate",
