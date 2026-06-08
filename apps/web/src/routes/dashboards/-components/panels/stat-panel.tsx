@@ -4,7 +4,7 @@ import { formatValue } from '@graflare/shared/format/value-format';
 import { applyValueMappings } from '@graflare/shared/format/value-mappings';
 import { useCallback, useMemo } from 'react';
 
-import { firstScalar, getThresholdColor } from './panel-data-extract';
+import { firstScalar, getThresholdColor, readableTextColor } from './panel-data-extract';
 import { PanelFrame } from './panel-frame';
 import { usePanelData } from './use-panel-data';
 
@@ -52,7 +52,9 @@ export const StatPanel = ({ panel, timeRange, refetchInterval }: StatPanelProps)
 
   const bgStyle = useMemo(() => {
     if (colorMode !== 'background' || effectiveColor === undefined) return;
-    return { backgroundColor: effectiveColor, color: 'white' };
+    // Pick the text color from the background's relative luminance so the readout
+    // stays legible on light threshold fills (e.g. yellow), not a hardcoded white.
+    return { backgroundColor: effectiveColor, color: readableTextColor(effectiveColor) };
   }, [colorMode, effectiveColor]);
 
   return (
@@ -62,7 +64,9 @@ export const StatPanel = ({ panel, timeRange, refetchInterval }: StatPanelProps)
         style={bgStyle}
         aria-label={`${panel.title}: ${value === null ? 'no data' : displayText}`}
       >
-        <span className='font-semibold tabular-nums' style={valueStyle}>
+        {/* The em-dash is a visual no-data sentinel; the output's aria-label already
+            says "no data", so hide the bare glyph from assistive tech. */}
+        <span className='font-semibold tabular-nums' style={valueStyle} aria-hidden={value === null ? true : undefined}>
           {value === null ? '—' : displayText}
         </span>
       </output>

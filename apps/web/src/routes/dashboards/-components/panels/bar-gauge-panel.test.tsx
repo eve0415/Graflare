@@ -64,6 +64,10 @@ describe('bar-gauge panel', () => {
     expect(meters).toHaveLength(2);
     expect(screen.getByText('1.5 KiB')).toBeDefined();
     expect(screen.getByText('3 KiB')).toBeDefined();
+
+    // The accessible name pairs the series label with the unit-formatted value, so a
+    // screen reader announces "mem, 1.5 KiB" rather than the bare numeric meter value.
+    expect(meters.map(m => m.getAttribute('aria-label'))).toEqual(['mem: 1.5 KiB', 'mem: 3 KiB']);
   });
 
   it('exposes value/min/max on each bar for assistive tech', () => {

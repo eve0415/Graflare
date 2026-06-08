@@ -1,7 +1,7 @@
 import { Button } from '@graflare/ui/components/button';
 import { Skeleton } from '@graflare/ui/components/skeleton';
 import { AlertCircle, Pencil, Table2, Trash2 } from 'lucide-react';
-import { Suspense, useCallback, useMemo, useState } from 'react';
+import { Suspense, useCallback, useId, useMemo, useState } from 'react';
 
 import { usePanelActions } from './panel-actions-context';
 
@@ -18,6 +18,11 @@ interface PanelFrameProps {
 export const PanelFrame = ({ title, loading, error, onRetry, children, dataTableContent, panelId }: PanelFrameProps) => {
   const [showDataTable, setShowDataTable] = useState(false);
   const actions = usePanelActions();
+  // Names the panel's region landmark via its visible title so screen-reader users
+  // can navigate to it; `react-grid-layout` items are bare divs with no semantics of
+  // their own. The Edit/Delete/data-table controls are real <button>s, so they stay
+  // in the tab order without making the non-interactive region itself a tab stop.
+  const titleId = useId();
 
   const toggleDataTable = useCallback(() => {
     setShowDataTable(v => !v);
@@ -34,18 +39,14 @@ export const PanelFrame = ({ title, loading, error, onRetry, children, dataTable
   const suspenseFallback = useMemo(() => <Skeleton className='h-full w-full' />, []);
 
   return (
-    <div className='border-border bg-card flex h-full flex-col overflow-hidden rounded-lg border'>
+    <section className='border-border bg-card flex h-full flex-col overflow-hidden rounded-lg border' aria-labelledby={titleId}>
       <div className='flex items-center justify-between border-b px-3 py-1.5'>
-        <h3 className='text-sm font-medium'>{title}</h3>
+        <h3 id={titleId} className='text-sm font-medium'>
+          {title}
+        </h3>
         <div className='flex items-center gap-1'>
           {dataTableContent !== undefined && (
-            <Button
-              variant='ghost'
-              size='icon'
-              className='h-6 w-6'
-              onClick={toggleDataTable}
-              aria-label={showDataTable ? 'Show visualization' : 'Show data table'}
-            >
+            <Button variant='ghost' size='icon' className='h-6 w-6' onClick={toggleDataTable} aria-pressed={showDataTable} aria-label='Show data table'>
               <Table2 className='h-3.5 w-3.5' />
             </Button>
           )}
@@ -81,6 +82,6 @@ export const PanelFrame = ({ title, loading, error, onRetry, children, dataTable
           <Suspense fallback={suspenseFallback}>{showDataTable && dataTableContent !== undefined ? dataTableContent : children}</Suspense>
         )}
       </div>
-    </div>
+    </section>
   );
 };

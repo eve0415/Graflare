@@ -41,4 +41,31 @@ describe('panel-frame', () => {
     expect(screen.queryByLabelText('Edit panel')).toBeNull();
     expect(screen.queryByLabelText('Delete panel')).toBeNull();
   });
+
+  it('exposes the panel as a region landmark labelled by its title', () => {
+    render(
+      <PanelFrame title='CPU'>
+        <div>body</div>
+      </PanelFrame>,
+    );
+
+    // react-grid-layout items are bare divs; the named <section> gives screen-reader
+    // users a navigable landmark, and its title is the accessible name.
+    const region = screen.getByRole('region', { name: 'CPU' });
+    expect(region.tagName).toBe('SECTION');
+  });
+
+  it('reflects the data-table toggle state via aria-pressed', () => {
+    render(
+      <PanelFrame title='CPU' dataTableContent={<div>table</div>}>
+        <div>body</div>
+      </PanelFrame>,
+    );
+
+    const toggle = screen.getByLabelText('Show data table');
+    expect(toggle.getAttribute('aria-pressed')).toBe('false');
+
+    fireEvent.click(toggle);
+    expect(toggle.getAttribute('aria-pressed')).toBe('true');
+  });
 });

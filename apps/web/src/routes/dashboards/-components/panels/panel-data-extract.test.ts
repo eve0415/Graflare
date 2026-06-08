@@ -2,7 +2,7 @@ import type { PanelDataResult } from './use-panel-data';
 
 import { describe, expect, it } from 'vitest';
 
-import { extractResultSeries, firstScalar, getThresholdColor, latestSample } from './panel-data-extract';
+import { extractResultSeries, firstScalar, getThresholdColor, latestSample, readableTextColor } from './panel-data-extract';
 
 // Minimal Prometheus instant-vector success shape, one entry per series.
 const vector = (samples: { metric: Record<string, string>; value: number }[]): PanelDataResult[] => [
@@ -196,5 +196,37 @@ describe('getThresholdColor', () => {
       { value: 50, color: 'yellow' },
     ];
     expect(getThresholdColor(60, shuffled, 'fallback')).toBe('yellow');
+  });
+});
+
+describe('readableTextColor', () => {
+  it('picks black text on a light background', () => {
+    expect(readableTextColor('#ffffff')).toBe('#000');
+    expect(readableTextColor('#fafad2')).toBe('#000');
+  });
+
+  it('picks white text on a dark background', () => {
+    expect(readableTextColor('#000000')).toBe('#fff');
+    expect(readableTextColor('#1e3a5f')).toBe('#fff');
+  });
+
+  it('picks black text on a mid yellow (luminance-driven, not naive average)', () => {
+    // #f1c40f is bright enough that black, not white, clears 4.5:1 — the classic
+    // case that a non-linearised luminance calc gets wrong.
+    expect(readableTextColor('#f1c40f')).toBe('#000');
+  });
+
+  it('accepts 3-digit shorthand hex', () => {
+    expect(readableTextColor('#fff')).toBe('#000');
+    expect(readableTextColor('#000')).toBe('#fff');
+  });
+
+  it('falls back to black for an unparseable (non-hex) color string', () => {
+    // stat-panel feeds `bgStyle.backgroundColor`, which can be the CSS var fallback
+    // `var(--color-foreground)` when the value is below every threshold — never throw.
+    expect(readableTextColor('var(--color-foreground)')).toBe('#000');
+    expect(readableTextColor('')).toBe('#000');
+    expect(readableTextColor('#12')).toBe('#000');
+    expect(readableTextColor('#zzzzzz')).toBe('#000');
   });
 });

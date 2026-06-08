@@ -99,7 +99,9 @@ export const GaugePanel = ({ panel, timeRange, refetchInterval }: GaugePanelProp
             <path key={String(i)} d={describeArc(arc.start, arc.end, 80)} fill='none' stroke={arc.color} strokeWidth='12' strokeLinecap='round' opacity={0.3} />
           ))}
           {value !== null && <path d={describeArc(-90, angle, 80)} fill='none' stroke={thresholdColor} strokeWidth='12' strokeLinecap='round' />}
-          <text x='100' y='105' textAnchor='middle' className='fill-foreground text-2xl font-semibold'>
+          {/* When there's no value this reads as a bare em-dash; the meter's
+              aria-label already says "no data", so hide the sentinel glyph. */}
+          <text x='100' y='105' textAnchor='middle' className='fill-foreground text-2xl font-semibold' aria-hidden={value === null ? true : undefined}>
             {centerText}
           </text>
           <text x='20' y='125' textAnchor='middle' className='fill-muted-foreground text-xs'>
