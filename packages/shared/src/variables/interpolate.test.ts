@@ -1,12 +1,16 @@
+import type { PanelQuery } from '../schemas/panel';
+
 import { describe, expect, it } from 'vitest';
 
-import { interpolateVariables } from './interpolate';
+import { interpolateQueries, interpolateVariables } from './interpolate';
 
 // Build "${name}" at runtime to avoid triggering no-template-curly-in-string.
 const braced = (name: string): string => ['$', '{', name, '}'].join('');
 
 // Build "${name" (unclosed) at runtime.
 const unclosed = (name: string): string => ['$', '{', name].join('');
+
+const query = (expr: string): PanelQuery => ({ refId: 'A', expr, legendFormat: '', format: 'time_series' });
 
 describe('interpolateVariables', () => {
   it('replaces a single bare variable', () => {
@@ -116,5 +120,31 @@ describe('interpolateVariables', () => {
   it('handles adjacent $$ and variable', () => {
     const vars = new Map([['x', 'v']]);
     expect(interpolateVariables('$$$x', vars)).toBe('$v');
+  });
+});
+
+describe('interpolateQueries', () => {
+  it('interpolates each query expr and preserves the other fields', () => {
+    const vars = new Map([['job', 'node']]);
+    const [result] = interpolateQueries([{ refId: 'B', expr: 'up{job="$job"}', legendFormat: '$job', format: 'table' }], vars);
+    expect(result?.expr).toBe('up{job="node"}');
+    expect(result?.refId).toBe('B');
+    expect(result?.legendFormat).toBe('$job');
+    expect(result?.format).toBe('table');
+  });
+
+  it('interpolates every query in the list', () => {
+    const vars = new Map<string, string | string[]>([
+      ['job', 'node'],
+      ['env', ['staging', 'prod']],
+    ]);
+    const result = interpolateQueries([query('up{job="$job"}'), query('rate(req{env=~"$env"}[5m])')], vars);
+    expect(result.map(q => q.expr)).toEqual(['up{job="node"}', 'rate(req{env=~"staging|prod"}[5m])']);
+  });
+
+  it('returns the queries unchanged with an empty variable map', () => {
+    const vars = new Map<string, string | string[]>();
+    const input = [query('up{job="prometheus"}')];
+    expect(interpolateQueries(input, vars)).toEqual(input);
   });
 });

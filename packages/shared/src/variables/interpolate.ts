@@ -1,3 +1,5 @@
+import type { PanelQuery } from '../schemas/panel';
+
 /**
  * Replace template variables (`$var`, `${var}`) in a PromQL expression.
  *
@@ -6,7 +8,7 @@
  * - `$$` is an escape for a literal `$`.
  * - Unknown variables are left as-is.
  */
-export const interpolateVariables = (expr: string, variables: Map<string, string | string[]>): string => {
+export const interpolateVariables = (expr: string, variables: ReadonlyMap<string, string | string[]>): string => {
   let result = '';
   let i = 0;
   let inQuote = false;
@@ -91,3 +93,12 @@ export const interpolateVariables = (expr: string, variables: Map<string, string
 
   return result;
 };
+
+/**
+ * Interpolate dashboard variables into a panel's queries at execution time.
+ * Only the query expression is templated — the rest of each query (refId,
+ * legendFormat, format) is preserved, and the original panel queries are left
+ * untouched so editing/saving keeps the raw `$var` form.
+ */
+export const interpolateQueries = (queries: readonly PanelQuery[], variables: ReadonlyMap<string, string | string[]>): PanelQuery[] =>
+  queries.map(q => ({ ...q, expr: interpolateVariables(q.expr, variables) }));

@@ -199,7 +199,14 @@ const DashboardViewPage = () => {
             <p className='text-sm'>Switch to edit mode to add panels.</p>
           </div>
         ) : (
-          <DashboardGrid panels={dashboardPanels} timeRange={timeRange} refreshInterval={refetchMs} editMode={editMode} onLayoutChange={handleLayoutChange} />
+          <DashboardGrid
+            panels={dashboardPanels}
+            timeRange={timeRange}
+            refreshInterval={refetchMs}
+            editMode={editMode}
+            onLayoutChange={handleLayoutChange}
+            variables={variableValues}
+          />
         )}
       </div>
 

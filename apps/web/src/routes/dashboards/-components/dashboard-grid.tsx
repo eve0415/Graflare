@@ -15,13 +15,14 @@ interface DashboardGridProps {
   refreshInterval: number | false;
   editMode: boolean;
   onLayoutChange?: (panels: Panel[]) => void;
+  variables: ReadonlyMap<string, string | string[]>;
 }
 
 const ROW_HEIGHT = 30;
 const COLS = 24;
 const GRID_CONFIG = { cols: COLS, rowHeight: ROW_HEIGHT };
 
-export const DashboardGrid = ({ panels, timeRange, refreshInterval, editMode, onLayoutChange }: DashboardGridProps) => {
+export const DashboardGrid = ({ panels, timeRange, refreshInterval, editMode, onLayoutChange, variables }: DashboardGridProps) => {
   const layout = useMemo(
     () =>
       panels.map(p => ({
@@ -71,6 +72,7 @@ export const DashboardGrid = ({ panels, timeRange, refreshInterval, editMode, on
             refetchInterval={typeof refreshInterval === 'number' ? refreshInterval : false}
             width={panel.gridPos.w * (ROW_HEIGHT + 10)}
             height={panel.gridPos.h * ROW_HEIGHT}
+            variables={variables}
           />
         </div>
       ))}
