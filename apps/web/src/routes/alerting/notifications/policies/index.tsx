@@ -1,10 +1,10 @@
 import { Badge } from '@graflare/ui/components/badge';
-import { Button } from '@graflare/ui/components/button';
+import { Button, buttonVariants } from '@graflare/ui/components/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@graflare/ui/components/card';
 import { Skeleton } from '@graflare/ui/components/skeleton';
 import { useSuspenseQuery } from '@tanstack/react-query';
-import { createFileRoute, useRouter } from '@tanstack/react-router';
-import { Trash2 } from 'lucide-react';
+import { Link, createFileRoute, useRouter } from '@tanstack/react-router';
+import { Plus, Trash2 } from 'lucide-react';
 import { useCallback, useMemo, useState } from 'react';
 
 import { deleteNotificationPolicy } from '../../-api';
@@ -75,6 +75,7 @@ const PoliciesPage = () => {
       for (const child of childList) {
         children.push({
           id: child.id,
+          params: { id: child.id },
           matchers: child.matchers,
           contactPointId: child.contactPointId,
           cpName: resolveCpName(cpMap, child.contactPointId, 'No contact point'),
@@ -85,6 +86,7 @@ const PoliciesPage = () => {
       }
       result.push({
         id: policy.id,
+        params: { id: policy.id },
         contactPointId: policy.contactPointId,
         matchers: policy.matchers,
         groupBy: policy.groupBy,
@@ -105,6 +107,10 @@ const PoliciesPage = () => {
     <div className='space-y-4'>
       <div className='flex items-center justify-between'>
         <h2 className='text-lg font-semibold'>Notification Policies</h2>
+        <Link to='/alerting/notifications/policies/new' className={buttonVariants({ size: 'sm' })}>
+          <Plus className='mr-1 h-3 w-3' />
+          New Policy
+        </Link>
       </div>
 
       {policies.length === 0 ? (
@@ -115,9 +121,14 @@ const PoliciesPage = () => {
             <Card key={policy.id}>
               <CardHeader className='flex flex-row items-center justify-between pb-2'>
                 <CardTitle className='text-sm font-medium'>{policy.cpName}</CardTitle>
-                <Button variant='ghost' size='xs' onClick={policy.onDelete} disabled={deleting === policy.id}>
-                  <Trash2 className='h-3 w-3' />
-                </Button>
+                <div className='flex items-center gap-1'>
+                  <Link to='/alerting/notifications/policies/$id' params={policy.params} className={buttonVariants({ variant: 'ghost', size: 'xs' })}>
+                    Edit
+                  </Link>
+                  <Button variant='ghost' size='xs' onClick={policy.onDelete} disabled={deleting === policy.id}>
+                    <Trash2 className='h-3 w-3' />
+                  </Button>
+                </div>
               </CardHeader>
               <CardContent className='space-y-2'>
                 <div className='flex flex-wrap gap-1'>
@@ -144,9 +155,14 @@ const PoliciesPage = () => {
                             ))}
                           </div>
                         </div>
-                        <Button variant='ghost' size='xs' onClick={child.onDelete} disabled={deleting === child.id}>
-                          <Trash2 className='h-3 w-3' />
-                        </Button>
+                        <div className='flex items-center gap-1'>
+                          <Link to='/alerting/notifications/policies/$id' params={child.params} className={buttonVariants({ variant: 'ghost', size: 'xs' })}>
+                            Edit
+                          </Link>
+                          <Button variant='ghost' size='xs' onClick={child.onDelete} disabled={deleting === child.id}>
+                            <Trash2 className='h-3 w-3' />
+                          </Button>
+                        </div>
                       </div>
                     ))}
                   </div>

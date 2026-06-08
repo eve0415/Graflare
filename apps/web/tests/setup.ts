@@ -150,7 +150,10 @@ vi.mock('../src/routes/alerting/-queries', () => ({
     queryKey: ['contact-point', id],
     queryFn: () => Promise.resolve(null),
   })),
-  notificationPoliciesQueryOptions: () => ({ queryKey: ['notification-policies'], queryFn: () => Promise.resolve([]) }),
+  notificationPoliciesQueryOptions: vi.fn<() => { queryKey: readonly unknown[]; queryFn: () => Promise<unknown> }>(() => ({
+    queryKey: ['notification-policies'],
+    queryFn: () => Promise.resolve([]),
+  })),
   silencesQueryOptions: () => ({ queryKey: ['silences'], queryFn: () => Promise.resolve([]) }),
   silenceQueryOptions: () => ({ queryKey: ['silence'], queryFn: () => Promise.resolve(null) }),
   muteTimingsQueryOptions: () => ({ queryKey: ['mute-timings'], queryFn: () => Promise.resolve([]) }),

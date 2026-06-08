@@ -5,7 +5,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { routeTree } from '../routeTree.gen';
 
-import { alertRuleQueryOptions, contactPointQueryOptions } from './alerting/-queries';
+import { alertRuleQueryOptions, contactPointQueryOptions, notificationPoliciesQueryOptions } from './alerting/-queries';
 
 afterEach(cleanup);
 
@@ -185,6 +185,48 @@ describe('routes', () => {
     } finally {
       vi.mocked(contactPointQueryOptions).mockImplementation((id: string) =>
         queryOptions({ queryKey: ['contact-point', id], queryFn: (): Promise<typeof contactPoint | null> => Promise.resolve(null) }),
+      );
+    }
+  });
+
+  it('renders new notification policy form at /alerting/notifications/policies/new', async () => {
+    await renderWithRouter('/alerting/notifications/policies/new');
+    await waitFor(() => {
+      expect(screen.getByText('New Notification Policy')).toBeDefined();
+      expect(screen.getByLabelText('Repeat interval (seconds)')).toBeDefined();
+    });
+  });
+
+  it('renders the edit form pre-filled at /alerting/notifications/policies/:id', async () => {
+    const policy = {
+      id: 'policy-1',
+      orgId: 'org-1',
+      parentId: null,
+      contactPointId: null,
+      groupBy: ['alertname', 'cluster'],
+      matchers: [{ name: 'severity', operator: '=', value: 'critical' }],
+      muteTimingIds: [],
+      groupWaitS: 30,
+      groupIntervalS: 300,
+      repeatIntervalS: 7200,
+      continueMatching: false,
+      createdAt: 0,
+      updatedAt: 0,
+    };
+    // The edit route loads the policy LIST and `.find`s by id, so the mock returns an array.
+    vi.mocked(notificationPoliciesQueryOptions).mockReturnValue(
+      queryOptions({ queryKey: ['notification-policies'], queryFn: (): Promise<(typeof policy)[]> => Promise.resolve([policy]) }),
+    );
+
+    try {
+      await renderWithRouter('/alerting/notifications/policies/policy-1');
+      await waitFor(() => {
+        expect(screen.getByLabelText('Repeat interval (seconds)')).toBe(screen.getByDisplayValue('7200'));
+        expect(screen.getByDisplayValue('critical')).toBeDefined();
+      });
+    } finally {
+      vi.mocked(notificationPoliciesQueryOptions).mockReturnValue(
+        queryOptions({ queryKey: ['notification-policies'], queryFn: (): Promise<(typeof policy)[]> => Promise.resolve([]) }),
       );
     }
   });
