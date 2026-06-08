@@ -14,6 +14,7 @@ export interface DatasourceRow {
   url: string;
   authType: string;
   queryTimeoutMs: number;
+  cacheTtl: number;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -33,6 +34,7 @@ const toDatasourceRow = (ds: {
   url: string;
   authType: string;
   queryTimeoutMs: number;
+  cacheTtl: number;
   createdAt: Date;
   updatedAt: Date;
 }): DatasourceRow => ({
@@ -44,6 +46,7 @@ const toDatasourceRow = (ds: {
   url: ds.url,
   authType: ds.authType,
   queryTimeoutMs: ds.queryTimeoutMs,
+  cacheTtl: ds.cacheTtl,
   createdAt: ds.createdAt,
   updatedAt: ds.updatedAt,
 });
@@ -73,6 +76,7 @@ export const createDatasource = createServerFn({ method: 'POST' })
       url: ds.url,
       authType: ds.authType,
       queryTimeoutMs: ds.queryTimeoutMs,
+      cacheTtl: ds.cacheTtl,
       createdAt: ds.createdAt,
       updatedAt: ds.updatedAt,
     };

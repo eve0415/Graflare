@@ -21,6 +21,7 @@ interface DatasourceFormData {
   url: string;
   authType: AuthType;
   queryTimeoutMs: number;
+  cacheTtl: number;
   username?: string;
   password?: string;
   token?: string;
@@ -66,6 +67,7 @@ export const DatasourceForm = ({ mode, initialData }: Props) => {
       url: '',
       authType: 'none',
       queryTimeoutMs: 30000,
+      cacheTtl: 0,
     },
   );
   const [saving, setSaving] = useState(false);
@@ -92,6 +94,7 @@ export const DatasourceForm = ({ mode, initialData }: Props) => {
               url: form.url,
               authType: form.authType,
               queryTimeoutMs: form.queryTimeoutMs,
+              cacheTtl: form.cacheTtl,
               credentials,
             },
           });
@@ -106,6 +109,7 @@ export const DatasourceForm = ({ mode, initialData }: Props) => {
                 url: form.url,
                 authType: form.authType,
                 queryTimeoutMs: form.queryTimeoutMs,
+                cacheTtl: form.cacheTtl,
                 credentials,
               },
             },
@@ -197,6 +201,12 @@ export const DatasourceForm = ({ mode, initialData }: Props) => {
   const handleTimeoutChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
     const value = Number.parseInt(e.target.value, 10);
     setForm(prev => ({ ...prev, queryTimeoutMs: value }));
+  }, []);
+
+  const handleCacheTtlChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+    const parsed = Number.parseInt(e.target.value, 10);
+    const value = Number.isNaN(parsed) ? 0 : Math.max(0, parsed);
+    setForm(prev => ({ ...prev, cacheTtl: value }));
   }, []);
 
   const handleSubmitEvent = useCallback(
@@ -317,6 +327,11 @@ export const DatasourceForm = ({ mode, initialData }: Props) => {
           <div className='space-y-2'>
             <Label htmlFor='timeout'>Query Timeout (ms)</Label>
             <Input id='timeout' type='number' min={1000} max={120000} step={1000} value={form.queryTimeoutMs} onChange={handleTimeoutChange} />
+          </div>
+
+          <div className='space-y-2'>
+            <Label htmlFor='cacheTtl'>Cache TTL (seconds, 0 = disabled)</Label>
+            <Input id='cacheTtl' type='number' min={0} max={86400} step={1} value={form.cacheTtl} onChange={handleCacheTtlChange} />
           </div>
 
           <div className='flex items-center gap-3'>

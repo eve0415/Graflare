@@ -47,6 +47,7 @@ vi.mock('../src/routes/datasources/-api', () => ({
       url: 'https://example.com',
       authType: 'none',
       queryTimeoutMs: 30000,
+      cacheTtl: 0,
       createdAt: new Date(0),
       updatedAt: new Date(0),
     }),

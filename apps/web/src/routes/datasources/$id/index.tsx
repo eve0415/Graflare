@@ -22,6 +22,7 @@ const EditDatasourcePage = () => {
             url: ds.url,
             authType: datasourceAuthType.parse(ds.authType),
             queryTimeoutMs: ds.queryTimeoutMs,
+            cacheTtl: ds.cacheTtl,
           },
     [ds],
   );
