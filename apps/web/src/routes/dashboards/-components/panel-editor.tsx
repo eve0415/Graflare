@@ -26,6 +26,7 @@ const PANEL_TYPE_OPTIONS = [
   { value: 'barchart', label: 'Bar Chart' },
   { value: 'pie', label: 'Pie Chart' },
   { value: 'histogram', label: 'Histogram' },
+  { value: 'heatmap', label: 'Heatmap' },
   { value: 'text', label: 'Text' },
 ] as const;
 
@@ -100,6 +101,7 @@ export const PanelEditor = ({ panel, open, onClose, onSave }: PanelEditorProps) 
         val === 'barchart' ||
         val === 'pie' ||
         val === 'histogram' ||
+        val === 'heatmap' ||
         val === 'text'
       ) {
         updateField('type', val);

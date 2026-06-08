@@ -6,6 +6,7 @@ import { useMemo } from 'react';
 import { BarChartPanel } from './bar-chart-panel';
 import { BarGaugePanel } from './bar-gauge-panel';
 import { GaugePanel } from './gauge-panel';
+import { HeatmapPanel } from './heatmap-panel';
 import { HistogramPanel } from './histogram-panel';
 import { PanelFrame } from './panel-frame';
 import { PiePanel } from './pie-panel';
@@ -46,6 +47,8 @@ export const PanelRenderer = ({ panel, timeRange, refetchInterval, width, height
       return <PiePanel panel={resolvedPanel} timeRange={timeRange} refetchInterval={refetchInterval} />;
     case 'histogram':
       return <HistogramPanel panel={resolvedPanel} timeRange={timeRange} refetchInterval={refetchInterval} width={width} height={height} />;
+    case 'heatmap':
+      return <HeatmapPanel panel={resolvedPanel} timeRange={timeRange} refetchInterval={refetchInterval} width={width} height={height} />;
     case 'text':
       // No data query: the text panel renders author content from displayOptions.text
       // and ignores timeRange/refetch/width/height.
