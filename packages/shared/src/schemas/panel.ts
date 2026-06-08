@@ -3,7 +3,7 @@ import * as z from 'zod/mini';
 import { fieldConfigSchema } from './field-config';
 import { thresholdsSchema } from './threshold';
 
-export const panelTypeSchema = z.enum(['timeseries', 'stat', 'table', 'gauge', 'bargauge', 'barchart', 'pie', 'histogram']);
+export const panelTypeSchema = z.enum(['timeseries', 'stat', 'table', 'gauge', 'bargauge', 'barchart', 'pie', 'histogram', 'text']);
 
 export type PanelType = z.infer<typeof panelTypeSchema>;
 
@@ -99,6 +99,17 @@ export const histogramDisplaySchema = z.object({
 
 export type HistogramDisplay = z.infer<typeof histogramDisplaySchema>;
 
+// Text: author-written panel content with no data query. `content` holds the source
+// string (Markdown, or HTML when `mode` is 'html'); `mode` selects how it is parsed.
+// Both are rendered through react-markdown with rehype-sanitize ON, so author HTML is
+// XSS-stripped, never injected raw. Minimal + defaulted, mirroring the other panels.
+export const textDisplaySchema = z.object({
+  content: z._default(z.string().check(z.maxLength(16384)), ''),
+  mode: z._default(z.enum(['markdown', 'html']), 'markdown'),
+});
+
+export type TextDisplay = z.infer<typeof textDisplaySchema>;
+
 export const displayOptionsSchema = z.object({
   timeseries: z.optional(timeseriesDisplaySchema),
   stat: z.optional(statDisplaySchema),
@@ -108,6 +119,7 @@ export const displayOptionsSchema = z.object({
   barchart: z.optional(barChartDisplaySchema),
   pie: z.optional(pieDisplaySchema),
   histogram: z.optional(histogramDisplaySchema),
+  text: z.optional(textDisplaySchema),
 });
 
 export type DisplayOptions = z.infer<typeof displayOptionsSchema>;

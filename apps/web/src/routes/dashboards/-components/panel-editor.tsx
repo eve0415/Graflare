@@ -26,7 +26,17 @@ const PANEL_TYPE_OPTIONS = [
   { value: 'barchart', label: 'Bar Chart' },
   { value: 'pie', label: 'Pie Chart' },
   { value: 'histogram', label: 'Histogram' },
+  { value: 'text', label: 'Text' },
 ] as const;
+
+// Render mode for the text panel's content editor. Single source feeds both the
+// Select's `items` (trigger label) and the dropdown options (base-ui-select rule).
+const TEXT_MODE_OPTIONS = [
+  { value: 'markdown', label: 'Markdown' },
+  { value: 'html', label: 'HTML' },
+] as const;
+
+const isTextMode = (v: string | null): v is 'markdown' | 'html' => v === 'markdown' || v === 'html';
 
 // Flat {value,label} array for the unit Select's `items` (trigger label resolution);
 // the dropdown is rendered grouped from UNIT_CATALOG. Single source = the catalog.
@@ -89,7 +99,8 @@ export const PanelEditor = ({ panel, open, onClose, onSave }: PanelEditorProps) 
         val === 'bargauge' ||
         val === 'barchart' ||
         val === 'pie' ||
-        val === 'histogram'
+        val === 'histogram' ||
+        val === 'text'
       ) {
         updateField('type', val);
       }
@@ -153,6 +164,26 @@ export const PanelEditor = ({ panel, open, onClose, onSave }: PanelEditorProps) 
       updateField('thresholds', updated);
     },
     [draft.thresholds, updateField],
+  );
+
+  // Text panel content lives under displayOptions.text. Merge onto the current value
+  // so changing one field (content/mode) preserves the other; fall back to the schema
+  // defaults ('' / 'markdown') the first time either is set.
+  const handleTextContentChange = useCallback(
+    (e: React.ChangeEvent<HTMLTextAreaElement>) => {
+      const current = draft.displayOptions.text;
+      updateField('displayOptions', { ...draft.displayOptions, text: { content: e.target.value, mode: current?.mode ?? 'markdown' } });
+    },
+    [draft.displayOptions, updateField],
+  );
+
+  const handleTextModeChange = useCallback(
+    (val: string | null) => {
+      if (!isTextMode(val)) return;
+      const current = draft.displayOptions.text;
+      updateField('displayOptions', { ...draft.displayOptions, text: { content: current?.content ?? '', mode: val } });
+    },
+    [draft.displayOptions, updateField],
   );
 
   // Standard options + value mappings all live under fieldConfig.defaults. Replace
@@ -243,6 +274,40 @@ export const PanelEditor = ({ panel, open, onClose, onSave }: PanelEditorProps) 
               </SelectContent>
             </Select>
           </div>
+
+          {draft.type === 'text' && (
+            <div className='space-y-3'>
+              <Label>Content</Label>
+
+              <div className='space-y-2'>
+                <Label htmlFor='panel-text-mode' className='text-muted-foreground text-xs font-normal'>
+                  Mode
+                </Label>
+                <Select value={draft.displayOptions.text?.mode ?? 'markdown'} onValueChange={handleTextModeChange} items={TEXT_MODE_OPTIONS}>
+                  <SelectTrigger id='panel-text-mode'>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {TEXT_MODE_OPTIONS.map(o => (
+                      <SelectItem key={o.value} value={o.value}>
+                        {o.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <textarea
+                id='panel-text-content'
+                aria-label='Panel content'
+                value={draft.displayOptions.text?.content ?? ''}
+                onChange={handleTextContentChange}
+                rows={10}
+                placeholder={draft.displayOptions.text?.mode === 'html' ? 'HTML…' : 'Markdown…'}
+                className='border-input bg-background ring-offset-background placeholder:text-muted-foreground focus-visible:ring-ring flex w-full rounded-md border px-3 py-2 font-mono text-sm focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:outline-none'
+              />
+            </div>
+          )}
 
           <div className='space-y-3'>
             <div className='flex items-center justify-between'>

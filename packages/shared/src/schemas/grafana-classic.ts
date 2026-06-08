@@ -32,6 +32,15 @@ const grafanaFieldConfigSchema = z.object({
   ),
 });
 
+// Per-panel `options` bag. Only the text panel's fields are modelled (content + mode);
+// Grafana's `mode` is one of code/text/html/markdown — kept as a free string here and
+// clamped to our markdown|html enum in the adapter. Extra keys from other panel types
+// are ignored. Optional, since most panels carry no options we consume.
+const grafanaPanelOptionsSchema = z.object({
+  content: z._default(z.string(), ''),
+  mode: z._default(z.string(), 'markdown'),
+});
+
 const grafanaBasePanelSchema = z.object({
   type: z._default(z.string(), 'unknown'),
   title: z._default(z.string(), ''),
@@ -39,6 +48,7 @@ const grafanaBasePanelSchema = z.object({
   targets: z._default(z.array(grafanaTargetSchema), []),
   gridPos: z._default(grafanaGridPosSchema, { x: 0, y: 0, w: 12, h: 8 }),
   fieldConfig: z._default(grafanaFieldConfigSchema, { defaults: { thresholds: { steps: [] } } }),
+  options: z.optional(grafanaPanelOptionsSchema),
 });
 
 export type GrafanaBasePanel = z.infer<typeof grafanaBasePanelSchema>;

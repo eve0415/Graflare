@@ -11,6 +11,7 @@ import { PanelFrame } from './panel-frame';
 import { PiePanel } from './pie-panel';
 import { StatPanel } from './stat-panel';
 import { TablePanel } from './table-panel';
+import { TextPanel } from './text-panel';
 import { TimeSeriesPanel } from './time-series-panel';
 
 interface PanelRendererProps {
@@ -45,6 +46,10 @@ export const PanelRenderer = ({ panel, timeRange, refetchInterval, width, height
       return <PiePanel panel={resolvedPanel} timeRange={timeRange} refetchInterval={refetchInterval} />;
     case 'histogram':
       return <HistogramPanel panel={resolvedPanel} timeRange={timeRange} refetchInterval={refetchInterval} width={width} height={height} />;
+    case 'text':
+      // No data query: the text panel renders author content from displayOptions.text
+      // and ignores timeRange/refetch/width/height.
+      return <TextPanel panel={resolvedPanel} />;
     default:
       return (
         <PanelFrame title={resolvedPanel.title}>

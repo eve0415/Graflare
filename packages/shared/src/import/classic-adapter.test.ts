@@ -10,6 +10,15 @@ const makePanel = (type: string) => ({
   fieldConfig: { defaults: { thresholds: { steps: [] } } },
 });
 
+const makeTextPanel = (options: Record<string, unknown>) => ({
+  type: 'text',
+  title: 'Notes',
+  targets: [],
+  gridPos: { x: 0, y: 0, w: 12, h: 8 },
+  fieldConfig: { defaults: { thresholds: { steps: [] } } },
+  options,
+});
+
 const minimalDashboard = {
   title: 'Test Dashboard',
   description: 'A test',
@@ -128,6 +137,36 @@ describe('importClassic', () => {
       const result = importClassic({ ...minimalDashboard, panels: [makePanel('histogram')] });
       expect(result.dashboard.panels[0]?.type).toBe('histogram');
       expect(result.warnings).toEqual([]);
+    });
+
+    it('keeps "text" as "text"', () => {
+      const result = importClassic({ ...minimalDashboard, panels: [makePanel('text')] });
+      expect(result.dashboard.panels[0]?.type).toBe('text');
+      expect(result.warnings).toEqual([]);
+    });
+  });
+
+  describe('text panel options', () => {
+    it('maps options.content and options.mode into displayOptions.text', () => {
+      const result = importClassic({ ...minimalDashboard, panels: [makeTextPanel({ content: '# Hi\n- a', mode: 'markdown' })] });
+      expect(result.dashboard.panels[0]?.displayOptions).toEqual({ text: { content: '# Hi\n- a', mode: 'markdown' } });
+    });
+
+    it('keeps html mode', () => {
+      const result = importClassic({ ...minimalDashboard, panels: [makeTextPanel({ content: '<b>x</b>', mode: 'html' })] });
+      expect(result.dashboard.panels[0]?.displayOptions.text).toEqual({ content: '<b>x</b>', mode: 'html' });
+    });
+
+    it('clamps non-html modes (code/text) to markdown', () => {
+      const code = importClassic({ ...minimalDashboard, panels: [makeTextPanel({ content: 'x', mode: 'code' })] });
+      expect(code.dashboard.panels[0]?.displayOptions.text?.mode).toBe('markdown');
+      const text = importClassic({ ...minimalDashboard, panels: [makeTextPanel({ content: 'x', mode: 'text' })] });
+      expect(text.dashboard.panels[0]?.displayOptions.text?.mode).toBe('markdown');
+    });
+
+    it('defaults content to empty and mode to markdown when options are absent', () => {
+      const result = importClassic({ ...minimalDashboard, panels: [makePanel('text')] });
+      expect(result.dashboard.panels[0]?.displayOptions.text).toEqual({ content: '', mode: 'markdown' });
     });
   });
 

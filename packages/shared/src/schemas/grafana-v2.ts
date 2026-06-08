@@ -6,6 +6,13 @@ const v2QuerySchema = z.object({
   legendFormat: z._default(z.string(), ''),
 });
 
+// Per-element `options` bag — same shape and purpose as the classic adapter's. Only the
+// text panel's content+mode are consumed; mode is a free string clamped in the adapter.
+const v2ElementOptionsSchema = z.object({
+  content: z._default(z.string(), ''),
+  mode: z._default(z.string(), 'markdown'),
+});
+
 const v2ElementSpecSchema = z.object({
   title: z._default(z.string(), ''),
   data: z._default(
@@ -14,6 +21,7 @@ const v2ElementSpecSchema = z.object({
     }),
     { queries: [] },
   ),
+  options: z.optional(v2ElementOptionsSchema),
 });
 
 const v2ElementSchema = z.object({

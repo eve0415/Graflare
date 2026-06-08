@@ -84,3 +84,44 @@ describe('panel-editor standard options', () => {
     expect(screen.getByText('#ef4444')).toBeDefined();
   });
 });
+
+const textPanel = (): Panel => ({ ...basePanel(), type: 'text', displayOptions: {} });
+
+describe('panel-editor text content', () => {
+  it('omits the Content section for a non-text panel', () => {
+    renderEditor(basePanel(), vi.fn<(p: Panel) => void>());
+    expect(screen.queryByLabelText('Panel content')).toBeNull();
+  });
+
+  it('shows the Content section (textarea + mode) for a text panel', () => {
+    renderEditor(textPanel(), vi.fn<(p: Panel) => void>());
+    expect(screen.getByText('Content')).toBeDefined();
+    expect(screen.getByLabelText('Panel content')).toBeDefined();
+    expect(screen.getByLabelText('Mode')).toBeDefined();
+  });
+
+  it('writes typed content into displayOptions.text, defaulting mode to markdown', () => {
+    const onSave = vi.fn<(p: Panel) => void>();
+    renderEditor(textPanel(), onSave);
+
+    fireEvent.change(screen.getByLabelText('Panel content'), { target: { value: '# Title\n- x' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Apply' }));
+
+    expect(onSave.mock.calls[0]?.[0].displayOptions.text).toEqual({ content: '# Title\n- x', mode: 'markdown' });
+  });
+
+  it('seeds existing content into the textarea and preserves mode when editing content', () => {
+    const panel = textPanel();
+    panel.displayOptions = { text: { content: '<b>hi</b>', mode: 'html' } };
+    const onSave = vi.fn<(p: Panel) => void>();
+    renderEditor(panel, onSave);
+
+    const textarea = screen.getByLabelText('Panel content');
+    expect(textarea).toHaveProperty('value', '<b>hi</b>');
+
+    // Editing content must keep the existing html mode, not reset it to markdown.
+    fireEvent.change(textarea, { target: { value: '<i>bye</i>' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Apply' }));
+    expect(onSave.mock.calls[0]?.[0].displayOptions.text).toEqual({ content: '<i>bye</i>', mode: 'html' });
+  });
+});

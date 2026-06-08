@@ -18,9 +18,15 @@ const PANEL_TYPE_MAP: Record<string, string> = {
   barchart: 'barchart',
   piechart: 'pie',
   histogram: 'histogram',
+  text: 'text',
 };
 
-const SUPPORTED_TYPES = new Set(['timeseries', 'stat', 'table', 'gauge', 'bargauge', 'barchart', 'pie', 'histogram']);
+const SUPPORTED_TYPES = new Set(['timeseries', 'stat', 'table', 'gauge', 'bargauge', 'barchart', 'pie', 'histogram', 'text']);
+
+// Grafana's text panel `mode` is one of code/text/html/markdown. We only render
+// markdown or sanitized html, so anything that isn't explicitly 'html' becomes
+// 'markdown' (the safe default — html still goes through rehype-sanitize).
+const clampTextMode = (mode: string): 'markdown' | 'html' => (mode === 'html' ? 'html' : 'markdown');
 
 const mapQueries = (targets: GrafanaPanel['targets'], baseIndex: number): PanelQuery[] =>
   targets.map((t, i) => ({
@@ -84,10 +90,16 @@ const convertPanel = (gp: GrafanaBasePanel, index: number, warnings: string[]): 
     panelType !== 'bargauge' &&
     panelType !== 'barchart' &&
     panelType !== 'pie' &&
-    panelType !== 'histogram'
+    panelType !== 'histogram' &&
+    panelType !== 'text'
   ) {
     return null;
   }
+
+  // Text panels carry their content in displayOptions.text (mapped from Grafana's
+  // `options.content` + `options.mode`); every other type imports with empty options.
+  const displayOptions: Panel['displayOptions'] =
+    panelType === 'text' ? { text: { content: gp.options?.content ?? '', mode: clampTextMode(gp.options?.mode ?? 'markdown') } } : {};
 
   return {
     id: `panel-${String(index)}`,
@@ -97,7 +109,7 @@ const convertPanel = (gp: GrafanaBasePanel, index: number, warnings: string[]): 
     queries: mapQueries(gp.targets, 0),
     gridPos: clampGridPos(gp.gridPos),
     thresholds: mapThresholds(gp.fieldConfig),
-    displayOptions: {},
+    displayOptions,
     fieldConfig: { defaults: { unit: '', mappings: [] }, overrides: [] },
   };
 };

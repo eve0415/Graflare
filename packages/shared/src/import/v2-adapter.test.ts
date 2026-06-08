@@ -157,12 +157,58 @@ describe('importV2', () => {
       expect(result.warnings).toEqual([]);
     });
 
+    it('supports Text panels (case-insensitive)', () => {
+      const result = importV2(makeV2({ a: { kind: 'Text' } }));
+      expect(result.dashboard.panels[0]?.type).toBe('text');
+      expect(result.warnings).toEqual([]);
+    });
+
     it('converts unsupported type to stat with warning', () => {
       const result = importV2(makeV2({ hm: { kind: 'Heatmap' } }));
 
       expect(result.dashboard.panels).toHaveLength(1);
       expect(result.dashboard.panels[0]?.type).toBe('stat');
       expect(result.warnings).toEqual(['Unsupported panel type "Heatmap" (element "hm") — converted to placeholder stat panel']);
+    });
+  });
+
+  describe('text panel options', () => {
+    const textV2 = (options: Record<string, unknown>) => ({
+      ...validV2Dashboard,
+      spec: {
+        ...validV2Dashboard.spec,
+        elements: {
+          notes: { kind: 'Text', spec: { title: 'Notes', data: { queries: [] }, options } },
+        },
+        layout: { items: [{ element: 'notes', x: 0, y: 0, width: 12, height: 8 }] },
+      },
+    });
+
+    it('maps options.content and options.mode into displayOptions.text', () => {
+      const result = importV2(textV2({ content: '# Hi\n- a', mode: 'markdown' }));
+      expect(result.dashboard.panels[0]?.displayOptions).toEqual({ text: { content: '# Hi\n- a', mode: 'markdown' } });
+    });
+
+    it('keeps html mode', () => {
+      const result = importV2(textV2({ content: '<b>x</b>', mode: 'html' }));
+      expect(result.dashboard.panels[0]?.displayOptions.text).toEqual({ content: '<b>x</b>', mode: 'html' });
+    });
+
+    it('clamps non-html modes (code/text) to markdown', () => {
+      expect(importV2(textV2({ content: 'x', mode: 'code' })).dashboard.panels[0]?.displayOptions.text?.mode).toBe('markdown');
+      expect(importV2(textV2({ content: 'x', mode: 'text' })).dashboard.panels[0]?.displayOptions.text?.mode).toBe('markdown');
+    });
+
+    it('defaults content to empty and mode to markdown when options are absent', () => {
+      const result = importV2({
+        ...validV2Dashboard,
+        spec: {
+          ...validV2Dashboard.spec,
+          elements: { notes: { kind: 'Text', spec: { title: 'Notes', data: { queries: [] } } } },
+          layout: { items: [{ element: 'notes', x: 0, y: 0, width: 12, height: 8 }] },
+        },
+      });
+      expect(result.dashboard.panels[0]?.displayOptions.text).toEqual({ content: '', mode: 'markdown' });
     });
   });
 

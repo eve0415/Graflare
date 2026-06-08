@@ -13,7 +13,12 @@ const PANEL_KIND_MAP: Record<string, string> = {
   piechart: 'pie',
 };
 
-const SUPPORTED_TYPES = new Set(['timeseries', 'stat', 'table', 'gauge', 'bargauge', 'barchart', 'pie', 'histogram']);
+const SUPPORTED_TYPES = new Set(['timeseries', 'stat', 'table', 'gauge', 'bargauge', 'barchart', 'pie', 'histogram', 'text']);
+
+// Grafana's text panel `mode` is one of code/text/html/markdown; we render only markdown
+// or sanitized html, so anything other than 'html' clamps to 'markdown'. Mirrors the
+// classic adapter.
+const clampTextMode = (mode: string): 'markdown' | 'html' => (mode === 'html' ? 'html' : 'markdown');
 
 const mapV2Queries = (el: V2Element): PanelQuery[] =>
   el.spec.data.queries.map((q, i) => ({
@@ -88,7 +93,8 @@ export const importV2 = (json: Record<string, unknown>): ImportResult => {
       panelType !== 'bargauge' &&
       panelType !== 'barchart' &&
       panelType !== 'pie' &&
-      panelType !== 'histogram'
+      panelType !== 'histogram' &&
+      panelType !== 'text'
     )
       continue;
 
@@ -100,6 +106,11 @@ export const importV2 = (json: Record<string, unknown>): ImportResult => {
       h: Math.max(1, Math.min(100, Math.round(layoutItem?.height ?? 8))),
     };
 
+    // Text panels carry content in displayOptions.text (from the element's
+    // `options.content` + `options.mode`); other types import with empty options.
+    const displayOptions: Panel['displayOptions'] =
+      panelType === 'text' ? { text: { content: element.spec.options?.content ?? '', mode: clampTextMode(element.spec.options?.mode ?? 'markdown') } } : {};
+
     panels.push({
       id: `panel-${String(panelIndex)}`,
       type: panelType,
@@ -108,7 +119,7 @@ export const importV2 = (json: Record<string, unknown>): ImportResult => {
       queries: mapV2Queries(element),
       gridPos,
       thresholds: [],
-      displayOptions: {},
+      displayOptions,
       fieldConfig: { defaults: { unit: '', mappings: [] }, overrides: [] },
     });
 
