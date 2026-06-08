@@ -90,6 +90,20 @@ describe('contact-point-form slack/discord', () => {
     expect(screen.getByText('Email Addresses')).toBeDefined();
   });
 
+  // A <fieldset>+<legend> exposes a `group` role named by the (sr-only) legend, so
+  // assistive tech conveys that these inputs belong to the chosen channel. The form
+  // seeds its type from `initialForm` only on mount, so each case is its own render.
+  it.each([
+    [contactPointToForm({ name: 'E', settings: { type: 'email', addresses: ['a@b.com'] } }), 'Email settings'],
+    [contactPointToForm({ name: 'W', settings: { type: 'webhook', url: '', method: 'POST', username: '', password: '' } }), 'Webhook settings'],
+    [contactPointToForm({ name: 'S', settings: { type: 'slack', webhookUrl: '', channel: '', username: '' } }), 'Slack settings'],
+    [contactPointToForm({ name: 'D', settings: { type: 'discord', webhookUrl: '', username: '', avatarUrl: '' } }), 'Discord settings'],
+  ])('groups the %o settings block under a labelled fieldset', (initial, legend) => {
+    const onSubmit = vi.fn<(data: CreateContactPoint) => Promise<void>>(() => Promise.resolve());
+    render(<ContactPointForm initialForm={initial} submitLabel='Create' onSubmit={onSubmit} />);
+    expect(screen.getByRole('group', { name: legend })).toBeDefined();
+  });
+
   it('shows the redaction hint for the slack secret only in edit mode', () => {
     const initial = contactPointToForm({ name: 'S', settings: { type: 'slack', webhookUrl: '******', channel: '', username: '' } });
     const onSubmit = vi.fn<(data: CreateContactPoint) => Promise<void>>(() => Promise.resolve());

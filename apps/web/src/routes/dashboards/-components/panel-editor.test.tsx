@@ -73,4 +73,14 @@ describe('panel-editor standard options', () => {
     expect(screen.getByLabelText('Mapping 1 from')).toBeDefined();
     expect(screen.getByLabelText('Mapping 1 to')).toBeDefined();
   });
+
+  it('shows the threshold color hex as text alongside the swatch', () => {
+    const panel = basePanel();
+    panel.thresholds = [{ value: 10, color: '#ef4444' }];
+    renderEditor(panel, vi.fn<(p: Panel) => void>());
+
+    // The swatch is unreadable for color-blind users; the hex value is surfaced as text.
+    expect(screen.getByLabelText('Threshold 1 color')).toBeDefined();
+    expect(screen.getByText('#ef4444')).toBeDefined();
+  });
 });

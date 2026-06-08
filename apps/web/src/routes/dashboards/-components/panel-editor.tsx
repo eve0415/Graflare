@@ -428,7 +428,17 @@ const ThresholdRow = ({
         className='h-8 w-8 cursor-pointer rounded border-0'
         aria-label={`Threshold ${String(index + 1)} color`}
       />
-      <Input type='number' value={threshold.value} onChange={handleValueChange} className='w-24 text-sm' aria-label={`Threshold ${String(index + 1)} value`} />
+      {/* The swatch alone is unreadable for color-blind / high-contrast users, so
+          surface the hex value as text too. */}
+      <span className='text-muted-foreground w-16 font-mono text-xs uppercase tabular-nums'>{threshold.color}</span>
+      <Input
+        type='number'
+        step='any'
+        value={threshold.value}
+        onChange={handleValueChange}
+        className='w-24 text-sm'
+        aria-label={`Threshold ${String(index + 1)} value`}
+      />
       <Button variant='ghost' size='icon' className='h-8 w-8' onClick={handleRemove} aria-label={`Remove threshold ${String(index + 1)}`}>
         <Trash2 className='h-3.5 w-3.5' />
       </Button>
@@ -459,9 +469,14 @@ const NumericOption = ({
       <Label htmlFor={`panel-${field}`} className='text-muted-foreground text-xs font-normal'>
         {label}
       </Label>
+      {/* `decimals` is a non-negative integer count, so a numeric mobile keypad fits;
+          `min`/`max` may be negative, so we leave the default keyboard (which keeps the
+          minus key) and only widen the step to allow fractional bounds. */}
       <Input
         id={`panel-${field}`}
         type='number'
+        step={field === 'decimals' ? '1' : 'any'}
+        inputMode={field === 'decimals' ? 'numeric' : undefined}
         placeholder='auto'
         value={value === undefined ? '' : String(value)}
         onChange={handleChange}
@@ -580,6 +595,7 @@ const MappingRow = ({
           <>
             <Input
               type='number'
+              step='any'
               placeholder='From'
               value={mapping.from}
               onChange={handleFromChange}
@@ -588,6 +604,7 @@ const MappingRow = ({
             />
             <Input
               type='number'
+              step='any'
               placeholder='To'
               value={mapping.to}
               onChange={handleToChange}
@@ -635,6 +652,9 @@ const MappingRow = ({
           className='h-8 w-8 shrink-0 cursor-pointer rounded border-0'
           aria-label={`Mapping ${String(index + 1)} color`}
         />
+        {/* Mirror the swatch's hex as text so the value is legible without relying on
+            color perception. */}
+        <span className='text-muted-foreground w-16 shrink-0 font-mono text-xs uppercase tabular-nums'>{mapping.result.color ?? '#000000'}</span>
         <Input
           placeholder='Display text (optional)'
           value={mapping.result.text ?? ''}

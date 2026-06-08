@@ -322,7 +322,8 @@ export const ContactPointForm = ({ initialForm, submitLabel, onSubmit }: Props) 
           </div>
 
           {form.settings.type === 'email' && (
-            <div className='space-y-3'>
+            <fieldset className='space-y-3'>
+              <legend className='sr-only'>Email settings</legend>
               <div className='flex items-center justify-between'>
                 <Label>Email Addresses</Label>
                 <Button type='button' variant='outline' size='sm' onClick={handleAddAddress}>
@@ -340,11 +341,12 @@ export const ContactPointForm = ({ initialForm, submitLabel, onSubmit }: Props) 
                   onRemove={handleRemoveAddress}
                 />
               ))}
-            </div>
+            </fieldset>
           )}
 
           {form.settings.type === 'webhook' && (
-            <>
+            <fieldset className='space-y-4'>
+              <legend className='sr-only'>Webhook settings</legend>
               <div className='space-y-2'>
                 <Label htmlFor='webhookUrl'>URL</Label>
                 <Input
@@ -380,11 +382,12 @@ export const ContactPointForm = ({ initialForm, submitLabel, onSubmit }: Props) 
                 <Input id='webhookPassword' type='password' value={form.settings.password} onChange={handleWebhookPasswordChange} />
                 {isEdit && <p className='text-muted-foreground text-xs'>Leave as ****** to keep the current password.</p>}
               </div>
-            </>
+            </fieldset>
           )}
 
           {form.settings.type === 'slack' && (
-            <>
+            <fieldset className='space-y-4'>
+              <legend className='sr-only'>Slack settings</legend>
               <div className='space-y-2'>
                 <Label htmlFor='slackWebhookUrl'>Webhook URL</Label>
                 <Input
@@ -405,11 +408,12 @@ export const ContactPointForm = ({ initialForm, submitLabel, onSubmit }: Props) 
                 <Label htmlFor='slackUsername'>Username (optional)</Label>
                 <Input id='slackUsername' value={form.settings.username} onChange={handleSlackUsernameChange} placeholder='Graflare' />
               </div>
-            </>
+            </fieldset>
           )}
 
           {form.settings.type === 'discord' && (
-            <>
+            <fieldset className='space-y-4'>
+              <legend className='sr-only'>Discord settings</legend>
               <div className='space-y-2'>
                 <Label htmlFor='discordWebhookUrl'>Webhook URL</Label>
                 <Input
@@ -430,7 +434,7 @@ export const ContactPointForm = ({ initialForm, submitLabel, onSubmit }: Props) 
                 <Label htmlFor='discordAvatarUrl'>Avatar URL (optional)</Label>
                 <Input id='discordAvatarUrl' type='text' value={form.settings.avatarUrl} onChange={handleDiscordAvatarUrlChange} placeholder='https://...' />
               </div>
-            </>
+            </fieldset>
           )}
         </CardContent>
         <CardFooter className='flex gap-2'>
