@@ -1,7 +1,7 @@
 import type { PanelQuery } from '../schemas/panel';
 
 /**
- * Replace template variables (`$var`, `${var}`) in a PromQL expression.
+ * Replace template variables (`$var`, `${var}`, legacy `[[var]]`) in a PromQL expression.
  *
  * - Multi-value variables are joined with `|` (regex alternation).
  * - Content inside single-quoted strings is left untouched.
@@ -84,6 +84,22 @@ export const interpolateVariables = (expr: string, variables: ReadonlyMap<string
       }
       i = end;
       continue;
+    }
+
+    // --- legacy [[name]] syntax ---
+    if (ch === '[' && expr[i + 1] === '[') {
+      const close = expr.indexOf(']]', i + 2);
+      if (close !== -1) {
+        const name = expr.slice(i + 2, close);
+        const value = variables.get(name);
+        if (value === undefined) {
+          result += expr.slice(i, close + 2);
+        } else {
+          result += Array.isArray(value) ? value.join('|') : value;
+        }
+        i = close + 2;
+        continue;
+      }
     }
 
     // --- ordinary character ---

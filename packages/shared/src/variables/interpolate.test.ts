@@ -121,6 +121,31 @@ describe('interpolateVariables', () => {
     const vars = new Map([['x', 'v']]);
     expect(interpolateVariables('$$$x', vars)).toBe('$v');
   });
+
+  it('replaces legacy [[name]] syntax', () => {
+    const vars = new Map([['job', 'node']]);
+    expect(interpolateVariables('up{job="[[job]]"}', vars)).toBe('up{job="node"}');
+  });
+
+  it('joins multi-value [[name]] with pipe', () => {
+    const vars = new Map<string, string | string[]>([['env', ['staging', 'prod']]]);
+    expect(interpolateVariables('up{env=~"[[env]]"}', vars)).toBe('up{env=~"staging|prod"}');
+  });
+
+  it('leaves unknown [[name]] as-is', () => {
+    const vars = new Map<string, string | string[]>();
+    expect(interpolateVariables('[[missing]]', vars)).toBe('[[missing]]');
+  });
+
+  it('does not touch a single-bracket PromQL range', () => {
+    const vars = new Map([['m', '5m']]);
+    expect(interpolateVariables('rate(metric[5m])', vars)).toBe('rate(metric[5m])');
+  });
+
+  it('does not replace [[name]] inside single-quoted strings', () => {
+    const vars = new Map([['x', 'replaced']]);
+    expect(interpolateVariables("metric{l='[[x]]'} + [[x]]", vars)).toBe("metric{l='[[x]]'} + replaced");
+  });
 });
 
 describe('interpolateQueries', () => {
