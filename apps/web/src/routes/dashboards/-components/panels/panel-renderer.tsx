@@ -6,6 +6,7 @@ import { useMemo } from 'react';
 import { BarChartPanel } from './bar-chart-panel';
 import { BarGaugePanel } from './bar-gauge-panel';
 import { GaugePanel } from './gauge-panel';
+import { HistogramPanel } from './histogram-panel';
 import { PanelFrame } from './panel-frame';
 import { PiePanel } from './pie-panel';
 import { StatPanel } from './stat-panel';
@@ -42,6 +43,8 @@ export const PanelRenderer = ({ panel, timeRange, refetchInterval, width, height
       return <BarChartPanel panel={resolvedPanel} timeRange={timeRange} refetchInterval={refetchInterval} width={width} height={height} />;
     case 'pie':
       return <PiePanel panel={resolvedPanel} timeRange={timeRange} refetchInterval={refetchInterval} />;
+    case 'histogram':
+      return <HistogramPanel panel={resolvedPanel} timeRange={timeRange} refetchInterval={refetchInterval} width={width} height={height} />;
     default:
       return (
         <PanelFrame title={resolvedPanel.title}>

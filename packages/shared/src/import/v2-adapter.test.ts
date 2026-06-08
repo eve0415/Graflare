@@ -151,6 +151,12 @@ describe('importV2', () => {
       expect(result.warnings).toEqual([]);
     });
 
+    it('supports Histogram panels (case-insensitive)', () => {
+      const result = importV2(makeV2({ a: { kind: 'Histogram' } }));
+      expect(result.dashboard.panels[0]?.type).toBe('histogram');
+      expect(result.warnings).toEqual([]);
+    });
+
     it('converts unsupported type to stat with warning', () => {
       const result = importV2(makeV2({ hm: { kind: 'Heatmap' } }));
 

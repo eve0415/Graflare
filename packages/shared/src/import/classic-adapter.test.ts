@@ -123,6 +123,12 @@ describe('importClassic', () => {
       expect(result.dashboard.panels[0]?.type).toBe('pie');
       expect(result.warnings).toEqual([]);
     });
+
+    it('keeps "histogram" as "histogram"', () => {
+      const result = importClassic({ ...minimalDashboard, panels: [makePanel('histogram')] });
+      expect(result.dashboard.panels[0]?.type).toBe('histogram');
+      expect(result.warnings).toEqual([]);
+    });
   });
 
   describe('unsupported panel types', () => {

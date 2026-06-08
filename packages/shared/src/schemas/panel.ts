@@ -3,7 +3,7 @@ import * as z from 'zod/mini';
 import { fieldConfigSchema } from './field-config';
 import { thresholdsSchema } from './threshold';
 
-export const panelTypeSchema = z.enum(['timeseries', 'stat', 'table', 'gauge', 'bargauge', 'barchart', 'pie']);
+export const panelTypeSchema = z.enum(['timeseries', 'stat', 'table', 'gauge', 'bargauge', 'barchart', 'pie', 'histogram']);
 
 export type PanelType = z.infer<typeof panelTypeSchema>;
 
@@ -89,6 +89,16 @@ export const pieDisplaySchema = z.object({
 
 export type PieDisplay = z.infer<typeof pieDisplaySchema>;
 
+// Histogram: buckets the distribution of every sample (all series, all points) into
+// equal-width bins. `bucketCount` drives the bin count when no explicit `bucketSize`
+// is set; `bucketSize` (optional) pins the bin width instead. Minimal + defaulted.
+export const histogramDisplaySchema = z.object({
+  bucketCount: z._default(z.int().check(z.minimum(1), z.maximum(100)), 20),
+  bucketSize: z.optional(z.number()),
+});
+
+export type HistogramDisplay = z.infer<typeof histogramDisplaySchema>;
+
 export const displayOptionsSchema = z.object({
   timeseries: z.optional(timeseriesDisplaySchema),
   stat: z.optional(statDisplaySchema),
@@ -97,6 +107,7 @@ export const displayOptionsSchema = z.object({
   bargauge: z.optional(barGaugeDisplaySchema),
   barchart: z.optional(barChartDisplaySchema),
   pie: z.optional(pieDisplaySchema),
+  histogram: z.optional(histogramDisplaySchema),
 });
 
 export type DisplayOptions = z.infer<typeof displayOptionsSchema>;

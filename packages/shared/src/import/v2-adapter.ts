@@ -13,7 +13,7 @@ const PANEL_KIND_MAP: Record<string, string> = {
   piechart: 'pie',
 };
 
-const SUPPORTED_TYPES = new Set(['timeseries', 'stat', 'table', 'gauge', 'bargauge', 'barchart', 'pie']);
+const SUPPORTED_TYPES = new Set(['timeseries', 'stat', 'table', 'gauge', 'bargauge', 'barchart', 'pie', 'histogram']);
 
 const mapV2Queries = (el: V2Element): PanelQuery[] =>
   el.spec.data.queries.map((q, i) => ({
@@ -87,7 +87,8 @@ export const importV2 = (json: Record<string, unknown>): ImportResult => {
       panelType !== 'gauge' &&
       panelType !== 'bargauge' &&
       panelType !== 'barchart' &&
-      panelType !== 'pie'
+      panelType !== 'pie' &&
+      panelType !== 'histogram'
     )
       continue;
 

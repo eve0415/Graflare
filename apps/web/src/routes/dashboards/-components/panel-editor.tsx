@@ -25,6 +25,7 @@ const PANEL_TYPE_OPTIONS = [
   { value: 'bargauge', label: 'Bar Gauge' },
   { value: 'barchart', label: 'Bar Chart' },
   { value: 'pie', label: 'Pie Chart' },
+  { value: 'histogram', label: 'Histogram' },
 ] as const;
 
 // Flat {value,label} array for the unit Select's `items` (trigger label resolution);
@@ -80,7 +81,16 @@ export const PanelEditor = ({ panel, open, onClose, onSave }: PanelEditorProps) 
 
   const handleTypeChange = useCallback(
     (val: string | null) => {
-      if (val === 'timeseries' || val === 'stat' || val === 'table' || val === 'gauge' || val === 'bargauge' || val === 'barchart' || val === 'pie') {
+      if (
+        val === 'timeseries' ||
+        val === 'stat' ||
+        val === 'table' ||
+        val === 'gauge' ||
+        val === 'bargauge' ||
+        val === 'barchart' ||
+        val === 'pie' ||
+        val === 'histogram'
+      ) {
         updateField('type', val);
       }
     },
