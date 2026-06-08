@@ -30,6 +30,7 @@ import { Route as AlertingAlertsIndexRouteImport } from './routes/alerting/alert
 import { Route as DatasourcesIdTestRouteImport } from './routes/datasources/$id/test'
 import { Route as AlertingSilencesNewRouteImport } from './routes/alerting/silences/new'
 import { Route as AlertingRulesNewRouteImport } from './routes/alerting/rules/new'
+import { Route as AlertingRulesIdRouteImport } from './routes/alerting/rules/$id'
 import { Route as AlertingMuteTimingsNewRouteImport } from './routes/alerting/mute-timings/new'
 import { Route as AlertingNotificationsPoliciesIndexRouteImport } from './routes/alerting/notifications/policies/index'
 import { Route as AlertingNotificationsContactPointsIndexRouteImport } from './routes/alerting/notifications/contact-points/index'
@@ -143,6 +144,11 @@ const AlertingRulesNewRoute = AlertingRulesNewRouteImport.update({
   path: '/rules/new',
   getParentRoute: () => AlertingRouteRoute,
 } as any)
+const AlertingRulesIdRoute = AlertingRulesIdRouteImport.update({
+  id: '/rules/$id',
+  path: '/rules/$id',
+  getParentRoute: () => AlertingRouteRoute,
+} as any)
 const AlertingMuteTimingsNewRoute = AlertingMuteTimingsNewRouteImport.update({
   id: '/mute-timings/new',
   path: '/mute-timings/new',
@@ -180,6 +186,7 @@ export interface FileRoutesByFullPath {
   '/explore/': typeof ExploreIndexRoute
   '/import/': typeof ImportIndexRoute
   '/alerting/mute-timings/new': typeof AlertingMuteTimingsNewRoute
+  '/alerting/rules/$id': typeof AlertingRulesIdRoute
   '/alerting/rules/new': typeof AlertingRulesNewRoute
   '/alerting/silences/new': typeof AlertingSilencesNewRoute
   '/datasources/$id/test': typeof DatasourcesIdTestRoute
@@ -204,6 +211,7 @@ export interface FileRoutesByTo {
   '/explore': typeof ExploreIndexRoute
   '/import': typeof ImportIndexRoute
   '/alerting/mute-timings/new': typeof AlertingMuteTimingsNewRoute
+  '/alerting/rules/$id': typeof AlertingRulesIdRoute
   '/alerting/rules/new': typeof AlertingRulesNewRoute
   '/alerting/silences/new': typeof AlertingSilencesNewRoute
   '/datasources/$id/test': typeof DatasourcesIdTestRoute
@@ -232,6 +240,7 @@ export interface FileRoutesById {
   '/explore/': typeof ExploreIndexRoute
   '/import/': typeof ImportIndexRoute
   '/alerting/mute-timings/new': typeof AlertingMuteTimingsNewRoute
+  '/alerting/rules/$id': typeof AlertingRulesIdRoute
   '/alerting/rules/new': typeof AlertingRulesNewRoute
   '/alerting/silences/new': typeof AlertingSilencesNewRoute
   '/datasources/$id/test': typeof DatasourcesIdTestRoute
@@ -261,6 +270,7 @@ export interface FileRouteTypes {
     | '/explore/'
     | '/import/'
     | '/alerting/mute-timings/new'
+    | '/alerting/rules/$id'
     | '/alerting/rules/new'
     | '/alerting/silences/new'
     | '/datasources/$id/test'
@@ -285,6 +295,7 @@ export interface FileRouteTypes {
     | '/explore'
     | '/import'
     | '/alerting/mute-timings/new'
+    | '/alerting/rules/$id'
     | '/alerting/rules/new'
     | '/alerting/silences/new'
     | '/datasources/$id/test'
@@ -312,6 +323,7 @@ export interface FileRouteTypes {
     | '/explore/'
     | '/import/'
     | '/alerting/mute-timings/new'
+    | '/alerting/rules/$id'
     | '/alerting/rules/new'
     | '/alerting/silences/new'
     | '/datasources/$id/test'
@@ -489,6 +501,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AlertingRulesNewRouteImport
       parentRoute: typeof AlertingRouteRoute
     }
+    '/alerting/rules/$id': {
+      id: '/alerting/rules/$id'
+      path: '/rules/$id'
+      fullPath: '/alerting/rules/$id'
+      preLoaderRoute: typeof AlertingRulesIdRouteImport
+      parentRoute: typeof AlertingRouteRoute
+    }
     '/alerting/mute-timings/new': {
       id: '/alerting/mute-timings/new'
       path: '/mute-timings/new'
@@ -547,6 +566,7 @@ interface AlertingRouteRouteChildren {
   AlertingNotificationsRouteRoute: typeof AlertingNotificationsRouteRouteWithChildren
   AlertingIndexRoute: typeof AlertingIndexRoute
   AlertingMuteTimingsNewRoute: typeof AlertingMuteTimingsNewRoute
+  AlertingRulesIdRoute: typeof AlertingRulesIdRoute
   AlertingRulesNewRoute: typeof AlertingRulesNewRoute
   AlertingSilencesNewRoute: typeof AlertingSilencesNewRoute
   AlertingAlertsIndexRoute: typeof AlertingAlertsIndexRoute
@@ -559,6 +579,7 @@ const AlertingRouteRouteChildren: AlertingRouteRouteChildren = {
   AlertingNotificationsRouteRoute: AlertingNotificationsRouteRouteWithChildren,
   AlertingIndexRoute: AlertingIndexRoute,
   AlertingMuteTimingsNewRoute: AlertingMuteTimingsNewRoute,
+  AlertingRulesIdRoute: AlertingRulesIdRoute,
   AlertingRulesNewRoute: AlertingRulesNewRoute,
   AlertingSilencesNewRoute: AlertingSilencesNewRoute,
   AlertingAlertsIndexRoute: AlertingAlertsIndexRoute,

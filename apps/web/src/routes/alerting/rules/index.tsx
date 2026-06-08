@@ -1,5 +1,5 @@
 import { Badge } from '@graflare/ui/components/badge';
-import { Button } from '@graflare/ui/components/button';
+import { Button, buttonVariants } from '@graflare/ui/components/button';
 import { Skeleton } from '@graflare/ui/components/skeleton';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@graflare/ui/components/table';
 import { useSuspenseQuery } from '@tanstack/react-query';
@@ -29,13 +29,14 @@ const AlertRulesListPage = () => {
   }, [groups]);
 
   const rulesByGroup = useMemo(() => {
-    const map = new Map<string, typeof rules>();
+    const map = new Map<string, { id: string; title: string; isPaused: boolean; forDurationS: number; params: { id: string } }[]>();
     for (const rule of rules) {
+      const row = { id: rule.id, title: rule.title, isPaused: rule.isPaused, forDurationS: rule.forDurationS, params: { id: rule.id } };
       const existing = map.get(rule.groupId);
       if (existing === undefined) {
-        map.set(rule.groupId, [rule]);
+        map.set(rule.groupId, [row]);
       } else {
-        map.set(rule.groupId, [...existing, rule]);
+        existing.push(row);
       }
     }
     return map;
@@ -77,9 +78,9 @@ const AlertRulesListPage = () => {
                     </TableCell>
                     <TableCell className='text-muted-foreground text-sm'>{rule.forDurationS}s</TableCell>
                     <TableCell>
-                      <Button variant='ghost' size='xs'>
+                      <Link to='/alerting/rules/$id' params={rule.params} className={buttonVariants({ variant: 'ghost', size: 'xs' })}>
                         Edit
-                      </Button>
+                      </Link>
                     </TableCell>
                   </TableRow>
                 ))}

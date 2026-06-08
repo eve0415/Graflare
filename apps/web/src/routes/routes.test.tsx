@@ -1,9 +1,11 @@
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { QueryClient, QueryClientProvider, queryOptions } from '@tanstack/react-query';
 import { RouterProvider, createMemoryHistory, createRouter } from '@tanstack/react-router';
 import { cleanup, render, screen, waitFor } from '@testing-library/react';
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { routeTree } from '../routeTree.gen';
+
+import { alertRuleQueryOptions } from './alerting/-queries';
 
 afterEach(cleanup);
 
@@ -109,5 +111,53 @@ describe('routes', () => {
     await waitFor(() => {
       expect(screen.getByLabelText('Search dashboards')).toBeDefined();
     });
+  });
+
+  it('renders new alert rule form at /alerting/rules/new', async () => {
+    await renderWithRouter('/alerting/rules/new');
+    await waitFor(() => {
+      expect(screen.getByText('New Alert Rule')).toBeDefined();
+      expect(screen.getByLabelText('Title')).toBeDefined();
+    });
+  });
+
+  it('renders alert rule not found at /alerting/rules/:id when missing', async () => {
+    await renderWithRouter('/alerting/rules/missing-rule-id');
+    await waitFor(() => {
+      expect(screen.getByText('Rule not found.')).toBeDefined();
+    });
+  });
+
+  it('renders the edit form pre-filled at /alerting/rules/:id', async () => {
+    const rule = {
+      id: 'rule-1',
+      orgId: 'org-1',
+      groupId: 'group-1',
+      title: 'High CPU usage',
+      queries: [{ refId: 'A', datasourceId: 'ds-1', expr: 'up', legendFormat: '' }],
+      condition: { refId: 'A', reducer: 'avg', operator: 'gt', threshold: 80 },
+      labels: { severity: 'critical' },
+      annotations: { summary: 'CPU high' },
+      forDurationS: 300,
+      noDataState: 'OK',
+      execErrState: 'KeepLastState',
+      isPaused: false,
+      createdAt: 0,
+      updatedAt: 0,
+    };
+    vi.mocked(alertRuleQueryOptions).mockReturnValue(
+      queryOptions({ queryKey: ['alert-rule', rule.id], queryFn: (): Promise<typeof rule | null> => Promise.resolve(rule) }),
+    );
+
+    try {
+      await renderWithRouter('/alerting/rules/rule-1');
+      await waitFor(() => {
+        expect(screen.getByLabelText('Title')).toBe(screen.getByDisplayValue('High CPU usage'));
+      });
+    } finally {
+      vi.mocked(alertRuleQueryOptions).mockImplementation((id: string) =>
+        queryOptions({ queryKey: ['alert-rule', id], queryFn: (): Promise<typeof rule | null> => Promise.resolve(null) }),
+      );
+    }
   });
 });

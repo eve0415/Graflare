@@ -140,7 +140,10 @@ vi.mock('../src/routes/alerting/-queries', () => ({
   alertRuleGroupsQueryOptions: () => ({ queryKey: ['alert-rule-groups'], queryFn: () => Promise.resolve([]) }),
   alertRuleGroupQueryOptions: () => ({ queryKey: ['alert-rule-group'], queryFn: () => Promise.resolve(null) }),
   alertRulesQueryOptions: () => ({ queryKey: ['alert-rules'], queryFn: () => Promise.resolve([]) }),
-  alertRuleQueryOptions: () => ({ queryKey: ['alert-rule'], queryFn: () => Promise.resolve(null) }),
+  alertRuleQueryOptions: vi.fn<(id: string) => { queryKey: readonly unknown[]; queryFn: () => Promise<unknown> }>((id: string) => ({
+    queryKey: ['alert-rule', id],
+    queryFn: () => Promise.resolve(null),
+  })),
   alertInstancesQueryOptions: () => ({ queryKey: ['alert-instances'], queryFn: () => Promise.resolve([]) }),
   contactPointsQueryOptions: () => ({ queryKey: ['contact-points'], queryFn: () => Promise.resolve([]) }),
   contactPointQueryOptions: () => ({ queryKey: ['contact-point'], queryFn: () => Promise.resolve(null) }),
