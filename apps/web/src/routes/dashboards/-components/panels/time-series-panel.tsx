@@ -107,6 +107,7 @@ export const TimeSeriesPanel = ({ panel, timeRange, refetchInterval, width, heig
   return (
     <PanelFrame
       title={panel.title}
+      panelId={panel.id}
       loading={isLoading}
       error={error instanceof Error ? error.message : null}
       onRetry={handleRetry}

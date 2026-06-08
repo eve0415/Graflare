@@ -1,7 +1,9 @@
 import { Button } from '@graflare/ui/components/button';
 import { Skeleton } from '@graflare/ui/components/skeleton';
-import { AlertCircle, MoreVertical, Table2 } from 'lucide-react';
+import { AlertCircle, Pencil, Table2, Trash2 } from 'lucide-react';
 import { Suspense, useCallback, useMemo, useState } from 'react';
+
+import { usePanelActions } from './panel-actions-context';
 
 interface PanelFrameProps {
   title: string;
@@ -10,14 +12,24 @@ interface PanelFrameProps {
   onRetry?: () => void;
   children: React.ReactNode;
   dataTableContent?: React.ReactNode;
+  panelId?: string;
 }
 
-export const PanelFrame = ({ title, loading, error, onRetry, children, dataTableContent }: PanelFrameProps) => {
+export const PanelFrame = ({ title, loading, error, onRetry, children, dataTableContent, panelId }: PanelFrameProps) => {
   const [showDataTable, setShowDataTable] = useState(false);
+  const actions = usePanelActions();
 
   const toggleDataTable = useCallback(() => {
     setShowDataTable(v => !v);
   }, []);
+
+  const handleEdit = useCallback(() => {
+    if (panelId !== undefined) actions?.onEdit(panelId);
+  }, [actions, panelId]);
+
+  const handleDelete = useCallback(() => {
+    if (panelId !== undefined) actions?.onDelete(panelId);
+  }, [actions, panelId]);
 
   const suspenseFallback = useMemo(() => <Skeleton className='h-full w-full' />, []);
 
@@ -37,9 +49,16 @@ export const PanelFrame = ({ title, loading, error, onRetry, children, dataTable
               <Table2 className='h-3.5 w-3.5' />
             </Button>
           )}
-          <Button variant='ghost' size='icon' className='h-6 w-6' aria-label='Panel options'>
-            <MoreVertical className='h-3.5 w-3.5' />
-          </Button>
+          {actions !== null && panelId !== undefined && (
+            <>
+              <Button variant='ghost' size='icon' className='h-6 w-6' onClick={handleEdit} aria-label='Edit panel'>
+                <Pencil className='h-3.5 w-3.5' />
+              </Button>
+              <Button variant='ghost' size='icon' className='h-6 w-6' onClick={handleDelete} aria-label='Delete panel'>
+                <Trash2 className='h-3.5 w-3.5' />
+              </Button>
+            </>
+          )}
         </div>
       </div>
 

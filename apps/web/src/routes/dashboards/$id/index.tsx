@@ -15,6 +15,7 @@ import { DashboardSettings } from '../-components/dashboard-settings';
 import { DashboardToolbar } from '../-components/dashboard-toolbar';
 import { DashboardViewSkeleton } from '../-components/dashboard-view-skeleton';
 import { PanelEditor } from '../-components/panel-editor';
+import { PanelActionsProvider } from '../-components/panels/panel-actions-context';
 import { VariableBar } from '../-components/variable-bar';
 import { dashboardQueryOptions } from '../-queries';
 
@@ -68,7 +69,9 @@ const DashboardViewPage = () => {
 
   const dashboardPanels = useMemo(() => {
     if (dashboard === null) return [];
-    if (panels.length > 0 && editMode) return panels;
+    // In edit mode the working copy is `panels` (even when emptied by deletes), so
+    // a delete-all doesn't snap back to the saved set.
+    if (editMode) return panels;
     return parsePanels(dashboard.panels);
   }, [dashboard, panels, editMode]);
 
@@ -128,6 +131,23 @@ const DashboardViewPage = () => {
     setPanels(prev => [...prev, newPanel]);
     setEditingPanel(newPanel);
   }, []);
+
+  const handleEditPanel = useCallback(
+    (panelId: string) => {
+      const panel = dashboardPanels.find(p => p.id === panelId);
+      if (panel !== undefined) setEditingPanel(panel);
+    },
+    [dashboardPanels],
+  );
+
+  const handleDeletePanel = useCallback((panelId: string) => {
+    setPanels(prev => prev.filter(p => p.id !== panelId));
+  }, []);
+
+  const panelActions = useMemo(
+    () => (editMode ? { onEdit: handleEditPanel, onDelete: handleDeletePanel } : null),
+    [editMode, handleEditPanel, handleDeletePanel],
+  );
 
   const handleSettingsOpen = useCallback(() => {
     setSettingsOpen(true);
@@ -199,14 +219,16 @@ const DashboardViewPage = () => {
             <p className='text-sm'>Switch to edit mode to add panels.</p>
           </div>
         ) : (
-          <DashboardGrid
-            panels={dashboardPanels}
-            timeRange={timeRange}
-            refreshInterval={refetchMs}
-            editMode={editMode}
-            onLayoutChange={handleLayoutChange}
-            variables={variableValues}
-          />
+          <PanelActionsProvider value={panelActions}>
+            <DashboardGrid
+              panels={dashboardPanels}
+              timeRange={timeRange}
+              refreshInterval={refetchMs}
+              editMode={editMode}
+              onLayoutChange={handleLayoutChange}
+              variables={variableValues}
+            />
+          </PanelActionsProvider>
         )}
       </div>
 

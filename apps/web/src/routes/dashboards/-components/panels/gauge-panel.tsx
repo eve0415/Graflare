@@ -97,7 +97,7 @@ export const GaugePanel = ({ panel, timeRange, refetchInterval }: GaugePanelProp
   }, [panel.thresholds, showMarkers, min, max]);
 
   return (
-    <PanelFrame title={panel.title} loading={isLoading} error={error instanceof Error ? error.message : null} onRetry={handleRetry}>
+    <PanelFrame title={panel.title} panelId={panel.id} loading={isLoading} error={error instanceof Error ? error.message : null} onRetry={handleRetry}>
       <meter
         className='flex h-full appearance-none flex-col items-center justify-center [&::-webkit-meter-bar]:bg-transparent [&::-webkit-meter-optimum-value]:bg-transparent'
         min={min}

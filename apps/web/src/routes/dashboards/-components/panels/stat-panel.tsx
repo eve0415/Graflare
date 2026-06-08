@@ -66,7 +66,7 @@ export const StatPanel = ({ panel, timeRange, refetchInterval }: StatPanelProps)
   }, [colorMode, thresholdColor]);
 
   return (
-    <PanelFrame title={panel.title} loading={isLoading} error={error instanceof Error ? error.message : null} onRetry={handleRetry}>
+    <PanelFrame title={panel.title} panelId={panel.id} loading={isLoading} error={error instanceof Error ? error.message : null} onRetry={handleRetry}>
       <output className='flex h-full items-center justify-center rounded' style={bgStyle} aria-label={`${panel.title}: ${value ?? 'no data'}`}>
         <span className='font-semibold tabular-nums' style={valueStyle}>
           {value ?? '—'}

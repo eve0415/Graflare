@@ -50,7 +50,7 @@ export const TablePanel = ({ panel, timeRange, refetchInterval }: TablePanelProp
   }, [refetch]);
 
   return (
-    <PanelFrame title={panel.title} loading={isLoading} error={error instanceof Error ? error.message : null} onRetry={handleRetry}>
+    <PanelFrame title={panel.title} panelId={panel.id} loading={isLoading} error={error instanceof Error ? error.message : null} onRetry={handleRetry}>
       <QueryResultTable data={tableData} />
     </PanelFrame>
   );
