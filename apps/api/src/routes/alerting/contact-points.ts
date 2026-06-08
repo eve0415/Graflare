@@ -1,4 +1,5 @@
 import type { AppEnv } from '../../index';
+import type { ContactPointSettings } from '@graflare/shared/schemas/alerting';
 
 import { contactPointIdParamSchema, createContactPointSchema, updateContactPointSchema } from '@graflare/shared/schemas/contact-point';
 import { sValidator } from '@hono/standard-validator';
@@ -10,23 +11,15 @@ import { createDb } from '../../db';
 import { contactPoints } from '../../db/schema';
 import { onValidationError } from '../../middleware/validate';
 
-function redactSettings(settings: Record<string, unknown>): Record<string, unknown> {
-  if (settings['type'] !== 'webhook') return settings;
-  const redacted = { ...settings };
-  if (typeof redacted['password'] === 'string' && redacted['password'].length > 0) {
-    redacted['password'] = '******';
-  }
-  return redacted;
-}
+const redactSettings = (settings: ContactPointSettings): ContactPointSettings => {
+  if (settings.type !== 'webhook' || settings.password.length === 0) return settings;
+  return { ...settings, password: '******' };
+};
 
-async function encryptSettingsCredentials(settings: Record<string, unknown>, encryptionKey: string): Promise<Record<string, unknown>> {
-  if (settings['type'] !== 'webhook') return settings;
-  const encrypted = { ...settings };
-  if (typeof encrypted['password'] === 'string' && encrypted['password'].length > 0) {
-    encrypted['password'] = await encryptCredentials(encrypted['password'], encryptionKey);
-  }
-  return encrypted;
-}
+const encryptSettingsCredentials = async (settings: ContactPointSettings, encryptionKey: string): Promise<ContactPointSettings> => {
+  if (settings.type !== 'webhook' || settings.password.length === 0) return settings;
+  return { ...settings, password: await encryptCredentials(settings.password, encryptionKey) };
+};
 
 const app = new Hono<AppEnv>();
 
@@ -49,11 +42,12 @@ app.get('/:id', sValidator('param', contactPointIdParamSchema, onValidationError
     .where(and(eq(contactPoints.id, id), eq(contactPoints.orgId, orgId)))
     .limit(1);
 
-  if (rows.length === 0) {
+  const [row] = rows;
+  if (row === undefined) {
     return c.json({ error: 'Not found' }, 404);
   }
 
-  return c.json({ ...rows[0], settings: redactSettings(rows[0].settings) });
+  return c.json({ ...row, settings: redactSettings(row.settings) });
 });
 
 app.post('/', sValidator('json', createContactPointSchema, onValidationError), async c => {
@@ -109,12 +103,15 @@ app.put('/:id', sValidator('param', contactPointIdParamSchema, onValidationError
     .set(updates)
     .where(and(eq(contactPoints.id, id), eq(contactPoints.orgId, orgId)));
 
-  const updated = await db
+  const [updatedRow] = await db
     .select()
     .from(contactPoints)
     .where(and(eq(contactPoints.id, id), eq(contactPoints.orgId, orgId)))
     .limit(1);
-  return c.json({ ...updated[0], settings: redactSettings(updated[0].settings) });
+  if (updatedRow === undefined) {
+    return c.json({ error: 'Not found' }, 404);
+  }
+  return c.json({ ...updatedRow, settings: redactSettings(updatedRow.settings) });
 });
 
 app.delete('/:id', sValidator('param', contactPointIdParamSchema, onValidationError), async c => {

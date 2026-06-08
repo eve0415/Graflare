@@ -1,3 +1,5 @@
+import type { PrometheusAuth } from './client';
+
 import { datasourceCredentialsSchema } from '@graflare/shared/schemas/datasource';
 import { and, eq } from 'drizzle-orm';
 
@@ -7,7 +9,7 @@ import { datasources } from '../db/schema';
 
 import { PrometheusClient } from './client';
 
-export async function createPrometheusClient(db: D1Database, encryptionKey: string, orgId: string, datasourceId: string): Promise<PrometheusClient | null> {
+export const createPrometheusClient = async (db: D1Database, encryptionKey: string, orgId: string, datasourceId: string): Promise<PrometheusClient | null> => {
   const drizzle = createDb(db);
   const rows = await drizzle
     .select()
@@ -18,7 +20,7 @@ export async function createPrometheusClient(db: D1Database, encryptionKey: stri
   const [ds] = rows;
   if (ds === undefined) return null;
 
-  let auth: { type: 'none' | 'basic' | 'bearer'; credentials?: { username?: string; password?: string; token?: string } } = { type: 'none' };
+  let auth: PrometheusAuth = { type: 'none' };
 
   if (ds.credentials) {
     const creds = datasourceCredentialsSchema.parse(JSON.parse(await decryptCredentials(ds.credentials, encryptionKey)));
@@ -28,4 +30,4 @@ export async function createPrometheusClient(db: D1Database, encryptionKey: stri
   }
 
   return new PrometheusClient(ds.url, auth, ds.queryTimeoutMs);
-}
+};

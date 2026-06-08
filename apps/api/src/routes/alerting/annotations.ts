@@ -50,7 +50,7 @@ app.post('/', sValidator('json', createAnnotationSchema, onValidationError), asy
     panelId: data.panelId,
     alertRuleId: data.alertRuleId,
     time: new Date(data.time),
-    timeEnd: data.timeEnd !== undefined ? new Date(data.timeEnd) : undefined,
+    timeEnd: data.timeEnd === undefined ? undefined : new Date(data.timeEnd),
     text: data.text,
     tags: data.tags ?? [],
     prevState: data.prevState,

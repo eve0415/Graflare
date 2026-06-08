@@ -3,7 +3,7 @@ import type { PrometheusResponse } from '@graflare/shared/schemas/prometheus';
 
 import { prometheusResponseSchema } from '@graflare/shared/schemas/prometheus';
 
-interface PrometheusAuth {
+export interface PrometheusAuth {
   type: 'none' | 'basic' | 'bearer';
   credentials?: DatasourceCredentials;
 }
