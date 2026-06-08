@@ -1,7 +1,7 @@
 import { Button } from '@graflare/ui/components/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@graflare/ui/components/select';
 import { Separator } from '@graflare/ui/components/separator';
-import { Pencil, RefreshCw, Save, Settings } from 'lucide-react';
+import { MessageSquarePlus, Pencil, RefreshCw, Save, Settings } from 'lucide-react';
 import { useCallback } from 'react';
 
 import { TimeRangePicker } from '../../-root/time-range-picker';
@@ -27,6 +27,7 @@ interface DashboardToolbarProps {
   onEditModeToggle: () => void;
   onSave?: () => void;
   onSettings?: () => void;
+  onAddAnnotation?: () => void;
   saving?: boolean;
 }
 
@@ -52,6 +53,7 @@ export const DashboardToolbar = ({
   onEditModeToggle,
   onSave,
   onSettings,
+  onAddAnnotation,
   saving,
 }: DashboardToolbarProps) => {
   const handleRefreshChange = useCallback(
@@ -81,6 +83,13 @@ export const DashboardToolbar = ({
             ))}
           </SelectContent>
         </Select>
+
+        {onAddAnnotation !== undefined && (
+          <Button variant='ghost' size='sm' onClick={onAddAnnotation}>
+            <MessageSquarePlus className='mr-1 h-3.5 w-3.5' />
+            Annotations
+          </Button>
+        )}
 
         <Separator orientation='vertical' className='!h-6' />
 

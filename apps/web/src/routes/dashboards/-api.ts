@@ -1,4 +1,4 @@
-import { annotationSchema } from '@graflare/shared/schemas/annotation';
+import { annotationIdParamSchema, annotationSchema, createAnnotationSchema } from '@graflare/shared/schemas/annotation';
 import {
   createDashboardSchema,
   dashboardListQuerySchema,
@@ -139,6 +139,22 @@ export const listAnnotations = createServerFn({ method: 'GET' })
         createdAt: r.createdAt.getTime(),
       }),
     );
+  });
+
+export const createAnnotation = createServerFn({ method: 'POST' })
+  .inputValidator(createAnnotationSchema)
+  .handler(async ({ data }) => {
+    // `data.time` is epoch MS (the API does `new Date(input.time)`). The RPC row is
+    // Disposable-branded, so return only the new id as a plain object.
+    const r = await env.API.createAnnotation(getAccessJwt(), data);
+    if (r === null) return null;
+    return { id: r.id };
+  });
+
+export const deleteAnnotation = createServerFn({ method: 'POST' })
+  .inputValidator(annotationIdParamSchema)
+  .handler(async ({ data: { id } }) => {
+    await env.API.deleteAnnotation(getAccessJwt(), id);
   });
 
 export const listFolders = createServerFn({ method: 'GET' }).handler(async () => {

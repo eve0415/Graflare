@@ -12,6 +12,7 @@ import { Plus } from 'lucide-react';
 import { useCallback, useMemo, useState } from 'react';
 
 import { updateDashboard } from '../-api';
+import { AnnotationsDialog } from '../-components/annotations-dialog';
 import { DashboardGrid } from '../-components/dashboard-grid';
 import { DashboardSettings } from '../-components/dashboard-settings';
 import { DashboardToolbar } from '../-components/dashboard-toolbar';
@@ -74,6 +75,7 @@ const DashboardViewPage = () => {
   const [panels, setPanels] = useState<Panel[]>([]);
   const [editingPanel, setEditingPanel] = useState<Panel | null>(null);
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [annotationsOpen, setAnnotationsOpen] = useState(false);
   const [variableValues, setVariableValues] = useState<Map<string, string>>(new Map());
 
   const dashboardPanels = useMemo(() => {
@@ -177,6 +179,14 @@ const DashboardViewPage = () => {
     setSettingsOpen(false);
   }, []);
 
+  const handleAnnotationsOpen = useCallback(() => {
+    setAnnotationsOpen(true);
+  }, []);
+
+  const handleAnnotationsClose = useCallback(() => {
+    setAnnotationsOpen(false);
+  }, []);
+
   const handleSettingsSave = useCallback(
     (data: { title: string; description: string; tags: string[] }) => {
       const run = async () => {
@@ -218,6 +228,7 @@ const DashboardViewPage = () => {
         onEditModeToggle={handleEditToggle}
         onSave={handleSave}
         onSettings={handleSettingsOpen}
+        onAddAnnotation={handleAnnotationsOpen}
         saving={saving}
       />
 
@@ -265,6 +276,8 @@ const DashboardViewPage = () => {
         onSave={handleSettingsSave}
         onRestore={handleRestore}
       />
+
+      <AnnotationsDialog open={annotationsOpen} onClose={handleAnnotationsClose} dashboardId={id} annotations={dashboardAnnotations} />
     </div>
   );
 };
