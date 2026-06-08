@@ -145,6 +145,12 @@ describe('importClassic', () => {
       expect(result.warnings).toEqual([]);
     });
 
+    it('keeps "state-timeline" as "state-timeline"', () => {
+      const result = importClassic({ ...minimalDashboard, panels: [makePanel('state-timeline')] });
+      expect(result.dashboard.panels[0]?.type).toBe('state-timeline');
+      expect(result.warnings).toEqual([]);
+    });
+
     it('keeps "text" as "text"', () => {
       const result = importClassic({ ...minimalDashboard, panels: [makePanel('text')] });
       expect(result.dashboard.panels[0]?.type).toBe('text');
@@ -182,7 +188,7 @@ describe('importClassic', () => {
         ...minimalDashboard,
         panels: [
           {
-            type: 'state-timeline',
+            type: 'nodeGraph',
             title: 'My Timeline',
             targets: [{ refId: 'A', expr: 'up' }],
             gridPos: { x: 0, y: 0, w: 12, h: 8 },
@@ -193,7 +199,7 @@ describe('importClassic', () => {
 
       expect(result.dashboard.panels).toHaveLength(1);
       expect(result.dashboard.panels[0]?.type).toBe('stat');
-      expect(result.warnings).toEqual(['Unsupported panel type "state-timeline" (panel "My Timeline") — converted to placeholder stat panel']);
+      expect(result.warnings).toEqual(['Unsupported panel type "nodeGraph" (panel "My Timeline") — converted to placeholder stat panel']);
     });
 
     it('uses fallback panel name when title is empty', () => {
@@ -201,7 +207,7 @@ describe('importClassic', () => {
         ...minimalDashboard,
         panels: [
           {
-            type: 'state-timeline',
+            type: 'nodeGraph',
             title: '',
             targets: [],
             gridPos: { x: 0, y: 0, w: 12, h: 8 },
@@ -210,7 +216,7 @@ describe('importClassic', () => {
         ],
       });
 
-      expect(result.warnings).toEqual(['Unsupported panel type "state-timeline" (panel "Panel 0") — converted to placeholder stat panel']);
+      expect(result.warnings).toEqual(['Unsupported panel type "nodeGraph" (panel "Panel 0") — converted to placeholder stat panel']);
     });
 
     it('falls through PANEL_TYPE_MAP for unknown types', () => {
@@ -279,7 +285,7 @@ describe('importClassic', () => {
             title: 'Row',
             panels: [
               {
-                type: 'state-timeline',
+                type: 'nodeGraph',
                 title: 'Nested Timeline',
                 targets: [],
                 gridPos: { x: 0, y: 0, w: 12, h: 8 },
@@ -295,7 +301,7 @@ describe('importClassic', () => {
 
       expect(result.dashboard.panels).toHaveLength(1);
       expect(result.dashboard.panels[0]?.type).toBe('stat');
-      expect(result.warnings[0]).toContain('state-timeline');
+      expect(result.warnings[0]).toContain('nodeGraph');
     });
   });
 
@@ -787,7 +793,7 @@ describe('importClassic', () => {
             fieldConfig: { defaults: { thresholds: { steps: [] } } },
           },
           {
-            type: 'state-timeline',
+            type: 'nodeGraph',
             title: 'Unsupported',
             targets: [],
             gridPos: { x: 0, y: 25, w: 12, h: 8 },
@@ -802,7 +808,7 @@ describe('importClassic', () => {
       expect(result.dashboard.panels.map(p => p.type)).toEqual(['timeseries', 'stat', 'table', 'gauge', 'timeseries', 'stat']);
       expect(result.dashboard.panels.map(p => p.id)).toEqual(['panel-0', 'panel-1', 'panel-2', 'panel-3', 'panel-4', 'panel-5']);
       expect(result.warnings).toHaveLength(1);
-      expect(result.warnings[0]).toContain('state-timeline');
+      expect(result.warnings[0]).toContain('nodeGraph');
     });
   });
 });

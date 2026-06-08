@@ -27,6 +27,7 @@ const PANEL_TYPE_OPTIONS = [
   { value: 'pie', label: 'Pie Chart' },
   { value: 'histogram', label: 'Histogram' },
   { value: 'heatmap', label: 'Heatmap' },
+  { value: 'state-timeline', label: 'State Timeline' },
   { value: 'text', label: 'Text' },
 ] as const;
 
@@ -102,6 +103,7 @@ export const PanelEditor = ({ panel, open, onClose, onSave }: PanelEditorProps) 
         val === 'pie' ||
         val === 'histogram' ||
         val === 'heatmap' ||
+        val === 'state-timeline' ||
         val === 'text'
       ) {
         updateField('type', val);

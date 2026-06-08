@@ -163,6 +163,14 @@ describe('importV2', () => {
       expect(result.warnings).toEqual([]);
     });
 
+    it('maps the StateTimeline kind to the hyphenated state-timeline id', () => {
+      // The V2 kind lowercases to `statetimeline` (hyphen lost), so PANEL_KIND_MAP must
+      // map it back — an identity fallback alone would leave it unsupported.
+      const result = importV2(makeV2({ a: { kind: 'StateTimeline' } }));
+      expect(result.dashboard.panels[0]?.type).toBe('state-timeline');
+      expect(result.warnings).toEqual([]);
+    });
+
     it('supports Text panels (case-insensitive)', () => {
       const result = importV2(makeV2({ a: { kind: 'Text' } }));
       expect(result.dashboard.panels[0]?.type).toBe('text');
@@ -170,11 +178,11 @@ describe('importV2', () => {
     });
 
     it('converts unsupported type to stat with warning', () => {
-      const result = importV2(makeV2({ tl: { kind: 'StateTimeline' } }));
+      const result = importV2(makeV2({ ng: { kind: 'NodeGraph' } }));
 
       expect(result.dashboard.panels).toHaveLength(1);
       expect(result.dashboard.panels[0]?.type).toBe('stat');
-      expect(result.warnings).toEqual(['Unsupported panel type "StateTimeline" (element "tl") — converted to placeholder stat panel']);
+      expect(result.warnings).toEqual(['Unsupported panel type "NodeGraph" (element "ng") — converted to placeholder stat panel']);
     });
   });
 
@@ -544,9 +552,9 @@ describe('importV2', () => {
               kind: 'Gauge',
               spec: { title: 'GA', data: { queries: [{ refId: 'A', expr: 'up' }] } },
             },
-            tl: {
-              kind: 'StateTimeline',
-              spec: { title: 'TL', data: { queries: [] } },
+            ng: {
+              kind: 'NodeGraph',
+              spec: { title: 'NG', data: { queries: [] } },
             },
           },
           layout: {
@@ -555,7 +563,7 @@ describe('importV2', () => {
               { element: 'st', x: 12, y: 0, width: 6, height: 4 },
               { element: 'tb', x: 0, y: 8, width: 24, height: 8 },
               { element: 'ga', x: 0, y: 16, width: 6, height: 6 },
-              { element: 'tl', x: 6, y: 16, width: 6, height: 6 },
+              { element: 'ng', x: 6, y: 16, width: 6, height: 6 },
             ],
           },
           variables: [],
@@ -566,7 +574,7 @@ describe('importV2', () => {
       expect(result.dashboard.panels.map(p => p.type)).toEqual(['timeseries', 'stat', 'table', 'gauge', 'stat']);
       expect(result.dashboard.panels.map(p => p.id)).toEqual(['panel-0', 'panel-1', 'panel-2', 'panel-3', 'panel-4']);
       expect(result.warnings).toHaveLength(1);
-      expect(result.warnings[0]).toContain('StateTimeline');
+      expect(result.warnings[0]).toContain('NodeGraph');
     });
   });
 });

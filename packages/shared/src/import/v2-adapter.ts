@@ -11,9 +11,13 @@ import { grafanaV2Schema } from '../schemas/grafana-v2';
 // exceptions live here, mirroring the classic adapter's PANEL_TYPE_MAP.
 const PANEL_KIND_MAP: Record<string, string> = {
   piechart: 'pie',
+  // V2 kinds are PascalCase single tokens, so `StateTimeline` lowercases to
+  // `statetimeline` — the hyphen in our internal id is lost. Map it back explicitly
+  // (the identity fallback can't recover a hyphen). Mirrors `piechart → pie`.
+  statetimeline: 'state-timeline',
 };
 
-const SUPPORTED_TYPES = new Set(['timeseries', 'stat', 'table', 'gauge', 'bargauge', 'barchart', 'pie', 'histogram', 'heatmap', 'text']);
+const SUPPORTED_TYPES = new Set(['timeseries', 'stat', 'table', 'gauge', 'bargauge', 'barchart', 'pie', 'histogram', 'heatmap', 'state-timeline', 'text']);
 
 // Grafana's text panel `mode` is one of code/text/html/markdown; we render only markdown
 // or sanitized html, so anything other than 'html' clamps to 'markdown'. Mirrors the
@@ -95,6 +99,7 @@ export const importV2 = (json: Record<string, unknown>): ImportResult => {
       panelType !== 'pie' &&
       panelType !== 'histogram' &&
       panelType !== 'heatmap' &&
+      panelType !== 'state-timeline' &&
       panelType !== 'text'
     )
       continue;

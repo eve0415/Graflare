@@ -95,7 +95,7 @@ describe('importV1', () => {
               fieldConfig: { defaults: { thresholds: { steps: [] } } },
             },
             {
-              type: 'state-timeline',
+              type: 'nodeGraph',
               title: 'Unsupported',
               targets: [],
               gridPos: { x: 12, y: 0, w: 12, h: 8 },
@@ -109,7 +109,7 @@ describe('importV1', () => {
       expect(result.dashboard.panels[0]?.type).toBe('timeseries');
       expect(result.dashboard.panels[1]?.type).toBe('stat');
       expect(result.warnings).toHaveLength(1);
-      expect(result.warnings[0]).toContain('state-timeline');
+      expect(result.warnings[0]).toContain('nodeGraph');
     });
 
     it('passes variables through to classic adapter', () => {

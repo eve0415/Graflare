@@ -3,7 +3,19 @@ import * as z from 'zod/mini';
 import { fieldConfigSchema } from './field-config';
 import { thresholdsSchema } from './threshold';
 
-export const panelTypeSchema = z.enum(['timeseries', 'stat', 'table', 'gauge', 'bargauge', 'barchart', 'pie', 'histogram', 'heatmap', 'text']);
+export const panelTypeSchema = z.enum([
+  'timeseries',
+  'stat',
+  'table',
+  'gauge',
+  'bargauge',
+  'barchart',
+  'pie',
+  'histogram',
+  'heatmap',
+  'state-timeline',
+  'text',
+]);
 
 export type PanelType = z.infer<typeof panelTypeSchema>;
 
@@ -111,6 +123,18 @@ export const heatmapDisplaySchema = z.object({
 
 export type HeatmapDisplay = z.infer<typeof heatmapDisplaySchema>;
 
+// State timeline: one horizontal lane per series; consecutive equal values merge into a
+// colored segment spanning their time range (value → color via thresholds/mappings).
+// `rowHeight` is the fraction of a lane the segment band fills (gaps between lanes);
+// `showValue` controls when the state's display value is drawn on its segment. Minimal +
+// defaulted — extra controls (alignment, legend) can be added as further defaulted keys.
+export const stateTimelineDisplaySchema = z.object({
+  rowHeight: z._default(z.number().check(z.minimum(0.1), z.maximum(1)), 0.9),
+  showValue: z._default(z.enum(['auto', 'always', 'never']), 'auto'),
+});
+
+export type StateTimelineDisplay = z.infer<typeof stateTimelineDisplaySchema>;
+
 // Text: author-written panel content with no data query. `content` holds the source
 // string (Markdown, or HTML when `mode` is 'html'); `mode` selects how it is parsed.
 // Both are rendered through react-markdown with rehype-sanitize ON, so author HTML is
@@ -132,6 +156,7 @@ export const displayOptionsSchema = z.object({
   pie: z.optional(pieDisplaySchema),
   histogram: z.optional(histogramDisplaySchema),
   heatmap: z.optional(heatmapDisplaySchema),
+  'state-timeline': z.optional(stateTimelineDisplaySchema),
   text: z.optional(textDisplaySchema),
 });
 
