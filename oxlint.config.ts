@@ -5,7 +5,18 @@ export default defineConfig({
   // `react-hooks` is a reserved plugin name in oxlint, so the JS plugin
   // (React Compiler + hooks rules) must be aliased.
   jsPlugins: [{ name: 'react-hooks-js', specifier: 'eslint-plugin-react-hooks' }],
-  ignorePatterns: ['**/dist', '**/.output', '**/.vinxi', '**/.wrangler', '**/.localflare', '**/.claude', '**/.agents', '**/drizzle', '**/worker-configuration.d.ts', '**/routeTree.gen.ts'],
+  ignorePatterns: [
+    '**/dist',
+    '**/.output',
+    '**/.vinxi',
+    '**/.wrangler',
+    '**/.localflare',
+    '**/.claude',
+    '**/.agents',
+    '**/drizzle',
+    '**/worker-configuration.d.ts',
+    '**/routeTree.gen.ts',
+  ],
   options: {
     typeAware: true,
     typeCheck: true,
@@ -113,7 +124,9 @@ export default defineConfig({
     'unicorn/no-useless-switch-case': 'error',
     'unicorn/no-useless-undefined': 'error',
     'unicorn/no-zero-fractions': 'error',
-    'unicorn/number-literal-case': 'error',
+    // Off: conflicts with oxfmt, which owns literal formatting and enforces
+    // lowercase hex digits. This rule wants uppercase — an unwinnable fight.
+    'unicorn/number-literal-case': 'off',
     'unicorn/numeric-separators-style': ['error', { onlyIfContainsSeparator: true }],
     'unicorn/prefer-array-find': 'error',
     'unicorn/prefer-array-flat': 'error',
@@ -284,7 +297,10 @@ export default defineConfig({
         'react/rules-of-hooks': 'off',
         'react/exhaustive-deps': 'off',
 
-        'react-perf/jsx-no-jsx-as-prop': 'error',
+        // Off: Base UI's polymorphic `render={<Component />}` prop (our shadcn/Base UI
+        // convention) necessarily passes a JSX element as a prop. This rule only ever
+        // false-positives on it. The new-array/object/function variants stay on.
+        'react-perf/jsx-no-jsx-as-prop': 'off',
         'react-perf/jsx-no-new-array-as-prop': 'error',
         'react-perf/jsx-no-new-function-as-prop': 'error',
         'react-perf/jsx-no-new-object-as-prop': 'error',
@@ -341,6 +357,7 @@ export default defineConfig({
       rules: {
         'func-style': 'off',
         'import/no-self-import': 'off',
+        'no-unused-expressions': 'off',
         'react-perf/jsx-no-new-object-as-prop': 'off',
         'react-perf/jsx-no-new-function-as-prop': 'off',
         'react-perf/jsx-no-jsx-as-prop': 'off',
