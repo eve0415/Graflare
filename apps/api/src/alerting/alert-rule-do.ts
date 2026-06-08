@@ -9,6 +9,8 @@ import { drizzle } from 'drizzle-orm/durable-sqlite';
 import { migrate } from 'drizzle-orm/durable-sqlite/migrator';
 
 import migrations from '../../drizzle-do/migrations';
+import { createDb } from '../db';
+import { alertInstances } from '../db/schema';
 import { createPrometheusClient } from '../prometheus/factory';
 
 import { config as configTable, instances } from './do-schema';
@@ -353,18 +355,26 @@ export class AlertRuleDO extends DurableObject<Env> {
     activeAt: number | null,
     evalAt: number,
   ): Promise<void> {
-    const stmt = this.env.DB.prepare(
-      `INSERT INTO alert_instances (id, org_id, rule_id, labels_hash, labels, state, value, active_at, last_eval_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-       ON CONFLICT (rule_id, labels_hash) DO UPDATE SET
-         labels = excluded.labels,
-         state = excluded.state,
-         value = excluded.value,
-         active_at = excluded.active_at,
-         last_eval_at = excluded.last_eval_at`,
-    );
+    const activeAtDate = activeAt === null ? null : new Date(activeAt);
+    const lastEvalDate = new Date(evalAt);
 
-    await stmt.bind(crypto.randomUUID(), config.orgId, config.ruleId, labelsHash, JSON.stringify(labels), state, value, activeAt, evalAt).run();
+    await createDb(this.env.DB)
+      .insert(alertInstances)
+      .values({
+        id: crypto.randomUUID(),
+        orgId: config.orgId,
+        ruleId: config.ruleId,
+        labelsHash,
+        labels,
+        state,
+        value,
+        activeAt: activeAtDate,
+        lastEvalAt: lastEvalDate,
+      })
+      .onConflictDoUpdate({
+        target: [alertInstances.ruleId, alertInstances.labelsHash],
+        set: { labels, state, value, activeAt: activeAtDate, lastEvalAt: lastEvalDate },
+      });
   }
 
   private async triggerNotification(config: AlertRuleConfig): Promise<void> {
