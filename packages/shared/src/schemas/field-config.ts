@@ -24,6 +24,29 @@ const specialMapping = z.object({ type: z.literal('special'), match: z.enum(['nu
 export const valueMappingSchema = z.union([valueMapping, rangeMapping, regexMapping, specialMapping]);
 export type ValueMapping = z.infer<typeof valueMappingSchema>;
 
+export type ValueMappingType = ValueMapping['type'];
+
+// Build a fresh, well-formed mapping of the given type, carrying the result across.
+// The editor uses this when a row's type changes — a spread (`{ ...m, type }`) would
+// leave stale/missing discriminant fields and break the union.
+export const makeValueMapping = (type: ValueMappingType, result: MappingResult): ValueMapping => {
+  switch (type) {
+    case 'value':
+      return { type, value: '', result };
+    case 'range':
+      return { type, from: 0, to: 0, result };
+    case 'regex':
+      return { type, pattern: '', result };
+    case 'special':
+      return { type, match: 'null', result };
+    default: {
+      // Exhaustiveness guard: a new mapping type must add a branch above.
+      const _exhaustive: never = type;
+      throw new Error(`Unknown mapping type: ${String(_exhaustive)}`);
+    }
+  }
+};
+
 // FieldConfigDefaults — the per-field display config. formatValue takes THIS type
 // (not the whole panel) so a future per-field override can resolve to the same
 // shape and reuse the formatter unchanged.
