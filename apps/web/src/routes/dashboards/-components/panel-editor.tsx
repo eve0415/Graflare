@@ -28,6 +28,7 @@ const PANEL_TYPE_OPTIONS = [
   { value: 'histogram', label: 'Histogram' },
   { value: 'heatmap', label: 'Heatmap' },
   { value: 'state-timeline', label: 'State Timeline' },
+  { value: 'status-history', label: 'Status History' },
   { value: 'text', label: 'Text' },
 ] as const;
 
@@ -104,6 +105,7 @@ export const PanelEditor = ({ panel, open, onClose, onSave }: PanelEditorProps) 
         val === 'histogram' ||
         val === 'heatmap' ||
         val === 'state-timeline' ||
+        val === 'status-history' ||
         val === 'text'
       ) {
         updateField('type', val);

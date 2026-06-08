@@ -12,6 +12,7 @@ import { PanelFrame } from './panel-frame';
 import { PiePanel } from './pie-panel';
 import { StatPanel } from './stat-panel';
 import { StateTimelinePanel } from './state-timeline-panel';
+import { StatusHistoryPanel } from './status-history-panel';
 import { TablePanel } from './table-panel';
 import { TextPanel } from './text-panel';
 import { TimeSeriesPanel } from './time-series-panel';
@@ -52,6 +53,8 @@ export const PanelRenderer = ({ panel, timeRange, refetchInterval, width, height
       return <HeatmapPanel panel={resolvedPanel} timeRange={timeRange} refetchInterval={refetchInterval} width={width} height={height} />;
     case 'state-timeline':
       return <StateTimelinePanel panel={resolvedPanel} timeRange={timeRange} refetchInterval={refetchInterval} width={width} height={height} />;
+    case 'status-history':
+      return <StatusHistoryPanel panel={resolvedPanel} timeRange={timeRange} refetchInterval={refetchInterval} width={width} height={height} />;
     case 'text':
       // No data query: the text panel renders author content from displayOptions.text
       // and ignores timeRange/refetch/width/height.

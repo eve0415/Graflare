@@ -171,6 +171,13 @@ describe('importV2', () => {
       expect(result.warnings).toEqual([]);
     });
 
+    it('maps the StatusHistory kind to the hyphenated status-history id', () => {
+      // Same hyphen-recovery path as StateTimeline: `statushistory` must map back.
+      const result = importV2(makeV2({ a: { kind: 'StatusHistory' } }));
+      expect(result.dashboard.panels[0]?.type).toBe('status-history');
+      expect(result.warnings).toEqual([]);
+    });
+
     it('supports Text panels (case-insensitive)', () => {
       const result = importV2(makeV2({ a: { kind: 'Text' } }));
       expect(result.dashboard.panels[0]?.type).toBe('text');

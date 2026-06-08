@@ -151,6 +151,12 @@ describe('importClassic', () => {
       expect(result.warnings).toEqual([]);
     });
 
+    it('keeps "status-history" as "status-history"', () => {
+      const result = importClassic({ ...minimalDashboard, panels: [makePanel('status-history')] });
+      expect(result.dashboard.panels[0]?.type).toBe('status-history');
+      expect(result.warnings).toEqual([]);
+    });
+
     it('keeps "text" as "text"', () => {
       const result = importClassic({ ...minimalDashboard, panels: [makePanel('text')] });
       expect(result.dashboard.panels[0]?.type).toBe('text');

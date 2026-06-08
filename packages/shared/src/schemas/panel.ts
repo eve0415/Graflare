@@ -14,6 +14,7 @@ export const panelTypeSchema = z.enum([
   'histogram',
   'heatmap',
   'state-timeline',
+  'status-history',
   'text',
 ]);
 
@@ -135,6 +136,18 @@ export const stateTimelineDisplaySchema = z.object({
 
 export type StateTimelineDisplay = z.infer<typeof stateTimelineDisplaySchema>;
 
+// Status history: one lane per series; each sample is a discrete colored cell at its
+// timestamp (no merging) — a grid of state boxes over time. `rowHeight` is the fraction
+// of a lane each cell band fills; `colWidth` the fraction of a time slot each cell
+// occupies (gaps between cells). Minimal + defaulted — extra controls (legend, fill
+// opacity) can be added as further defaulted keys without breaking stored panels.
+export const statusHistoryDisplaySchema = z.object({
+  rowHeight: z._default(z.number().check(z.minimum(0.1), z.maximum(1)), 0.9),
+  colWidth: z._default(z.number().check(z.minimum(0.1), z.maximum(1)), 0.9),
+});
+
+export type StatusHistoryDisplay = z.infer<typeof statusHistoryDisplaySchema>;
+
 // Text: author-written panel content with no data query. `content` holds the source
 // string (Markdown, or HTML when `mode` is 'html'); `mode` selects how it is parsed.
 // Both are rendered through react-markdown with rehype-sanitize ON, so author HTML is
@@ -157,6 +170,7 @@ export const displayOptionsSchema = z.object({
   histogram: z.optional(histogramDisplaySchema),
   heatmap: z.optional(heatmapDisplaySchema),
   'state-timeline': z.optional(stateTimelineDisplaySchema),
+  'status-history': z.optional(statusHistoryDisplaySchema),
   text: z.optional(textDisplaySchema),
 });
 

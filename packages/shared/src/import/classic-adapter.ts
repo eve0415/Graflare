@@ -20,10 +20,24 @@ const PANEL_TYPE_MAP: Record<string, string> = {
   histogram: 'histogram',
   heatmap: 'heatmap',
   'state-timeline': 'state-timeline',
+  'status-history': 'status-history',
   text: 'text',
 };
 
-const SUPPORTED_TYPES = new Set(['timeseries', 'stat', 'table', 'gauge', 'bargauge', 'barchart', 'pie', 'histogram', 'heatmap', 'state-timeline', 'text']);
+const SUPPORTED_TYPES = new Set([
+  'timeseries',
+  'stat',
+  'table',
+  'gauge',
+  'bargauge',
+  'barchart',
+  'pie',
+  'histogram',
+  'heatmap',
+  'state-timeline',
+  'status-history',
+  'text',
+]);
 
 // Grafana's text panel `mode` is one of code/text/html/markdown. We only render
 // markdown or sanitized html, so anything that isn't explicitly 'html' becomes
@@ -95,6 +109,7 @@ const convertPanel = (gp: GrafanaBasePanel, index: number, warnings: string[]): 
     panelType !== 'histogram' &&
     panelType !== 'heatmap' &&
     panelType !== 'state-timeline' &&
+    panelType !== 'status-history' &&
     panelType !== 'text'
   ) {
     return null;
