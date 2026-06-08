@@ -117,6 +117,12 @@ describe('importClassic', () => {
       expect(result.dashboard.panels[0]?.type).toBe('barchart');
       expect(result.warnings).toEqual([]);
     });
+
+    it('maps "piechart" to "pie"', () => {
+      const result = importClassic({ ...minimalDashboard, panels: [makePanel('piechart')] });
+      expect(result.dashboard.panels[0]?.type).toBe('pie');
+      expect(result.warnings).toEqual([]);
+    });
   });
 
   describe('unsupported panel types', () => {
@@ -161,8 +167,8 @@ describe('importClassic', () => {
         ...minimalDashboard,
         panels: [
           {
-            type: 'piechart',
-            title: 'Pie',
+            type: 'logs',
+            title: 'Logs',
             targets: [],
             gridPos: { x: 0, y: 0, w: 6, h: 4 },
             fieldConfig: { defaults: { thresholds: { steps: [] } } },
@@ -171,7 +177,7 @@ describe('importClassic', () => {
       });
 
       expect(result.dashboard.panels[0]?.type).toBe('stat');
-      expect(result.warnings[0]).toContain('piechart');
+      expect(result.warnings[0]).toContain('logs');
     });
   });
 

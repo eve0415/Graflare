@@ -3,7 +3,7 @@ import * as z from 'zod/mini';
 import { fieldConfigSchema } from './field-config';
 import { thresholdsSchema } from './threshold';
 
-export const panelTypeSchema = z.enum(['timeseries', 'stat', 'table', 'gauge', 'bargauge', 'barchart']);
+export const panelTypeSchema = z.enum(['timeseries', 'stat', 'table', 'gauge', 'bargauge', 'barchart', 'pie']);
 
 export type PanelType = z.infer<typeof panelTypeSchema>;
 
@@ -79,6 +79,16 @@ export const barChartDisplaySchema = z.object({
 
 export type BarChartDisplay = z.infer<typeof barChartDisplaySchema>;
 
+// Pie chart: one slice per series, sized by its latest value's share of the total.
+// `display` toggles the solid pie vs a centre-punched donut; `legend` places (or
+// hides) the label/value list. Minimal + defaulted, mirroring the other panels.
+export const pieDisplaySchema = z.object({
+  display: z._default(z.enum(['pie', 'donut']), 'pie'),
+  legend: z._default(z.enum(['right', 'bottom', 'none']), 'right'),
+});
+
+export type PieDisplay = z.infer<typeof pieDisplaySchema>;
+
 export const displayOptionsSchema = z.object({
   timeseries: z.optional(timeseriesDisplaySchema),
   stat: z.optional(statDisplaySchema),
@@ -86,6 +96,7 @@ export const displayOptionsSchema = z.object({
   gauge: z.optional(gaugeDisplaySchema),
   bargauge: z.optional(barGaugeDisplaySchema),
   barchart: z.optional(barChartDisplaySchema),
+  pie: z.optional(pieDisplaySchema),
 });
 
 export type DisplayOptions = z.infer<typeof displayOptionsSchema>;

@@ -7,6 +7,7 @@ import { BarChartPanel } from './bar-chart-panel';
 import { BarGaugePanel } from './bar-gauge-panel';
 import { GaugePanel } from './gauge-panel';
 import { PanelFrame } from './panel-frame';
+import { PiePanel } from './pie-panel';
 import { StatPanel } from './stat-panel';
 import { TablePanel } from './table-panel';
 import { TimeSeriesPanel } from './time-series-panel';
@@ -39,6 +40,8 @@ export const PanelRenderer = ({ panel, timeRange, refetchInterval, width, height
       return <BarGaugePanel panel={resolvedPanel} timeRange={timeRange} refetchInterval={refetchInterval} />;
     case 'barchart':
       return <BarChartPanel panel={resolvedPanel} timeRange={timeRange} refetchInterval={refetchInterval} width={width} height={height} />;
+    case 'pie':
+      return <PiePanel panel={resolvedPanel} timeRange={timeRange} refetchInterval={refetchInterval} />;
     default:
       return (
         <PanelFrame title={resolvedPanel.title}>

@@ -6,7 +6,14 @@ import type { ImportResult } from './types';
 
 import { grafanaV2Schema } from '../schemas/grafana-v2';
 
-const SUPPORTED_TYPES = new Set(['timeseries', 'stat', 'table', 'gauge', 'bargauge', 'barchart']);
+// Grafana V2 element kinds whose lowercased name differs from our internal panel
+// type. Identity is assumed for the rest (e.g. `barchart` → `barchart`), so only the
+// exceptions live here, mirroring the classic adapter's PANEL_TYPE_MAP.
+const PANEL_KIND_MAP: Record<string, string> = {
+  piechart: 'pie',
+};
+
+const SUPPORTED_TYPES = new Set(['timeseries', 'stat', 'table', 'gauge', 'bargauge', 'barchart', 'pie']);
 
 const mapV2Queries = (el: V2Element): PanelQuery[] =>
   el.spec.data.queries.map((q, i) => ({
@@ -65,21 +72,22 @@ export const importV2 = (json: Record<string, unknown>): ImportResult => {
   const panels: Panel[] = [];
   let panelIndex = 0;
   for (const [key, element] of Object.entries(spec.elements)) {
-    const rawType = element.kind.toLowerCase();
-    const supported = SUPPORTED_TYPES.has(rawType);
+    const mapped = PANEL_KIND_MAP[element.kind.toLowerCase()] ?? element.kind.toLowerCase();
+    const supported = SUPPORTED_TYPES.has(mapped);
 
     if (!supported) {
       warnings.push(`Unsupported panel type "${element.kind}" (element "${key}") — converted to placeholder stat panel`);
     }
 
-    const panelType = supported ? rawType : 'stat';
+    const panelType = supported ? mapped : 'stat';
     if (
       panelType !== 'timeseries' &&
       panelType !== 'stat' &&
       panelType !== 'table' &&
       panelType !== 'gauge' &&
       panelType !== 'bargauge' &&
-      panelType !== 'barchart'
+      panelType !== 'barchart' &&
+      panelType !== 'pie'
     )
       continue;
 
