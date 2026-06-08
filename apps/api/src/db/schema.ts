@@ -1,3 +1,7 @@
+import type { AlertCondition, AlertQuery, ContactPointSettings, LabelMatcher, MuteTimeInterval } from '@graflare/shared/schemas/alerting';
+import type { Panel } from '@graflare/shared/schemas/panel';
+import type { Variable } from '@graflare/shared/schemas/variable';
+
 import { index, integer, sqliteTable, text, uniqueIndex } from 'drizzle-orm/sqlite-core';
 
 export const organizations = sqliteTable('organizations', {
@@ -51,8 +55,8 @@ export const dashboards = sqliteTable(
     slug: text('slug').notNull(),
     description: text('description').notNull().default(''),
     tags: text('tags', { mode: 'json' }).notNull().$type<string[]>().default([]),
-    panels: text('panels', { mode: 'json' }).notNull().$type<unknown[]>().default([]),
-    variables: text('variables', { mode: 'json' }).notNull().$type<unknown[]>().default([]),
+    panels: text('panels', { mode: 'json' }).notNull().$type<Panel[]>().default([]),
+    variables: text('variables', { mode: 'json' }).notNull().$type<Variable[]>().default([]),
     timeRange: text('time_range', { mode: 'json' })
       .notNull()
       .$type<{ from: string; to: string; refresh: string | null }>()
@@ -91,8 +95,8 @@ export const alertRules = sqliteTable(
       .notNull()
       .references(() => alertRuleGroups.id, { onDelete: 'cascade' }),
     title: text('title').notNull(),
-    queries: text('queries', { mode: 'json' }).notNull().$type<unknown[]>().default([]),
-    condition: text('condition', { mode: 'json' }).notNull().$type<Record<string, unknown>>(),
+    queries: text('queries', { mode: 'json' }).notNull().$type<AlertQuery[]>().default([]),
+    condition: text('condition', { mode: 'json' }).notNull().$type<AlertCondition>(),
     labels: text('labels', { mode: 'json' }).notNull().$type<Record<string, string>>().default({}),
     annotations: text('annotations', { mode: 'json' }).notNull().$type<Record<string, string>>().default({}),
     forDurationS: integer('for_duration_s').notNull().default(0),
@@ -134,7 +138,7 @@ export const contactPoints = sqliteTable(
       .references(() => organizations.id),
     name: text('name').notNull(),
     type: text('type').notNull(),
-    settings: text('settings', { mode: 'json' }).notNull().$type<Record<string, unknown>>(),
+    settings: text('settings', { mode: 'json' }).notNull().$type<ContactPointSettings>(),
     createdAt: integer('created_at', { mode: 'timestamp_ms' }).notNull(),
     updatedAt: integer('updated_at', { mode: 'timestamp_ms' }).notNull(),
   },
@@ -149,7 +153,7 @@ export const notificationPolicies = sqliteTable('notification_policies', {
   parentId: text('parent_id'),
   contactPointId: text('contact_point_id').references(() => contactPoints.id),
   groupBy: text('group_by', { mode: 'json' }).notNull().$type<string[]>().default(['alertname']),
-  matchers: text('matchers', { mode: 'json' }).notNull().$type<unknown[]>().default([]),
+  matchers: text('matchers', { mode: 'json' }).notNull().$type<LabelMatcher[]>().default([]),
   muteTimingIds: text('mute_timing_ids', { mode: 'json' }).notNull().$type<string[]>().default([]),
   groupWaitS: integer('group_wait_s').notNull().default(30),
   groupIntervalS: integer('group_interval_s').notNull().default(300),
@@ -166,7 +170,7 @@ export const silences = sqliteTable(
     orgId: text('org_id')
       .notNull()
       .references(() => organizations.id),
-    matchers: text('matchers', { mode: 'json' }).notNull().$type<unknown[]>(),
+    matchers: text('matchers', { mode: 'json' }).notNull().$type<LabelMatcher[]>(),
     startsAt: integer('starts_at', { mode: 'timestamp_ms' }).notNull(),
     endsAt: integer('ends_at', { mode: 'timestamp_ms' }).notNull(),
     comment: text('comment').notNull().default(''),
@@ -185,7 +189,7 @@ export const muteTimings = sqliteTable(
       .notNull()
       .references(() => organizations.id),
     name: text('name').notNull(),
-    intervals: text('intervals', { mode: 'json' }).notNull().$type<unknown[]>().default([]),
+    intervals: text('intervals', { mode: 'json' }).notNull().$type<MuteTimeInterval[]>().default([]),
     createdAt: integer('created_at', { mode: 'timestamp_ms' }).notNull(),
     updatedAt: integer('updated_at', { mode: 'timestamp_ms' }).notNull(),
   },

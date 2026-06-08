@@ -20,7 +20,6 @@ import type { CreateNotificationPolicy, UpdateNotificationPolicy } from '@grafla
 import type { PrometheusResponse } from '@graflare/shared/schemas/prometheus';
 import type { CreateSilence, UpdateSilence } from '@graflare/shared/schemas/silence';
 import type { SqlFormat, SqlResponse } from '@graflare/shared/schemas/sql';
-import type { DurableObjectNamespace } from 'cloudflare:workers';
 
 import { detectFormat, importDashboard as importDashboardFn } from '@graflare/shared/import';
 import { alertInstanceListQuerySchema, upsertAlertInstanceSchema } from '@graflare/shared/schemas/alert-instance';

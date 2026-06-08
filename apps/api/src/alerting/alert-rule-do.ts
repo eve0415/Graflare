@@ -7,11 +7,9 @@ import { createPrometheusClient } from '../prometheus/factory';
 
 const ALERT_INSTANCE_STATES = new Set(['Normal', 'Pending', 'Firing', 'Resolved']);
 
-function isAlertInstanceState(s: string): s is AlertInstanceState {
-  return ALERT_INSTANCE_STATES.has(s);
-}
+const isAlertInstanceState = (s: string): s is AlertInstanceState => ALERT_INSTANCE_STATES.has(s);
 
-function isAlertRuleConfig(raw: unknown): raw is AlertRuleConfig {
+const isAlertRuleConfig = (raw: unknown): raw is AlertRuleConfig => {
   if (typeof raw !== 'object' || raw === null) return false;
   return (
     'orgId' in raw &&
@@ -23,7 +21,7 @@ function isAlertRuleConfig(raw: unknown): raw is AlertRuleConfig {
     'noDataState' in raw &&
     'execErrState' in raw
   );
-}
+};
 
 interface AlertRuleConfig {
   orgId: string;
@@ -38,7 +36,7 @@ interface AlertRuleConfig {
   annotations: Record<string, string>;
 }
 
-interface InstanceRow {
+type InstanceRow = {
   labels_hash: string;
   labels: string;
   state: string;
@@ -48,7 +46,7 @@ interface InstanceRow {
   resolved_at: number | null;
   last_eval_at: number;
   last_notified_at: number | null;
-}
+};
 
 interface Env {
   DB: D1Database;
@@ -59,7 +57,7 @@ interface Env {
 export class AlertRuleDO extends DurableObject<Env> {
   constructor(ctx: DurableObjectState, env: Env) {
     super(ctx, env);
-    void this.ctx.blockConcurrencyWhile(() => {
+    void this.ctx.blockConcurrencyWhile(async () => {
       this.ctx.storage.sql.exec(`
         CREATE TABLE IF NOT EXISTS _sql_schema_migrations (
           id INTEGER PRIMARY KEY,
@@ -103,8 +101,9 @@ export class AlertRuleDO extends DurableObject<Env> {
 
     this.ctx.storage.sql.exec("INSERT OR REPLACE INTO config (key, value) VALUES ('rule_config', ?)", JSON.stringify(config));
 
-    if (existingRaw.length > 0) {
-      const existing: unknown = JSON.parse(existingRaw[0].value);
+    const [existingRow] = existingRaw;
+    if (existingRow !== undefined) {
+      const existing: unknown = JSON.parse(existingRow.value);
       if (typeof existing === 'object' && existing !== null && 'evalIntervalS' in existing && existing.evalIntervalS !== config.evalIntervalS) {
         await this.ctx.storage.setAlarm(Date.now() + config.evalIntervalS * 1000);
       }
@@ -121,12 +120,13 @@ export class AlertRuleDO extends DurableObject<Env> {
     return this.ctx.storage.sql.exec<InstanceRow>('SELECT * FROM instances').toArray();
   }
 
-  async alarm(): Promise<void> {
+  override async alarm(): Promise<void> {
     const configRows = this.ctx.storage.sql.exec<{ value: string }>("SELECT value FROM config WHERE key = 'rule_config'").toArray();
 
-    if (configRows.length === 0) return;
+    const [configRow] = configRows;
+    if (configRow === undefined) return;
 
-    const configParsed: unknown = JSON.parse(configRows[0].value);
+    const configParsed: unknown = JSON.parse(configRow.value);
     if (!isAlertRuleConfig(configParsed)) return;
     const config = configParsed;
     const now = Date.now();
