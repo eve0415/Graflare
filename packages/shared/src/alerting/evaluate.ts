@@ -8,11 +8,11 @@ export interface EvaluationResult {
   firing: boolean;
 }
 
-function reduce(values: number[], reducer: ConditionReducer): number {
+const reduce = (values: number[], reducer: ConditionReducer): number => {
   if (values.length === 0) return Number.NaN;
   switch (reducer) {
     case 'last':
-      return values.at(-1);
+      return values.at(-1) ?? Number.NaN;
     case 'avg':
       return values.reduce((a, b) => a + b, 0) / values.length;
     case 'min':
@@ -24,9 +24,9 @@ function reduce(values: number[], reducer: ConditionReducer): number {
     case 'count':
       return values.length;
   }
-}
+};
 
-function compare(value: number, operator: ConditionOperator, threshold: number): boolean {
+const compare = (value: number, operator: ConditionOperator, threshold: number): boolean => {
   switch (operator) {
     case 'gt':
       return value > threshold;
@@ -41,17 +41,17 @@ function compare(value: number, operator: ConditionOperator, threshold: number):
     case 'neq':
       return value !== threshold;
   }
-}
+};
 
-function hashLabels(labels: Record<string, string>): string {
+const hashLabels = (labels: Record<string, string>): string => {
   const sorted = Object.keys(labels)
     .sort()
     .map(k => `${k}=${labels[k]}`)
     .join(',');
   return sorted;
-}
+};
 
-export function evaluateCondition(data: PrometheusQueryData, reducer: ConditionReducer, operator: ConditionOperator, threshold: number): EvaluationResult[] {
+export const evaluateCondition = (data: PrometheusQueryData, reducer: ConditionReducer, operator: ConditionOperator, threshold: number): EvaluationResult[] => {
   const results: EvaluationResult[] = [];
 
   if (data.resultType === 'vector') {
@@ -99,4 +99,4 @@ export function evaluateCondition(data: PrometheusQueryData, reducer: ConditionR
   }
 
   return results;
-}
+};

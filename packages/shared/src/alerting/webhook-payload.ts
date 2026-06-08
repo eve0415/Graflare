@@ -30,12 +30,12 @@ export interface AlertForPayload {
   generatorURL: string;
 }
 
-export function buildWebhookPayload(alerts: AlertForPayload[], receiver: string, externalURL: string): GrafanaWebhookPayload {
+export const buildWebhookPayload = (alerts: AlertForPayload[], receiver: string, externalURL: string): GrafanaWebhookPayload => {
   const webhookAlerts: WebhookAlert[] = alerts.map(a => ({
     status: a.state === 'Firing' ? 'firing' : 'resolved',
     labels: a.labels,
     annotations: a.annotations,
-    startsAt: a.activeAt !== null ? new Date(a.activeAt).toISOString() : '',
+    startsAt: a.activeAt === null ? '' : new Date(a.activeAt).toISOString(),
     endsAt: a.resolvedAt !== null && a.resolvedAt !== undefined ? new Date(a.resolvedAt).toISOString() : '',
     values: { value: Number.parseFloat(a.value) || 0 },
     generatorURL: a.generatorURL,
@@ -57,16 +57,16 @@ export function buildWebhookPayload(alerts: AlertForPayload[], receiver: string,
     externalURL,
     receiver,
   };
-}
+};
 
-function computeCommon(maps: Record<string, string>[]): Record<string, string> {
-  if (maps.length === 0) return {};
+const computeCommon = (maps: Record<string, string>[]): Record<string, string> => {
+  const [first] = maps;
+  if (first === undefined) return {};
   const result: Record<string, string> = {};
-  const first = maps[0];
   for (const [key, value] of Object.entries(first)) {
     if (maps.every(m => m[key] === value)) {
       result[key] = value;
     }
   }
   return result;
-}
+};

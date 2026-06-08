@@ -13,6 +13,7 @@ const mapV2Queries = (el: V2Element): PanelQuery[] =>
     refId: q.refId || String.fromCodePoint(65 + i),
     expr: q.expr,
     legendFormat: q.legendFormat,
+    format: 'time_series',
   }));
 
 const mapV2Variable = (v: V2Variable): Variable | null => {

@@ -1,10 +1,8 @@
 import type { LabelMatcher } from '../schemas/alerting';
 
-export function matchLabels(matchers: LabelMatcher[], labels: Record<string, string>): boolean {
-  return matchers.every(m => matchSingle(m, labels));
-}
+export const matchLabels = (matchers: LabelMatcher[], labels: Record<string, string>): boolean => matchers.every(m => matchSingle(m, labels));
 
-function matchSingle(matcher: LabelMatcher, labels: Record<string, string>): boolean {
+const matchSingle = (matcher: LabelMatcher, labels: Record<string, string>): boolean => {
   const value = labels[matcher.name] ?? '';
 
   switch (matcher.operator) {
@@ -17,12 +15,12 @@ function matchSingle(matcher: LabelMatcher, labels: Record<string, string>): boo
     case '!~':
       return !safeRegex(matcher.value).test(value);
   }
-}
+};
 
-function safeRegex(pattern: string): RegExp {
+const safeRegex = (pattern: string): RegExp => {
   try {
     return new RegExp(`^(?:${pattern})$`);
   } catch {
     return /(?!)/;
   }
-}
+};

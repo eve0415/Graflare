@@ -1,10 +1,8 @@
 import type { MuteTimeInterval } from '../schemas/alerting';
 
-export function isMuted(intervals: MuteTimeInterval[], now: Date): boolean {
-  return intervals.some(interval => isWithinInterval(interval, now));
-}
+export const isMuted = (intervals: MuteTimeInterval[], now: Date): boolean => intervals.some(interval => isWithinInterval(interval, now));
 
-function isWithinInterval(interval: MuteTimeInterval, now: Date): boolean {
+const isWithinInterval = (interval: MuteTimeInterval, now: Date): boolean => {
   const tz = interval.timezone ?? 'UTC';
   const localized = localizeDate(now, tz);
 
@@ -24,12 +22,12 @@ function isWithinInterval(interval: MuteTimeInterval, now: Date): boolean {
     return currentMinutes >= startMinutes && currentMinutes < endMinutes;
   }
   return currentMinutes >= startMinutes || currentMinutes < endMinutes;
-}
+};
 
-function parseTimeToMinutes(time: string): number {
-  const parts = time.split(':');
-  return Number.parseInt(parts[0], 10) * 60 + Number.parseInt(parts[1], 10);
-}
+const parseTimeToMinutes = (time: string): number => {
+  const [h, m] = time.split(':');
+  return Number.parseInt(h ?? '0', 10) * 60 + Number.parseInt(m ?? '0', 10);
+};
 
 interface LocalizedTime {
   weekday: number;
@@ -38,7 +36,7 @@ interface LocalizedTime {
   minutes: number;
 }
 
-function localizeDate(date: Date, tz: string): LocalizedTime {
+const localizeDate = (date: Date, tz: string): LocalizedTime => {
   try {
     const formatted = new Intl.DateTimeFormat('en-US', {
       timeZone: tz,
@@ -57,7 +55,7 @@ function localizeDate(date: Date, tz: string): LocalizedTime {
     const dayMap: Record<string, number> = { Sun: 0, Mon: 1, Tue: 2, Wed: 3, Thu: 4, Fri: 5, Sat: 6 };
 
     return {
-      weekday: dayMap[parts['weekday']] ?? date.getUTCDay(),
+      weekday: dayMap[parts['weekday'] ?? ''] ?? date.getUTCDay(),
       month: Number.parseInt(parts['month'] ?? '1', 10),
       hours: Number.parseInt(parts['hour'] ?? '0', 10),
       minutes: Number.parseInt(parts['minute'] ?? '0', 10),
@@ -70,4 +68,4 @@ function localizeDate(date: Date, tz: string): LocalizedTime {
       minutes: date.getUTCMinutes(),
     };
   }
-}
+};

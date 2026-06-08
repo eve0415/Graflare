@@ -24,6 +24,7 @@ const mapQueries = (targets: GrafanaPanel['targets'], baseIndex: number): PanelQ
     refId: t.refId || String.fromCodePoint(65 + baseIndex + i),
     expr: t.expr,
     legendFormat: t.legendFormat,
+    format: 'time_series',
   }));
 
 const clampGridPos = (gp: GrafanaPanel['gridPos']) => ({

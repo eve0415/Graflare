@@ -50,7 +50,7 @@ describe('importV2', () => {
       expect(panel?.type).toBe('timeseries');
       expect(panel?.title).toBe('CPU Usage');
       expect(panel?.description).toBe('');
-      expect(panel?.queries).toEqual([{ refId: 'A', expr: 'rate(cpu[5m])', legendFormat: '{{instance}}' }]);
+      expect(panel?.queries).toEqual([{ refId: 'A', expr: 'rate(cpu[5m])', legendFormat: '{{instance}}', format: 'time_series' }]);
       expect(panel?.gridPos).toEqual({ x: 0, y: 0, w: 12, h: 8 });
       expect(panel?.thresholds).toEqual([]);
       expect(panel?.displayOptions).toEqual({});
