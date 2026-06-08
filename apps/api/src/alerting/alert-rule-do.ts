@@ -49,10 +49,10 @@ interface InstanceRow extends Record<string, SqlStorageValue> {
   last_notified_at: number | null;
 }
 
-interface Env {
-  DB: D1Database;
+// Extend the generated binding types so the env stays in sync with wrangler.json
+// (DB, NOTIFICATION_WORKFLOW, …); ENCRYPTION_KEY is a secret, so it isn't generated.
+interface Env extends Cloudflare.Env {
   ENCRYPTION_KEY: string;
-  NOTIFICATION_WORKFLOW: Workflow;
 }
 
 export class AlertRuleDO extends DurableObject<Env> {
@@ -297,6 +297,9 @@ export class AlertRuleDO extends DurableObject<Env> {
     if (config.noDataState === 'KeepLastState') return;
 
     const targetState: AlertInstanceState = config.noDataState === 'Alerting' ? 'Firing' : 'Normal';
+    // Escalating to Firing (noData/error → Alerting) is a real alert and must notify,
+    // exactly like the normal-evaluation firing path. Going to Normal stays silent.
+    const notify = targetState === 'Firing';
     const allInstances = this.ctx.storage.sql.exec<InstanceRow>('SELECT * FROM instances').toArray();
 
     const pending: Promise<void>[] = [];
@@ -304,7 +307,7 @@ export class AlertRuleDO extends DurableObject<Env> {
       if (inst.state !== targetState) {
         this.ctx.storage.sql.exec('UPDATE instances SET state = ?, last_eval_at = ? WHERE labels_hash = ?', targetState, now, inst.labels_hash);
         const labels = labelsMapSchema.parse(JSON.parse(inst.labels));
-        pending.push(this.syncInstanceToD1(config, inst.labels_hash, labels, targetState, String(inst.value ?? 0), inst.fired_at, now));
+        pending.push(this.syncAndNotify(config, inst.labels_hash, labels, targetState, String(inst.value ?? 0), inst.fired_at, now, notify));
       }
     }
     await Promise.all(pending);
@@ -327,7 +330,10 @@ export class AlertRuleDO extends DurableObject<Env> {
     notify: boolean,
   ): Promise<void> {
     await this.syncInstanceToD1(config, labelsHash, labels, state, value, activeAt, evalAt);
-    if (notify) await this.triggerNotification(config);
+    if (notify) {
+      await this.triggerNotification(config);
+      this.ctx.storage.sql.exec('UPDATE instances SET last_notified_at = ? WHERE labels_hash = ?', evalAt, labelsHash);
+    }
   }
 
   private async syncInstanceToD1(
