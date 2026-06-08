@@ -18,6 +18,7 @@ import { PanelEditor } from '../-components/panel-editor';
 import { PanelActionsProvider } from '../-components/panels/panel-actions-context';
 import { VariableBar } from '../-components/variable-bar';
 import { dashboardQueryOptions } from '../-queries';
+import { datasourcesQueryOptions } from '../../datasources/-queries';
 
 type RefreshInterval = '5s' | '10s' | '30s' | '1m' | '5m' | '15m' | '30m' | '1h' | 'off';
 
@@ -250,7 +251,10 @@ const DashboardViewPage = () => {
 };
 
 export const Route = createFileRoute('/dashboards/$id/')({
-  loader: ({ params, context }) => context.queryClient.ensureQueryData(dashboardQueryOptions(params.id)),
+  // Prefetch both the dashboard and the datasource list so panels can resolve their
+  // datasource on first paint instead of waiting for the client-side fetch.
+  loader: ({ params, context }) =>
+    Promise.all([context.queryClient.ensureQueryData(dashboardQueryOptions(params.id)), context.queryClient.ensureQueryData(datasourcesQueryOptions())]),
   pendingComponent: DashboardViewSkeleton,
   component: DashboardViewPage,
 });
