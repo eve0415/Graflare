@@ -581,21 +581,28 @@ export class GraflareAPI extends WorkerEntrypoint<Bindings> {
         ...(schemaIdx !== -1 && row[schemaIdx] !== null ? { schema: String(row[schemaIdx]) } : {}),
       }));
 
+      const describedTables = await Promise.all(
+        tableList.map(async table => {
+          const dq = describeTableQuery(dialect, table.name, table.schema);
+          const result = await client.query(dq.sql, dq.params);
+          if (result.error !== undefined) return null;
+
+          const colNameIdx = result.columns.findIndex(c => c.name === 'name');
+          const typeIdx = result.columns.findIndex(c => c.name === 'type');
+          const nullableIdx = result.columns.findIndex(c => c.name === 'nullable');
+
+          const columns = result.rows.map(row => ({
+            name: String(row[colNameIdx] ?? ''),
+            type: String(row[typeIdx] ?? ''),
+            nullable: Number(row[nullableIdx]) === 1,
+          }));
+          return { name: table.name, columns };
+        }),
+      );
+
       const tables: Record<string, { name: string; type: string; nullable: boolean }[]> = {};
-      for (const table of tableList) {
-        const dq = describeTableQuery(dialect, table.name, table.schema);
-        const result = await client.query(dq.sql, dq.params);
-        if (result.error !== undefined) continue;
-
-        const colNameIdx = result.columns.findIndex(c => c.name === 'name');
-        const typeIdx = result.columns.findIndex(c => c.name === 'type');
-        const nullableIdx = result.columns.findIndex(c => c.name === 'nullable');
-
-        tables[table.name] = result.rows.map(row => ({
-          name: String(row[colNameIdx] ?? ''),
-          type: String(row[typeIdx] ?? ''),
-          nullable: Number(row[nullableIdx]) === 1,
-        }));
+      for (const t of describedTables) {
+        if (t !== null) tables[t.name] = t.columns;
       }
 
       return { tables };
@@ -1144,23 +1151,24 @@ export class GraflareAPI extends WorkerEntrypoint<Bindings> {
             .from(alertRules)
             .where(and(eq(alertRules.groupId, id), eq(alertRules.orgId, orgId)));
 
-          for (const rule of rules) {
-            if (!rule.isPaused) {
-              const stub = this.env.ALERT_RULE.getByName(rule.id);
-              await stub.updateConfig({
-                orgId,
-                ruleId: rule.id,
-                queries: rule.queries,
-                condition: rule.condition,
-                evalIntervalS: group.evalIntervalS,
-                forDurationS: rule.forDurationS,
-                noDataState: rule.noDataState,
-                execErrState: rule.execErrState,
-                labels: rule.labels,
-                annotations: rule.annotations,
-              });
-            }
-          }
+          await Promise.all(
+            rules
+              .filter(rule => !rule.isPaused)
+              .map(rule =>
+                this.env.ALERT_RULE.getByName(rule.id).updateConfig({
+                  orgId,
+                  ruleId: rule.id,
+                  queries: rule.queries,
+                  condition: rule.condition,
+                  evalIntervalS: group.evalIntervalS,
+                  forDurationS: rule.forDurationS,
+                  noDataState: rule.noDataState,
+                  execErrState: rule.execErrState,
+                  labels: rule.labels,
+                  annotations: rule.annotations,
+                }),
+              ),
+          );
         }
       }
     } catch (error) {
@@ -1355,36 +1363,36 @@ export class GraflareAPI extends WorkerEntrypoint<Bindings> {
 
   async upsertAlertInstances(jwt: string, instances: UpsertAlertInstance[]) {
     const { orgId } = await this.resolveAuth(jwt);
-    for (const inst of instances) {
+    const rows = instances.map(inst => {
       const parsed = upsertAlertInstanceSchema.parse(inst);
-      try {
-        await this.db
-          .insert(alertInstances)
-          .values({
-            id: crypto.randomUUID(),
-            orgId,
-            ruleId: parsed.ruleId,
-            labelsHash: parsed.labelsHash,
-            labels: parsed.labels ?? {},
-            state: parsed.state,
-            value: parsed.value,
-            activeAt: parsed.activeAt !== null ? new Date(parsed.activeAt) : null,
-            lastEvalAt: new Date(parsed.lastEvalAt),
-          })
-          .onConflictDoUpdate({
-            target: [alertInstances.ruleId, alertInstances.labelsHash],
-            set: {
-              labels: parsed.labels ?? {},
-              state: parsed.state,
-              value: parsed.value,
-              activeAt: parsed.activeAt !== null ? new Date(parsed.activeAt) : null,
-              lastEvalAt: new Date(parsed.lastEvalAt),
-            },
-          });
-      } catch (error) {
-        console.error('upsertAlertInstances failed:', error);
-        throw new Error('Failed to upsert alert instance', { cause: error });
-      }
+      return {
+        id: crypto.randomUUID(),
+        orgId,
+        ruleId: parsed.ruleId,
+        labelsHash: parsed.labelsHash,
+        labels: parsed.labels ?? {},
+        state: parsed.state,
+        value: parsed.value,
+        activeAt: parsed.activeAt === null ? null : new Date(parsed.activeAt),
+        lastEvalAt: new Date(parsed.lastEvalAt),
+      };
+    });
+
+    try {
+      await Promise.all(
+        rows.map(row =>
+          this.db
+            .insert(alertInstances)
+            .values(row)
+            .onConflictDoUpdate({
+              target: [alertInstances.ruleId, alertInstances.labelsHash],
+              set: { labels: row.labels, state: row.state, value: row.value, activeAt: row.activeAt, lastEvalAt: row.lastEvalAt },
+            }),
+        ),
+      );
+    } catch (error) {
+      console.error('upsertAlertInstances failed:', error);
+      throw new Error('Failed to upsert alert instances', { cause: error });
     }
   }
 
@@ -1800,7 +1808,7 @@ export class GraflareAPI extends WorkerEntrypoint<Bindings> {
         panelId: parsed.panelId,
         alertRuleId: parsed.alertRuleId,
         time: new Date(parsed.time),
-        timeEnd: parsed.timeEnd !== undefined ? new Date(parsed.timeEnd) : undefined,
+        timeEnd: parsed.timeEnd === undefined ? undefined : new Date(parsed.timeEnd),
         text: parsed.text,
         tags: parsed.tags ?? [],
         prevState: parsed.prevState,
