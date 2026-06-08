@@ -3,5 +3,5 @@
   "compilerOptions": {
     "types": ["node"]
   },
-  "files": ["drizzle.config.ts", "vitest.config.ts"]
+  "files": ["drizzle.config.ts", "drizzle-do.config.ts", "vitest.config.ts"]
 }

@@ -2,10 +2,14 @@ import type { AlertRuleDO } from './alert-rule-do';
 
 import { runInDurableObject } from 'cloudflare:test';
 import { env } from 'cloudflare:workers';
+import { eq } from 'drizzle-orm';
+import { drizzle } from 'drizzle-orm/durable-sqlite';
 import { beforeEach, describe, expect, it } from 'vitest';
 
 import { createDb } from '../db';
 import { alertInstances, alertRuleGroups, alertRules, organizations } from '../db/schema';
+
+import { config as configTable, instances } from './do-schema';
 
 const ORG_ID = 'org-c2';
 const RULE_ID = 'rule-c2';
@@ -27,14 +31,19 @@ const errorRuleConfig = {
 };
 
 const seedNormalInstance = (state: DurableObjectState, config: unknown): void => {
-  state.storage.sql.exec("INSERT OR REPLACE INTO config (key, value) VALUES ('rule_config', ?)", JSON.stringify(config));
-  state.storage.sql.exec(
-    "INSERT INTO instances (labels_hash, labels, state, value, last_eval_at) VALUES (?, ?, 'Normal', ?, ?)",
-    'inst-1',
-    JSON.stringify({ alertname: 'C2', severity: 'critical' }),
-    1,
-    1000,
-  );
+  const db = drizzle(state.storage, { schema: { instances, config: configTable } });
+  db.insert(configTable)
+    .values({ key: 'rule_config', value: JSON.stringify(config) })
+    .run();
+  db.insert(instances)
+    .values({
+      labelsHash: 'inst-1',
+      labels: JSON.stringify({ alertname: 'C2', severity: 'critical' }),
+      state: 'Normal',
+      value: 1,
+      lastEvalAt: 1000,
+    })
+    .run();
 };
 
 describe('alert-rule DO no-data/error notifications', () => {
@@ -85,7 +94,8 @@ describe('alert-rule DO no-data/error notifications', () => {
     await runInDurableObject<AlertRuleDO, void>(stub, async (instance, state) => {
       seedNormalInstance(state, errorRuleConfig);
       // Already Firing — a fresh error keeps it Firing and must not fire again.
-      state.storage.sql.exec("UPDATE instances SET state = 'Firing' WHERE labels_hash = ?", 'inst-1');
+      const db = drizzle(state.storage, { schema: { instances, config: configTable } });
+      db.update(instances).set({ state: 'Firing' }).where(eq(instances.labelsHash, 'inst-1')).run();
       await instance.alarm();
 
       const [inst] = instance.getState();

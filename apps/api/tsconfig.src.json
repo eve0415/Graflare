@@ -1,8 +1,11 @@
 {
   "extends": "../../tsconfig.json",
   "compilerOptions": {
-    "types": ["@cloudflare/workers-types"]
+    "types": ["@cloudflare/workers-types"],
+    // drizzle-kit's durable-sqlite output (drizzle-do/migrations.js) is the
+    // generated entrypoint AlertRuleDO imports; allow TS to read its inferred type.
+    "allowJs": true
   },
-  "include": ["src", "worker-configuration.d.ts"],
+  "include": ["src", "drizzle-do/migrations.js", "worker-configuration.d.ts"],
   "exclude": ["src/**/*.test.ts", "src/test-setup.ts"]
 }

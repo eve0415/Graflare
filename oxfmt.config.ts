@@ -7,6 +7,7 @@ export default defineConfig({
     '**/.vinxi',
     '**/.wrangler',
     '**/drizzle',
+    '**/drizzle-do',
     '**/worker-configuration.d.ts',
     '**/routeTree.gen.ts',
     '**/.claude',

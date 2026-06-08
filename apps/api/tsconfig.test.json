@@ -1,7 +1,10 @@
 {
   "extends": "../../tsconfig.json",
   "compilerOptions": {
-    "types": ["@cloudflare/vitest-pool-workers/types"]
+    "types": ["@cloudflare/vitest-pool-workers/types"],
+    // The DO test imports `AlertRuleDO`, which transitively pulls in the generated
+    // drizzle-do/migrations.js entrypoint — let TS read it and its `.sql` imports.
+    "allowJs": true
   },
-  "include": ["src/**/*.test.ts", "tests/setup.ts", "tests/test-env.d.ts", "worker-configuration.d.ts"]
+  "include": ["src/**/*.test.ts", "src/sql-modules.d.ts", "drizzle-do/migrations.js", "tests/setup.ts", "tests/test-env.d.ts", "worker-configuration.d.ts"]
 }

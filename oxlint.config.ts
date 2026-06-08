@@ -14,6 +14,7 @@ export default defineConfig({
     '**/.claude',
     '**/.agents',
     '**/drizzle',
+    '**/drizzle-do',
     '**/worker-configuration.d.ts',
     '**/routeTree.gen.ts',
   ],
@@ -391,7 +392,7 @@ export default defineConfig({
     },
     // Tool config files legitimately default-export.
     {
-      files: ['**/vite.config.ts', '**/vitest.config.ts', '**/drizzle.config.ts', 'oxlint.config.ts', 'oxfmt.config.ts'],
+      files: ['**/vite.config.ts', '**/vitest.config.ts', '**/drizzle*.config.ts', 'oxlint.config.ts', 'oxfmt.config.ts'],
       rules: {
         'import/no-default-export': 'off',
       },

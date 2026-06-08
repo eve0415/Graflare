@@ -1,10 +1,20 @@
 import type { AlertCondition, AlertInstanceState, AlertQuery, ExecErrState, NoDataState } from '@graflare/shared/schemas/alerting';
+import type { DrizzleSqliteDODatabase } from 'drizzle-orm/durable-sqlite';
 
 import { evaluateCondition } from '@graflare/shared/alerting/evaluate';
 import { labelsMapSchema } from '@graflare/shared/schemas/alerting';
 import { DurableObject } from 'cloudflare:workers';
+import { eq } from 'drizzle-orm';
+import { drizzle } from 'drizzle-orm/durable-sqlite';
+import { migrate } from 'drizzle-orm/durable-sqlite/migrator';
 
+import migrations from '../../drizzle-do/migrations';
 import { createPrometheusClient } from '../prometheus/factory';
+
+import { config as configTable, instances } from './do-schema';
+import * as doSchema from './do-schema';
+
+const RULE_CONFIG_KEY = 'rule_config';
 
 const ALERT_INSTANCE_STATES = new Set(['Normal', 'Pending', 'Firing', 'Resolved']);
 
@@ -37,6 +47,13 @@ interface AlertRuleConfig {
   annotations: Record<string, string>;
 }
 
+/** A row from the DO's internal `instances` table as Drizzle selects it (camelCase). */
+type InstanceSelect = typeof instances.$inferSelect;
+
+/**
+ * Public shape of an instance row. Keeps the original snake_case column names so
+ * the DO's RPC contract (and its callers) stay unchanged after the move to Drizzle.
+ */
 interface InstanceRow extends Record<string, SqlStorageValue> {
   labels_hash: string;
   labels: string;
@@ -49,6 +66,18 @@ interface InstanceRow extends Record<string, SqlStorageValue> {
   last_notified_at: number | null;
 }
 
+const toInstanceRow = (row: InstanceSelect): InstanceRow => ({
+  labels_hash: row.labelsHash,
+  labels: row.labels,
+  state: row.state,
+  value: row.value,
+  pending_since: row.pendingSince,
+  fired_at: row.firedAt,
+  resolved_at: row.resolvedAt,
+  last_eval_at: row.lastEvalAt,
+  last_notified_at: row.lastNotifiedAt,
+});
+
 // Extend the generated binding types so the env stays in sync with wrangler.json
 // (DB, NOTIFICATION_WORKFLOW, …); ENCRYPTION_KEY is a secret, so it isn't generated.
 interface Env extends Cloudflare.Env {
@@ -56,54 +85,26 @@ interface Env extends Cloudflare.Env {
 }
 
 export class AlertRuleDO extends DurableObject<Env> {
+  private readonly db: DrizzleSqliteDODatabase<typeof doSchema>;
+
   constructor(ctx: DurableObjectState, env: Env) {
     super(ctx, env);
-    void this.ctx.blockConcurrencyWhile(() => {
-      this.ctx.storage.sql.exec(`
-        CREATE TABLE IF NOT EXISTS _sql_schema_migrations (
-          id INTEGER PRIMARY KEY,
-          applied_at TEXT NOT NULL DEFAULT (datetime('now'))
-        )
-      `);
-
-      const applied = this.ctx.storage.sql.exec<{ id: number }>('SELECT id FROM _sql_schema_migrations WHERE id = 1').toArray();
-      if (applied.length === 0) {
-        this.ctx.storage.sql.exec(`
-          CREATE TABLE IF NOT EXISTS instances (
-            labels_hash TEXT PRIMARY KEY,
-            labels TEXT NOT NULL,
-            state TEXT NOT NULL DEFAULT 'Normal',
-            value REAL,
-            pending_since INTEGER,
-            fired_at INTEGER,
-            resolved_at INTEGER,
-            last_eval_at INTEGER NOT NULL,
-            last_notified_at INTEGER
-          )
-        `);
-        this.ctx.storage.sql.exec(`
-          CREATE TABLE IF NOT EXISTS config (
-            key TEXT PRIMARY KEY,
-            value TEXT NOT NULL
-          )
-        `);
-        this.ctx.storage.sql.exec('INSERT INTO _sql_schema_migrations (id) VALUES (1)');
-      }
-      return Promise.resolve();
+    this.db = drizzle(this.ctx.storage, { schema: doSchema, logger: false });
+    void this.ctx.blockConcurrencyWhile(async () => {
+      await migrate(this.db, migrations);
     });
   }
 
   async init(config: AlertRuleConfig): Promise<void> {
-    this.ctx.storage.sql.exec("INSERT OR REPLACE INTO config (key, value) VALUES ('rule_config', ?)", JSON.stringify(config));
+    this.writeConfig(config);
     await this.ctx.storage.setAlarm(Date.now() + config.evalIntervalS * 1000);
   }
 
   async updateConfig(config: AlertRuleConfig): Promise<void> {
-    const existingRaw = this.ctx.storage.sql.exec<{ value: string }>("SELECT value FROM config WHERE key = 'rule_config'").toArray();
+    const existingRow = this.db.select({ value: configTable.value }).from(configTable).where(eq(configTable.key, RULE_CONFIG_KEY)).get();
 
-    this.ctx.storage.sql.exec("INSERT OR REPLACE INTO config (key, value) VALUES ('rule_config', ?)", JSON.stringify(config));
+    this.writeConfig(config);
 
-    const [existingRow] = existingRaw;
     if (existingRow !== undefined) {
       const existing: unknown = JSON.parse(existingRow.value);
       if (typeof existing === 'object' && existing !== null && 'evalIntervalS' in existing && existing.evalIntervalS !== config.evalIntervalS) {
@@ -114,18 +115,21 @@ export class AlertRuleDO extends DurableObject<Env> {
 
   async stop(): Promise<void> {
     await this.ctx.storage.deleteAlarm();
-    this.ctx.storage.sql.exec("DELETE FROM config WHERE key = 'rule_config'");
-    this.ctx.storage.sql.exec('DELETE FROM instances');
+    this.db.delete(configTable).where(eq(configTable.key, RULE_CONFIG_KEY)).run();
+    this.db.delete(instances).run();
   }
 
   getState(): InstanceRow[] {
-    return this.ctx.storage.sql.exec<InstanceRow>('SELECT * FROM instances').toArray();
+    return this.db
+      .select()
+      .from(instances)
+      .all()
+      .map(row => toInstanceRow(row));
   }
 
   override async alarm(): Promise<void> {
-    const configRows = this.ctx.storage.sql.exec<{ value: string }>("SELECT value FROM config WHERE key = 'rule_config'").toArray();
+    const configRow = this.db.select({ value: configTable.value }).from(configTable).where(eq(configTable.key, RULE_CONFIG_KEY)).get();
 
-    const [configRow] = configRows;
     if (configRow === undefined) return;
 
     const configParsed: unknown = JSON.parse(configRow.value);
@@ -182,39 +186,40 @@ export class AlertRuleDO extends DurableObject<Env> {
 
       for (const result of results) {
         seenHashes.add(result.labelsHash);
-        const existing = this.ctx.storage.sql.exec<InstanceRow>('SELECT * FROM instances WHERE labels_hash = ?', result.labelsHash).toArray();
+        const prev = this.db.select().from(instances).where(eq(instances.labelsHash, result.labelsHash)).get() ?? null;
 
-        const prev = existing[0] ?? null;
         const prevStateRaw = prev?.state ?? 'Normal';
         const prevState: AlertInstanceState = isAlertInstanceState(prevStateRaw) ? prevStateRaw : 'Normal';
-        const newState = this.transitionState(prevState, result.firing, config.forDurationS, now, prev?.pending_since ?? null);
+        const newState = this.transitionState(prevState, result.firing, config.forDurationS, now, prev?.pendingSince ?? null);
 
         if (prev === null) {
-          this.ctx.storage.sql.exec(
-            `INSERT INTO instances (labels_hash, labels, state, value, pending_since, fired_at, resolved_at, last_eval_at)
-             VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
-            result.labelsHash,
-            JSON.stringify(result.labels),
-            newState.state,
-            result.value,
-            newState.pendingSince,
-            newState.firedAt,
-            newState.resolvedAt,
-            now,
-          );
+          this.db
+            .insert(instances)
+            .values({
+              labelsHash: result.labelsHash,
+              labels: JSON.stringify(result.labels),
+              state: newState.state,
+              value: result.value,
+              pendingSince: newState.pendingSince,
+              firedAt: newState.firedAt,
+              resolvedAt: newState.resolvedAt,
+              lastEvalAt: now,
+            })
+            .run();
         } else {
-          this.ctx.storage.sql.exec(
-            `UPDATE instances SET labels = ?, state = ?, value = ?, pending_since = ?, fired_at = ?, resolved_at = ?, last_eval_at = ?
-             WHERE labels_hash = ?`,
-            JSON.stringify(result.labels),
-            newState.state,
-            result.value,
-            newState.pendingSince,
-            newState.firedAt ?? prev.fired_at,
-            newState.resolvedAt,
-            now,
-            result.labelsHash,
-          );
+          this.db
+            .update(instances)
+            .set({
+              labels: JSON.stringify(result.labels),
+              state: newState.state,
+              value: result.value,
+              pendingSince: newState.pendingSince,
+              firedAt: newState.firedAt ?? prev.firedAt,
+              resolvedAt: newState.resolvedAt,
+              lastEvalAt: now,
+            })
+            .where(eq(instances.labelsHash, result.labelsHash))
+            .run();
         }
 
         if (prevState !== newState.state) {
@@ -226,7 +231,7 @@ export class AlertRuleDO extends DurableObject<Env> {
               result.labels,
               newState.state,
               String(result.value),
-              newState.firedAt ?? prev?.fired_at ?? null,
+              newState.firedAt ?? prev?.firedAt ?? null,
               now,
               notify,
             ),
@@ -234,17 +239,12 @@ export class AlertRuleDO extends DurableObject<Env> {
         }
       }
 
-      const allInstances = this.ctx.storage.sql.exec<InstanceRow>('SELECT * FROM instances').toArray();
+      const allInstances = this.db.select().from(instances).all();
       for (const inst of allInstances) {
-        if (!seenHashes.has(inst.labels_hash) && (inst.state === 'Firing' || inst.state === 'Pending')) {
-          this.ctx.storage.sql.exec(
-            "UPDATE instances SET state = 'Resolved', resolved_at = ?, last_eval_at = ? WHERE labels_hash = ?",
-            now,
-            now,
-            inst.labels_hash,
-          );
+        if (!seenHashes.has(inst.labelsHash) && (inst.state === 'Firing' || inst.state === 'Pending')) {
+          this.db.update(instances).set({ state: 'Resolved', resolvedAt: now, lastEvalAt: now }).where(eq(instances.labelsHash, inst.labelsHash)).run();
           const labels = labelsMapSchema.parse(JSON.parse(inst.labels));
-          pending.push(this.syncAndNotify(config, inst.labels_hash, labels, 'Resolved', String(inst.value ?? 0), inst.fired_at, now, true));
+          pending.push(this.syncAndNotify(config, inst.labelsHash, labels, 'Resolved', String(inst.value ?? 0), inst.firedAt, now, true));
         }
       }
 
@@ -254,6 +254,14 @@ export class AlertRuleDO extends DurableObject<Env> {
       await this.handleError(config, now);
       await this.ctx.storage.setAlarm(now + config.evalIntervalS * 1000);
     }
+  }
+
+  private writeConfig(config: AlertRuleConfig): void {
+    this.db
+      .insert(configTable)
+      .values({ key: RULE_CONFIG_KEY, value: JSON.stringify(config) })
+      .onConflictDoUpdate({ target: configTable.key, set: { value: JSON.stringify(config) } })
+      .run();
   }
 
   private transitionState(
@@ -300,14 +308,14 @@ export class AlertRuleDO extends DurableObject<Env> {
     // Escalating to Firing (noData/error → Alerting) is a real alert and must notify,
     // exactly like the normal-evaluation firing path. Going to Normal stays silent.
     const notify = targetState === 'Firing';
-    const allInstances = this.ctx.storage.sql.exec<InstanceRow>('SELECT * FROM instances').toArray();
+    const allInstances = this.db.select().from(instances).all();
 
     const pending: Promise<void>[] = [];
     for (const inst of allInstances) {
       if (inst.state !== targetState) {
-        this.ctx.storage.sql.exec('UPDATE instances SET state = ?, last_eval_at = ? WHERE labels_hash = ?', targetState, now, inst.labels_hash);
+        this.db.update(instances).set({ state: targetState, lastEvalAt: now }).where(eq(instances.labelsHash, inst.labelsHash)).run();
         const labels = labelsMapSchema.parse(JSON.parse(inst.labels));
-        pending.push(this.syncAndNotify(config, inst.labels_hash, labels, targetState, String(inst.value ?? 0), inst.fired_at, now, notify));
+        pending.push(this.syncAndNotify(config, inst.labelsHash, labels, targetState, String(inst.value ?? 0), inst.firedAt, now, notify));
       }
     }
     await Promise.all(pending);
@@ -332,7 +340,7 @@ export class AlertRuleDO extends DurableObject<Env> {
     await this.syncInstanceToD1(config, labelsHash, labels, state, value, activeAt, evalAt);
     if (notify) {
       await this.triggerNotification(config);
-      this.ctx.storage.sql.exec('UPDATE instances SET last_notified_at = ? WHERE labels_hash = ?', evalAt, labelsHash);
+      this.db.update(instances).set({ lastNotifiedAt: evalAt }).where(eq(instances.labelsHash, labelsHash)).run();
     }
   }
 
