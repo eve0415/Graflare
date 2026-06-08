@@ -90,11 +90,16 @@ const toHex = (buffer: ArrayBuffer): string => {
  * `k=v` pairs. PromQL is up to 8KB and contains `{}="` characters, so we hash
  * the normalized string (SHA-256) rather than embed it raw in the key — this
  * bounds key length and sidesteps URL-encoding pitfalls.
+ *
+ * Each key and value is `encodeURIComponent`-escaped before joining so a value
+ * that itself contains `=`/`&` (PromQL label matchers do, constantly) can't fake
+ * a delimiter and collide with a genuinely different param bag — e.g. without
+ * encoding, `{a:'1&b=2'}` and `{a:'1', b:'2'}` both serialize to `a=1&b=2`.
  */
 const normalizeParams = (params: Record<string, string>): string =>
   Object.keys(params)
     .sort()
-    .map(k => `${k}=${params[k] ?? ''}`)
+    .map(k => `${encodeURIComponent(k)}=${encodeURIComponent(params[k] ?? '')}`)
     .join('&');
 
 export interface QueryCacheKeyInput {

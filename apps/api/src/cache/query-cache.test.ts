@@ -149,6 +149,14 @@ describe('queryCacheKey', () => {
     expect(a).not.toBe(b);
   });
 
+  it('does not collide when a param value contains the k=v delimiters (PromQL has = everywhere)', async () => {
+    // Without per-component encoding, `{a:'1&b=2'}` and `{a:'1', b:'2'}` both
+    // serialize to "a=1&b=2" and hash to the same key — a same-tenant cache mixup.
+    const a = await queryCacheKey({ ...base, params: { a: '1&b=2' } });
+    const b = await queryCacheKey({ ...base, params: { a: '1', b: '2' } });
+    expect(a).not.toBe(b);
+  });
+
   it('carries the org id in the key path so two orgs are structurally separated', async () => {
     const a = await queryCacheKey(base);
     expect(a).toContain('/org-a/');
