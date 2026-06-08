@@ -8,25 +8,29 @@ export const TIME_MULTIPLIERS: Readonly<Record<string, number>> = {
 };
 
 /**
- * Resolve a Grafana-style time expression to an epoch-second number.
+ * Strictly parse a Grafana-style time expression to an epoch-second number,
+ * or `null` if the input is not recognised (no fallback).
  *
  * Accepted inputs:
  * - `"now"` — current epoch seconds (floored)
- * - `"now-<N><unit>"` — relative offset (s/m/h/d/w)
- * - Numeric string — parsed as-is (assumed epoch seconds)
+ * - `"now-<N><unit>"` / `"now+<N><unit>"` — relative offset (s/m/h/d/w),
+ *   past or future
+ * - Numeric string — parsed as-is (assumed epoch seconds), floored
  *
- * Falls back to current epoch seconds for unrecognised input.
+ * Returns `null` for anything else (e.g. `"now/d"`, `"tomorrow"`, `"now-2x"`).
+ * Note: the empty string parses to `0` (JS `Number('') === 0`), not `null`.
  */
-export const resolveTime = (expr: string): number => {
+export const parseTimeExpr = (expr: string): number | null => {
   if (expr === 'now') return Math.floor(Date.now() / 1000);
 
-  const match = /^now-(\d+)([smhdw])$/.exec(expr);
+  const match = /^now([+-])(\d+)([smhdw])$/.exec(expr);
   if (match !== null) {
-    const [, amount, unit] = match;
-    if (amount !== undefined && unit !== undefined) {
+    const [, sign, amount, unit] = match;
+    if (sign !== undefined && amount !== undefined && unit !== undefined) {
       const multiplier = TIME_MULTIPLIERS[unit];
       if (multiplier !== undefined) {
-        return Math.floor(Date.now() / 1000) - Number(amount) * multiplier;
+        const direction = sign === '-' ? -1 : 1;
+        return Math.floor(Date.now() / 1000) + direction * Number(amount) * multiplier;
       }
     }
   }
@@ -34,8 +38,19 @@ export const resolveTime = (expr: string): number => {
   const parsed = Number(expr);
   if (!Number.isNaN(parsed)) return Math.floor(parsed);
 
-  return Math.floor(Date.now() / 1000);
+  return null;
 };
+
+/**
+ * Resolve a Grafana-style time expression to an epoch-second number.
+ *
+ * Thin wrapper over {@link parseTimeExpr}: falls back to the current epoch
+ * seconds for any input the strict parser rejects. Used on the server query
+ * path, so its observable behavior is intentionally identical to before
+ * (the only added input it now resolves is the `"now+<N><unit>"` future form,
+ * which previously hit the same fallback).
+ */
+export const resolveTime = (expr: string): number => parseTimeExpr(expr) ?? Math.floor(Date.now() / 1000);
 
 /**
  * Auto-compute a reasonable step for Prometheus range queries.
