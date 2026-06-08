@@ -91,16 +91,6 @@ importers:
         version: 4.1.8(@types/node@25.9.2)(jsdom@29.1.1)(vite@8.0.16(@types/node@25.9.2)(esbuild@0.28.0)(jiti@2.7.0)(tsx@4.22.4)(yaml@2.8.3))
 
   apps/web:
-    dependencies:
-      react-markdown:
-        specifier: 10.1.0
-        version: 10.1.0(@types/react@19.2.17)(react@19.2.7)
-      rehype-raw:
-        specifier: 7.0.0
-        version: 7.0.0
-      rehype-sanitize:
-        specifier: 6.0.0
-        version: 6.0.0
     devDependencies:
       '@cloudflare/vite-plugin':
         specifier: 1.40.0
@@ -204,6 +194,15 @@ importers:
       react-grid-layout:
         specifier: 2.2.3
         version: 2.2.3(react-dom@19.2.7(react@19.2.7))(react@19.2.7)
+      react-markdown:
+        specifier: 10.1.0
+        version: 10.1.0(@types/react@19.2.17)(react@19.2.7)
+      rehype-raw:
+        specifier: 7.0.0
+        version: 7.0.0
+      rehype-sanitize:
+        specifier: 6.0.0
+        version: 6.0.0
       tailwindcss:
         specifier: 4.3.0
         version: 4.3.0
