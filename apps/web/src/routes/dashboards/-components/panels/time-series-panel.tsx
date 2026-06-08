@@ -2,14 +2,13 @@ import type { Panel } from '@graflare/shared/schemas/panel';
 import type uPlot from 'uplot';
 
 import { formatValue } from '@graflare/shared/format/value-format';
-import { useCallback, useMemo } from 'react';
+import { useMemo } from 'react';
 
 import { QueryResultTable, formatPrometheusToTable } from '../../../-root/query-result-table';
-import { UPlotChart } from '../../../-root/uplot-chart';
 
 import { extractResultSeries } from './panel-data-extract';
-import { PanelFrame } from './panel-frame';
-import { usePanelData } from './use-panel-data';
+import { UPlotPanel } from './uplot-panel';
+import { usePanelQuery } from './use-panel-query';
 
 interface TimeSeriesPanelProps {
   panel: Panel;
@@ -20,7 +19,7 @@ interface TimeSeriesPanelProps {
 }
 
 export const TimeSeriesPanel = ({ panel, timeRange, refetchInterval, width, height }: TimeSeriesPanelProps) => {
-  const { data, isLoading, error, refetch } = usePanelData(panel.datasourceId, panel.queries, timeRange, refetchInterval);
+  const { data, isLoading, error, handleRetry } = usePanelQuery(panel, timeRange, refetchInterval);
 
   const chartResult = useMemo(() => extractResultSeries(data), [data]);
 
@@ -88,27 +87,9 @@ export const TimeSeriesPanel = ({ panel, timeRange, refetchInterval, width, heig
   }, [width, height, chartResult, panel]);
 
   const tableData = useMemo(() => formatPrometheusToTable(chartResult), [chartResult]);
-
-  const handleRetry = useCallback(() => {
-    void refetch();
-  }, [refetch]);
-
   const dataTable = useMemo(() => <QueryResultTable data={tableData} />, [tableData]);
 
   return (
-    <PanelFrame
-      title={panel.title}
-      panelId={panel.id}
-      loading={isLoading}
-      error={error instanceof Error ? error.message : null}
-      onRetry={handleRetry}
-      dataTableContent={dataTable}
-    >
-      {chartData[0] !== undefined && chartData[0].length > 0 ? (
-        <UPlotChart options={chartOptions} data={chartData} />
-      ) : (
-        <p className='text-muted-foreground text-sm'>No data</p>
-      )}
-    </PanelFrame>
+    <UPlotPanel panel={panel} data={chartData} options={chartOptions} isLoading={isLoading} error={error} onRetry={handleRetry} dataTableContent={dataTable} />
   );
 };

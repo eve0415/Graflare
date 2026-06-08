@@ -1,12 +1,10 @@
 import type { Panel } from '@graflare/shared/schemas/panel';
 
-import { useCallback, useMemo } from 'react';
-
-import { UPlotChart } from '../../../-root/uplot-chart';
+import { useMemo } from 'react';
 
 import { buildHistogramOptions, histogramAlignedData, histogramBuckets, histogramValues } from './histogram-data';
-import { PanelFrame } from './panel-frame';
-import { usePanelData } from './use-panel-data';
+import { UPlotPanel } from './uplot-panel';
+import { usePanelQuery } from './use-panel-query';
 
 interface HistogramPanelProps {
   panel: Panel;
@@ -17,7 +15,7 @@ interface HistogramPanelProps {
 }
 
 export const HistogramPanel = ({ panel, timeRange, refetchInterval, width, height }: HistogramPanelProps) => {
-  const { data, isLoading, error, refetch } = usePanelData(panel.datasourceId, panel.queries, timeRange, refetchInterval);
+  const { data, isLoading, error, handleRetry } = usePanelQuery(panel, timeRange, refetchInterval);
 
   const buckets = useMemo(() => {
     const values = histogramValues(data);
@@ -37,17 +35,5 @@ export const HistogramPanel = ({ panel, timeRange, refetchInterval, width, heigh
     [panel.fieldConfig.defaults, width, height],
   );
 
-  const handleRetry = useCallback(() => {
-    void refetch();
-  }, [refetch]);
-
-  return (
-    <PanelFrame title={panel.title} panelId={panel.id} loading={isLoading} error={error instanceof Error ? error.message : null} onRetry={handleRetry}>
-      {chartData[0] !== undefined && chartData[0].length > 0 ? (
-        <UPlotChart options={chartOptions} data={chartData} />
-      ) : (
-        <p className='text-muted-foreground text-sm'>No data</p>
-      )}
-    </PanelFrame>
-  );
+  return <UPlotPanel panel={panel} data={chartData} options={chartOptions} isLoading={isLoading} error={error} onRetry={handleRetry} />;
 };
