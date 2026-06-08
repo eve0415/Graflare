@@ -17,7 +17,7 @@ describe('health check', () => {
   it('returns ok', async () => {
     const response = await exports.default.fetch(req('/health'));
     expect(response.status).toBe(200);
-    const body = await response.json();
+    const body: unknown = await response.json();
     expect(body).toEqual({ status: 'ok' });
   });
 });

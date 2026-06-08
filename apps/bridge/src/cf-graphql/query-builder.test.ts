@@ -7,6 +7,7 @@ import { buildBatchedQuery } from './query-builder';
 const fakeCollector = (overrides: Partial<GraphQLCollector>): GraphQLCollector => ({
   kind: 'graphql',
   name: 'test',
+  nodeName: 'test',
   scope: 'account',
   alias: 'test',
   fragment: 'test: testDataset { count }',

@@ -4,6 +4,11 @@ import { describe, expect, it } from 'vitest';
 
 import { evaluateCondition } from './evaluate';
 
+const must = <T,>(v: T | undefined): T => {
+  if (v === undefined) throw new Error('expected defined');
+  return v;
+};
+
 const vectorData = (metric: Record<string, string>, value: number): PrometheusQueryData => ({
   resultType: 'vector',
   result: [{ metric, value: [1000, String(value)] }],
@@ -24,13 +29,13 @@ describe('evaluateCondition', () => {
     it('fires on gt threshold', () => {
       const results = evaluateCondition(vectorData({ job: 'api' }, 90), 'last', 'gt', 80);
       expect(results).toHaveLength(1);
-      expect(results[0].firing).toBe(true);
-      expect(results[0].value).toBe(90);
+      expect(must(results[0]).firing).toBe(true);
+      expect(must(results[0]).value).toBe(90);
     });
 
     it('does not fire below threshold', () => {
       const results = evaluateCondition(vectorData({ job: 'api' }, 50), 'last', 'gt', 80);
-      expect(results[0].firing).toBe(false);
+      expect(must(results[0]).firing).toBe(false);
     });
 
     it('handles multi-series', () => {
@@ -44,78 +49,78 @@ describe('evaluateCondition', () => {
         80,
       );
       expect(results).toHaveLength(2);
-      expect(results[0].firing).toBe(true);
-      expect(results[1].firing).toBe(false);
+      expect(must(results[0]).firing).toBe(true);
+      expect(must(results[1]).firing).toBe(false);
     });
   });
 
   describe('matrix results', () => {
     it('reduces with last', () => {
       const results = evaluateCondition(matrixData({ job: 'api' }, [10, 20, 30]), 'last', 'gt', 25);
-      expect(results[0].value).toBe(30);
-      expect(results[0].firing).toBe(true);
+      expect(must(results[0]).value).toBe(30);
+      expect(must(results[0]).firing).toBe(true);
     });
 
     it('reduces with avg', () => {
       const results = evaluateCondition(matrixData({ job: 'api' }, [10, 20, 30]), 'avg', 'gt', 25);
-      expect(results[0].value).toBe(20);
-      expect(results[0].firing).toBe(false);
+      expect(must(results[0]).value).toBe(20);
+      expect(must(results[0]).firing).toBe(false);
     });
 
     it('reduces with min', () => {
       const results = evaluateCondition(matrixData({ job: 'api' }, [10, 20, 30]), 'min', 'lte', 10);
-      expect(results[0].value).toBe(10);
-      expect(results[0].firing).toBe(true);
+      expect(must(results[0]).value).toBe(10);
+      expect(must(results[0]).firing).toBe(true);
     });
 
     it('reduces with max', () => {
       const results = evaluateCondition(matrixData({ job: 'api' }, [10, 20, 30]), 'max', 'gte', 30);
-      expect(results[0].value).toBe(30);
-      expect(results[0].firing).toBe(true);
+      expect(must(results[0]).value).toBe(30);
+      expect(must(results[0]).firing).toBe(true);
     });
 
     it('reduces with sum', () => {
       const results = evaluateCondition(matrixData({ job: 'api' }, [10, 20, 30]), 'sum', 'eq', 60);
-      expect(results[0].value).toBe(60);
-      expect(results[0].firing).toBe(true);
+      expect(must(results[0]).value).toBe(60);
+      expect(must(results[0]).firing).toBe(true);
     });
 
     it('reduces with count', () => {
       const results = evaluateCondition(matrixData({ job: 'api' }, [10, 20, 30]), 'count', 'eq', 3);
-      expect(results[0].value).toBe(3);
-      expect(results[0].firing).toBe(true);
+      expect(must(results[0]).value).toBe(3);
+      expect(must(results[0]).firing).toBe(true);
     });
   });
 
   describe('operators', () => {
     it('lt', () => {
       const results = evaluateCondition(vectorData({ job: 'api' }, 5), 'last', 'lt', 10);
-      expect(results[0].firing).toBe(true);
+      expect(must(results[0]).firing).toBe(true);
     });
 
     it('lte at boundary', () => {
       const results = evaluateCondition(vectorData({ job: 'api' }, 10), 'last', 'lte', 10);
-      expect(results[0].firing).toBe(true);
+      expect(must(results[0]).firing).toBe(true);
     });
 
     it('gte at boundary', () => {
       const results = evaluateCondition(vectorData({ job: 'api' }, 10), 'last', 'gte', 10);
-      expect(results[0].firing).toBe(true);
+      expect(must(results[0]).firing).toBe(true);
     });
 
     it('eq', () => {
       const results = evaluateCondition(vectorData({ job: 'api' }, 42), 'last', 'eq', 42);
-      expect(results[0].firing).toBe(true);
+      expect(must(results[0]).firing).toBe(true);
     });
 
     it('neq', () => {
       const results = evaluateCondition(vectorData({ job: 'api' }, 42), 'last', 'neq', 43);
-      expect(results[0].firing).toBe(true);
+      expect(must(results[0]).firing).toBe(true);
     });
 
     it('gt not firing at boundary', () => {
       const results = evaluateCondition(vectorData({ job: 'api' }, 80), 'last', 'gt', 80);
-      expect(results[0].firing).toBe(false);
+      expect(must(results[0]).firing).toBe(false);
     });
   });
 
@@ -134,8 +139,8 @@ describe('evaluateCondition', () => {
 
     it('handles NaN value', () => {
       const results = evaluateCondition(vectorData({ job: 'api' }, Number.NaN), 'last', 'gt', 0);
-      expect(results[0].firing).toBe(false);
-      expect(Number.isNaN(results[0].value)).toBe(true);
+      expect(must(results[0]).firing).toBe(false);
+      expect(Number.isNaN(must(results[0]).value)).toBe(true);
     });
 
     it('empty matrix values returns NaN', () => {
@@ -144,13 +149,13 @@ describe('evaluateCondition', () => {
         result: [{ metric: { job: 'api' }, values: [] }],
       };
       const results = evaluateCondition(data, 'avg', 'gt', 0);
-      expect(results[0].firing).toBe(false);
+      expect(must(results[0]).firing).toBe(false);
     });
 
     it('deterministic labels hash', () => {
       const results1 = evaluateCondition(vectorData({ b: '2', a: '1' }, 90), 'last', 'gt', 80);
       const results2 = evaluateCondition(vectorData({ a: '1', b: '2' }, 90), 'last', 'gt', 80);
-      expect(results1[0].labelsHash).toBe(results2[0].labelsHash);
+      expect(must(results1[0]).labelsHash).toBe(must(results2[0]).labelsHash);
     });
   });
 });
