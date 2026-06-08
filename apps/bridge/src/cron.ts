@@ -78,7 +78,7 @@ const insertMetricRows = async (db: ReturnType<typeof drizzle>, rows: MetricRow[
 		chunks.push(values.slice(i, i + INSERT_CHUNK_SIZE));
 	}
 
-	await Promise.all(
+	const results = await Promise.allSettled(
 		chunks.map((chunk) =>
 			db
 				.insert(metrics)
@@ -100,6 +100,10 @@ const insertMetricRows = async (db: ReturnType<typeof drizzle>, rows: MetricRow[
 				}),
 		),
 	);
+	const failed = results.filter((r) => r.status === 'rejected');
+	if (failed.length > 0) {
+		console.error(JSON.stringify({ level: 'warn', event: 'metric_insert_partial_failure', failedChunks: failed.length, totalChunks: chunks.length }));
+	}
 };
 
 const updateSyncState = async (
