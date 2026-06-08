@@ -109,13 +109,7 @@ const updateSyncState = async (
 	scopeId: string,
 	nowSeconds: number,
 ): Promise<void> => {
-	await db
-		.insert(syncState)
-		.values({ dataset, scope, scopeId, lastSyncAt: nowSeconds })
-		.onConflictDoUpdate({
-			target: [syncState.dataset, syncState.scope, syncState.scopeId],
-			set: { lastSyncAt: nowSeconds },
-		});
+	await db.run(sql`INSERT INTO sync_state (dataset, scope, scope_id, last_sync_at) VALUES (${dataset}, ${scope}, ${scopeId}, ${nowSeconds}) ON CONFLICT(dataset, scope, scope_id) DO UPDATE SET last_sync_at = excluded.last_sync_at`);
 };
 
 const getAttemptCount = (
