@@ -52,9 +52,7 @@ const AlertInstancesPage = () => {
           <TableBody>
             {instances.map(inst => (
               <TableRow key={inst.id}>
-                <TableCell className='font-medium'>
-                  {ruleMap.get(inst.ruleId) ?? inst.ruleId}
-                </TableCell>
+                <TableCell className='font-medium'>{ruleMap.get(inst.ruleId) ?? inst.ruleId}</TableCell>
                 <TableCell>
                   <div className='flex flex-wrap gap-1'>
                     {Object.entries(inst.labels).map(([k, v]) => (
@@ -68,9 +66,7 @@ const AlertInstancesPage = () => {
                   <Badge variant={stateVariant(inst.state)}>{inst.state}</Badge>
                 </TableCell>
                 <TableCell className='text-muted-foreground text-sm'>{inst.value}</TableCell>
-                <TableCell className='text-muted-foreground text-sm'>
-                  {new Date(inst.lastEvalAt * 1000).toLocaleString()}
-                </TableCell>
+                <TableCell className='text-muted-foreground text-sm'>{new Date(inst.lastEvalAt * 1000).toLocaleString()}</TableCell>
               </TableRow>
             ))}
           </TableBody>
@@ -82,10 +78,7 @@ const AlertInstancesPage = () => {
 
 export const Route = createFileRoute('/alerting/alerts/')({
   loader: ({ context }) =>
-    Promise.all([
-      context.queryClient.ensureQueryData(alertInstancesQueryOptions()),
-      context.queryClient.ensureQueryData(alertRulesQueryOptions()),
-    ]),
+    Promise.all([context.queryClient.ensureQueryData(alertInstancesQueryOptions()), context.queryClient.ensureQueryData(alertRulesQueryOptions())]),
   pendingComponent: AlertInstancesSkeleton,
   component: AlertInstancesPage,
 });

@@ -75,11 +75,14 @@ describe('notification-policy routes', () => {
     if (typeof root !== 'object' || root === null || !('id' in root)) throw new Error('bad shape');
 
     const res = await app.request(
-      req('/', json({
-        parentId: root.id,
-        matchers: [{ name: 'severity', operator: '=', value: 'critical' }],
-        groupWaitS: 10,
-      })),
+      req(
+        '/',
+        json({
+          parentId: root.id,
+          matchers: [{ name: 'severity', operator: '=', value: 'critical' }],
+          groupWaitS: 10,
+        }),
+      ),
       {},
       testBindings,
     );

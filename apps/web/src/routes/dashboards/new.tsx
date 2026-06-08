@@ -11,23 +11,26 @@ const NewDashboardPage = () => {
   const [title, setTitle] = useState('');
   const [submitting, setSubmitting] = useState(false);
 
-  const handleSubmit = useCallback((e: React.FormEvent<HTMLFormElement>) => {
-    e.preventDefault();
-    if (title.trim() === '') return;
+  const handleSubmit = useCallback(
+    (e: React.FormEvent<HTMLFormElement>) => {
+      e.preventDefault();
+      if (title.trim() === '') return;
 
-    const run = async () => {
-      setSubmitting(true);
-      try {
-        const result = await createDashboard({ data: { title: title.trim() } });
-        if (result !== null) {
-          await navigate({ to: '/dashboards/$id', params: { id: result.id } });
+      const run = async () => {
+        setSubmitting(true);
+        try {
+          const result = await createDashboard({ data: { title: title.trim() } });
+          if (result !== null) {
+            await navigate({ to: '/dashboards/$id', params: { id: result.id } });
+          }
+        } finally {
+          setSubmitting(false);
         }
-      } finally {
-        setSubmitting(false);
-      }
-    };
-    void run();
-  }, [title, navigate]);
+      };
+      void run();
+    },
+    [title, navigate],
+  );
 
   const handleChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
     setTitle(e.target.value);
@@ -40,13 +43,7 @@ const NewDashboardPage = () => {
       <form onSubmit={handleSubmit} className='space-y-4'>
         <div className='space-y-2'>
           <Label htmlFor='title'>Title</Label>
-          <Input
-            id='title'
-            placeholder='My Dashboard'
-            value={title}
-            onChange={handleChange}
-            required
-          />
+          <Input id='title' placeholder='My Dashboard' value={title} onChange={handleChange} required />
         </div>
         <Button type='submit' disabled={submitting || title.trim() === ''}>
           {submitting ? 'Creating...' : 'Create Dashboard'}

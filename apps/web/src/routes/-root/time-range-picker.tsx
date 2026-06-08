@@ -37,10 +37,13 @@ const displayRange = (range: TimeRange) => {
 export const TimeRangePicker = ({ value, onChange }: TimeRangePickerProps) => {
   const [open, setOpen] = useState(false);
 
-  const handlePreset = useCallback((from: string, to: string) => {
-    onChange({ from, to });
-    setOpen(false);
-  }, [onChange]);
+  const handlePreset = useCallback(
+    (from: string, to: string) => {
+      onChange({ from, to });
+      setOpen(false);
+    },
+    [onChange],
+  );
 
   const display = useMemo(() => displayRange(value), [value]);
 
@@ -54,14 +57,7 @@ export const TimeRangePicker = ({ value, onChange }: TimeRangePickerProps) => {
         <div className='text-muted-foreground mb-2 px-2 text-xs font-medium'>Quick ranges</div>
         <div className='grid gap-0.5'>
           {presets.map(p => (
-            <PresetButton
-              key={p.label}
-              label={p.label}
-              from={p.from}
-              to={p.to}
-              active={p.from === value.from && p.to === value.to}
-              onSelect={handlePreset}
-            />
+            <PresetButton key={p.label} label={p.label} from={p.from} to={p.to} active={p.from === value.from && p.to === value.to} onSelect={handlePreset} />
           ))}
         </div>
         <Separator className='my-2' />
@@ -71,15 +67,25 @@ export const TimeRangePicker = ({ value, onChange }: TimeRangePickerProps) => {
   );
 };
 
-const PresetButton = ({ label, from, to, active, onSelect }: { label: string; from: string; to: string; active: boolean; onSelect: (from: string, to: string) => void }) => {
-  const handleClick = useCallback(() => { onSelect(from, to); }, [from, to, onSelect]);
+const PresetButton = ({
+  label,
+  from,
+  to,
+  active,
+  onSelect,
+}: {
+  label: string;
+  from: string;
+  to: string;
+  active: boolean;
+  onSelect: (from: string, to: string) => void;
+}) => {
+  const handleClick = useCallback(() => {
+    onSelect(from, to);
+  }, [from, to, onSelect]);
 
   return (
-    <button
-      type='button'
-      className={`hover:bg-accent rounded-sm px-2 py-1 text-left text-sm ${active ? 'bg-accent font-medium' : ''}`}
-      onClick={handleClick}
-    >
+    <button type='button' className={`hover:bg-accent rounded-sm px-2 py-1 text-left text-sm ${active ? 'bg-accent font-medium' : ''}`} onClick={handleClick}>
       {label}
     </button>
   );

@@ -35,14 +35,8 @@ const DashboardListPage = () => {
       </div>
 
       <div className='relative'>
-        <Search className='text-muted-foreground absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2' />
-        <Input
-          placeholder='Search dashboards...'
-          value={search}
-          onChange={handleSearch}
-          className='pl-9'
-          aria-label='Search dashboards'
-        />
+        <Search className='text-muted-foreground absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2' />
+        <Input placeholder='Search dashboards...' value={search} onChange={handleSearch} className='pl-9' aria-label='Search dashboards' />
       </div>
 
       {filtered.length === 0 && (
@@ -52,9 +46,7 @@ const DashboardListPage = () => {
         </div>
       )}
 
-      {filtered.length > 0 && (
-        <DashboardGrid dashboards={filtered} />
-      )}
+      {filtered.length > 0 && <DashboardGrid dashboards={filtered} />}
     </div>
   );
 };

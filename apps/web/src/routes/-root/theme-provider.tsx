@@ -24,9 +24,7 @@ const getStoredTheme = (): Theme => {
 };
 
 const getSystemTheme = (): 'light' | 'dark' =>
-  typeof globalThis.matchMedia === 'function' && globalThis.matchMedia('(prefers-color-scheme: dark)').matches
-    ? 'dark'
-    : 'light';
+  typeof globalThis.matchMedia === 'function' && globalThis.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
 
 const applyTheme = (resolved: 'light' | 'dark') => {
   if (typeof document !== 'undefined') {
@@ -43,7 +41,9 @@ const notifyListeners = () => {
 
 const themeSubscribe = (onStoreChange: () => void) => {
   listeners.add(onStoreChange);
-  return () => { listeners.delete(onStoreChange); };
+  return () => {
+    listeners.delete(onStoreChange);
+  };
 };
 const themeGetSnapshot = (): Theme => currentTheme;
 const themeGetServerSnapshot = (): Theme => 'system';
@@ -52,7 +52,9 @@ const systemThemeSubscribe = (onStoreChange: () => void) => {
   if (typeof globalThis.matchMedia !== 'function') return () => {};
   const mq = globalThis.matchMedia('(prefers-color-scheme: dark)');
   mq.addEventListener('change', onStoreChange);
-  return () => { mq.removeEventListener('change', onStoreChange); };
+  return () => {
+    mq.removeEventListener('change', onStoreChange);
+  };
 };
 const systemThemeGetServerSnapshot = (): 'light' | 'dark' => 'dark';
 
@@ -74,10 +76,7 @@ export const ThemeProvider = ({ children }: { children: React.ReactNode }) => {
     applyTheme(resolved);
   }, [resolved]);
 
-  const value = useMemo<ThemeContextValue>(
-    () => ({ theme, setTheme, resolved }),
-    [theme, setTheme, resolved],
-  );
+  const value = useMemo<ThemeContextValue>(() => ({ theme, setTheme, resolved }), [theme, setTheme, resolved]);
 
   return <ThemeContext value={value}>{children}</ThemeContext>;
 };

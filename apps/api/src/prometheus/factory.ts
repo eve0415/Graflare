@@ -7,12 +7,7 @@ import { datasources } from '../db/schema';
 
 import { PrometheusClient } from './client';
 
-export async function createPrometheusClient(
-  db: D1Database,
-  encryptionKey: string,
-  orgId: string,
-  datasourceId: string,
-): Promise<PrometheusClient | null> {
+export async function createPrometheusClient(db: D1Database, encryptionKey: string, orgId: string, datasourceId: string): Promise<PrometheusClient | null> {
   const drizzle = createDb(db);
   const rows = await drizzle
     .select()

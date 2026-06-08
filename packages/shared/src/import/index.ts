@@ -15,8 +15,11 @@ export const importDashboard = (json: Record<string, unknown>, format?: GrafanaF
   const detected = format ?? detectFormat(json);
 
   switch (detected) {
-    case 'v1': return importV1(json);
-    case 'v2': return importV2(json);
-    case 'classic': return importClassic(json);
+    case 'v1':
+      return importV1(json);
+    case 'v2':
+      return importV2(json);
+    case 'classic':
+      return importClassic(json);
   }
 };

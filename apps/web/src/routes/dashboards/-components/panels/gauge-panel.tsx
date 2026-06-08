@@ -33,12 +33,7 @@ const getThresholdColor = (value: number, thresholds: { value: number; color: st
 };
 
 export const GaugePanel = ({ panel, timeRange, refetchInterval }: GaugePanelProps) => {
-  const { data, isLoading, error, refetch } = usePanelData(
-    panel.datasourceId,
-    panel.queries,
-    timeRange,
-    refetchInterval,
-  );
+  const { data, isLoading, error, refetch } = usePanelData(panel.datasourceId, panel.queries, timeRange, refetchInterval);
 
   const value = useMemo(() => {
     if (data === null || data === undefined) return null;
@@ -69,11 +64,11 @@ export const GaugePanel = ({ panel, timeRange, refetchInterval }: GaugePanelProp
   const percentage = (normalizedValue - min) / (max - min);
   const angle = -90 + percentage * 180;
 
-  const handleRetry = useCallback(() => { void refetch(); }, [refetch]);
+  const handleRetry = useCallback(() => {
+    void refetch();
+  }, [refetch]);
 
-  const thresholdColor = value !== null && panel.thresholds.length > 0
-    ? getThresholdColor(value, panel.thresholds)
-    : '#4ade80';
+  const thresholdColor = value !== null && panel.thresholds.length > 0 ? getThresholdColor(value, panel.thresholds) : '#4ade80';
 
   const arcs = useMemo(() => {
     if (panel.thresholds.length === 0 || !showMarkers) {
@@ -102,14 +97,9 @@ export const GaugePanel = ({ panel, timeRange, refetchInterval }: GaugePanelProp
   }, [panel.thresholds, showMarkers, min, max]);
 
   return (
-    <PanelFrame
-      title={panel.title}
-      loading={isLoading}
-      error={error instanceof Error ? error.message : null}
-      onRetry={handleRetry}
-    >
+    <PanelFrame title={panel.title} loading={isLoading} error={error instanceof Error ? error.message : null} onRetry={handleRetry}>
       <meter
-        className='flex h-full flex-col items-center justify-center appearance-none [&::-webkit-meter-bar]:bg-transparent [&::-webkit-meter-optimum-value]:bg-transparent'
+        className='flex h-full appearance-none flex-col items-center justify-center [&::-webkit-meter-bar]:bg-transparent [&::-webkit-meter-optimum-value]:bg-transparent'
         min={min}
         max={max}
         value={value ?? undefined}
@@ -117,25 +107,9 @@ export const GaugePanel = ({ panel, timeRange, refetchInterval }: GaugePanelProp
       >
         <svg viewBox='0 0 200 130' className='w-full max-w-48'>
           {arcs.map((arc, i) => (
-            <path
-              key={String(i)}
-              d={describeArc(arc.start, arc.end, 80)}
-              fill='none'
-              stroke={arc.color}
-              strokeWidth='12'
-              strokeLinecap='round'
-              opacity={0.3}
-            />
+            <path key={String(i)} d={describeArc(arc.start, arc.end, 80)} fill='none' stroke={arc.color} strokeWidth='12' strokeLinecap='round' opacity={0.3} />
           ))}
-          {value !== null && (
-            <path
-              d={describeArc(-90, angle, 80)}
-              fill='none'
-              stroke={thresholdColor}
-              strokeWidth='12'
-              strokeLinecap='round'
-            />
-          )}
+          {value !== null && <path d={describeArc(-90, angle, 80)} fill='none' stroke={thresholdColor} strokeWidth='12' strokeLinecap='round' />}
           <text x='100' y='105' textAnchor='middle' className='fill-foreground text-2xl font-semibold'>
             {value === null ? '—' : String(Math.round(value * 100) / 100)}
           </text>

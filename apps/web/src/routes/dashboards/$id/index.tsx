@@ -9,13 +9,13 @@ import { createFileRoute } from '@tanstack/react-router';
 import { Plus } from 'lucide-react';
 import { useCallback, useMemo, useState } from 'react';
 
+import { updateDashboard } from '../-api';
 import { DashboardGrid } from '../-components/dashboard-grid';
 import { DashboardSettings } from '../-components/dashboard-settings';
 import { DashboardToolbar } from '../-components/dashboard-toolbar';
 import { DashboardViewSkeleton } from '../-components/dashboard-view-skeleton';
 import { PanelEditor } from '../-components/panel-editor';
 import { VariableBar } from '../-components/variable-bar';
-import { updateDashboard } from '../-api';
 import { dashboardQueryOptions } from '../-queries';
 
 type RefreshInterval = '5s' | '10s' | '30s' | '1m' | '5m' | '15m' | '30m' | '1h' | 'off';
@@ -137,13 +137,16 @@ const DashboardViewPage = () => {
     setSettingsOpen(false);
   }, []);
 
-  const handleSettingsSave = useCallback((data: { title: string; description: string; tags: string[] }) => {
-    const run = async () => {
-      await updateDashboard({ data: { id, data: { ...data, message: 'Settings updated' } } });
-      await queryClient.invalidateQueries({ queryKey: ['dashboard', id] });
-    };
-    void run();
-  }, [id, queryClient]);
+  const handleSettingsSave = useCallback(
+    (data: { title: string; description: string; tags: string[] }) => {
+      const run = async () => {
+        await updateDashboard({ data: { id, data: { ...data, message: 'Settings updated' } } });
+        await queryClient.invalidateQueries({ queryKey: ['dashboard', id] });
+      };
+      void run();
+    },
+    [id, queryClient],
+  );
 
   const handleRestore = useCallback(() => {
     void queryClient.invalidateQueries({ queryKey: ['dashboard', id] });
@@ -178,11 +181,7 @@ const DashboardViewPage = () => {
         saving={saving}
       />
 
-      <VariableBar
-        variables={dashboardVariables}
-        values={variableValues}
-        onChange={handleVariableChange}
-      />
+      <VariableBar variables={dashboardVariables} values={variableValues} onChange={handleVariableChange} />
 
       <div className='flex-1 p-4'>
         {editMode && (
@@ -200,24 +199,11 @@ const DashboardViewPage = () => {
             <p className='text-sm'>Switch to edit mode to add panels.</p>
           </div>
         ) : (
-          <DashboardGrid
-            panels={dashboardPanels}
-            timeRange={timeRange}
-            refreshInterval={refetchMs}
-            editMode={editMode}
-            onLayoutChange={handleLayoutChange}
-          />
+          <DashboardGrid panels={dashboardPanels} timeRange={timeRange} refreshInterval={refetchMs} editMode={editMode} onLayoutChange={handleLayoutChange} />
         )}
       </div>
 
-      {editingPanel !== null && (
-        <PanelEditor
-          panel={editingPanel}
-          open
-          onClose={handlePanelEditorClose}
-          onSave={handlePanelSave}
-        />
-      )}
+      {editingPanel !== null && <PanelEditor panel={editingPanel} open onClose={handlePanelEditorClose} onSave={handlePanelSave} />}
 
       <DashboardSettings
         open={settingsOpen}

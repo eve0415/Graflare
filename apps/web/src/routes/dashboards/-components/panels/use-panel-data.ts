@@ -1,3 +1,4 @@
+import type { DatasourceRow } from '../../../datasources/-api';
 import type { PanelQuery } from '@graflare/shared/schemas/panel';
 import type { PrometheusResponse } from '@graflare/shared/schemas/prometheus';
 import type { SqlResponse } from '@graflare/shared/schemas/sql';
@@ -5,8 +6,6 @@ import type { SqlResponse } from '@graflare/shared/schemas/sql';
 import { sqlRowsToSeries } from '@graflare/shared/sql/adapters';
 import { computeStep, resolveTime } from '@graflare/shared/time/resolve';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-
-import type { DatasourceRow } from '../../../datasources/-api';
 
 import { proxyQuery } from '../../../../lib/proxy';
 import { sqlQuery } from '../../../../lib/sql-proxy';
@@ -16,14 +15,10 @@ interface TimeRange {
   to: string;
 }
 
-const executePrometheusQueries = async (
-  datasourceId: string,
-  queries: PanelQuery[],
-  timeRange: TimeRange,
-): Promise<PrometheusResponse[]> => {
+const executePrometheusQueries = async (datasourceId: string, queries: PanelQuery[], timeRange: TimeRange): Promise<PrometheusResponse[]> => {
   const step = computeStep(timeRange.from, timeRange.to);
   return Promise.all(
-    queries.map((q) =>
+    queries.map(q =>
       proxyQuery({
         data: {
           datasourceId,
@@ -40,13 +35,9 @@ const executePrometheusQueries = async (
   );
 };
 
-const executeSqlQueries = async (
-  datasourceId: string,
-  queries: PanelQuery[],
-  timeRange: TimeRange,
-): Promise<(PrometheusResponse | SqlResponse)[]> =>
+const executeSqlQueries = async (datasourceId: string, queries: PanelQuery[], timeRange: TimeRange): Promise<(PrometheusResponse | SqlResponse)[]> =>
   Promise.all(
-    queries.map(async (q) => {
+    queries.map(async q => {
       const result = await sqlQuery({
         data: {
           datasourceId,
@@ -68,12 +59,7 @@ const executeSqlQueries = async (
 
 export type PanelDataResult = PrometheusResponse | SqlResponse;
 
-export const usePanelData = (
-  datasourceId: string | undefined,
-  queries: PanelQuery[],
-  timeRange: TimeRange,
-  refetchInterval: number | false,
-) => {
+export const usePanelData = (datasourceId: string | undefined, queries: PanelQuery[], timeRange: TimeRange, refetchInterval: number | false) => {
   const queryClient = useQueryClient();
 
   return useQuery({
@@ -82,7 +68,7 @@ export const usePanelData = (
       if (datasourceId === undefined || queries.length === 0) return null;
 
       const datasources = queryClient.getQueryData<DatasourceRow[]>(['datasources']);
-      const ds = datasources?.find((d) => d.id === datasourceId);
+      const ds = datasources?.find(d => d.id === datasourceId);
       if (ds === undefined) {
         return [{ status: 'error', errorType: 'internal', error: 'Data source not loaded' }];
       }

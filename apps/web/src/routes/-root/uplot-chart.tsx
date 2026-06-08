@@ -28,11 +28,5 @@ export const UPlotChart = ({ options, data, className }: UPlotChartProps) => {
     chartRef.current?.setData(data);
   }, [data]);
 
-  return (
-    <div
-      ref={containerRef}
-      className={className}
-      aria-label='Time series chart'
-    />
-  );
+  return <div ref={containerRef} className={className} aria-label='Time series chart' />;
 };

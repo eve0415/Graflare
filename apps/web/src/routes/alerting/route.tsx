@@ -22,9 +22,7 @@ const AlertingLayout = () => {
                 key={tab.to}
                 to={tab.to}
                 className={`-mb-px border-b-2 px-4 py-2 text-sm font-medium transition-colors ${
-                  isActive
-                    ? 'border-primary text-foreground'
-                    : 'border-transparent text-muted-foreground hover:text-foreground'
+                  isActive ? 'border-primary text-foreground' : 'text-muted-foreground hover:text-foreground border-transparent'
                 }`}
               >
                 {tab.label}

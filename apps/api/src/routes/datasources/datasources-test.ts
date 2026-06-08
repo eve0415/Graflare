@@ -43,7 +43,7 @@ app.post('/:id/test', sValidator('param', datasourceIdParamSchema, onValidationE
     }
 
     const base = new URL(ds.url);
-    base.pathname = `${base.pathname.replace(/\/$/, '')  }/api/v1/labels`;
+    base.pathname = `${base.pathname.replace(/\/$/, '')}/api/v1/labels`;
     base.searchParams.set('limit', '1');
     const targetUrl = base.toString();
 

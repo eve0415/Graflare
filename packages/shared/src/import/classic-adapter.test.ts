@@ -50,9 +50,7 @@ describe('importClassic', () => {
       expect(panel?.type).toBe('timeseries');
       expect(panel?.title).toBe('CPU Usage');
       expect(panel?.description).toBe('CPU over time');
-      expect(panel?.queries).toEqual([
-        { refId: 'A', expr: 'rate(cpu[5m])', legendFormat: '{{instance}}' },
-      ]);
+      expect(panel?.queries).toEqual([{ refId: 'A', expr: 'rate(cpu[5m])', legendFormat: '{{instance}}' }]);
       expect(panel?.gridPos).toEqual({ x: 0, y: 0, w: 12, h: 8 });
       expect(panel?.thresholds).toEqual([{ value: 0, color: 'green' }]);
       expect(panel?.displayOptions).toEqual({});
@@ -131,9 +129,7 @@ describe('importClassic', () => {
 
       expect(result.dashboard.panels).toHaveLength(1);
       expect(result.dashboard.panels[0]?.type).toBe('stat');
-      expect(result.warnings).toEqual([
-        'Unsupported panel type "heatmap" (panel "My Heatmap") — converted to placeholder stat panel',
-      ]);
+      expect(result.warnings).toEqual(['Unsupported panel type "heatmap" (panel "My Heatmap") — converted to placeholder stat panel']);
     });
 
     it('uses fallback panel name when title is empty', () => {
@@ -150,9 +146,7 @@ describe('importClassic', () => {
         ],
       });
 
-      expect(result.warnings).toEqual([
-        'Unsupported panel type "heatmap" (panel "Panel 0") — converted to placeholder stat panel',
-      ]);
+      expect(result.warnings).toEqual(['Unsupported panel type "heatmap" (panel "Panel 0") — converted to placeholder stat panel']);
     });
 
     it('falls through PANEL_TYPE_MAP for unknown types', () => {
@@ -273,10 +267,7 @@ describe('importClassic', () => {
           {
             type: 'timeseries',
             title: 'Auto refId',
-            targets: [
-              { expr: 'up' },
-              { expr: 'down' },
-            ],
+            targets: [{ expr: 'up' }, { expr: 'down' }],
             gridPos: { x: 0, y: 0, w: 12, h: 8 },
             fieldConfig: { defaults: { thresholds: { steps: [] } } },
           },
@@ -502,7 +493,7 @@ describe('importClassic', () => {
       expect(v?.type).toBe('query');
       expect(v?.label).toBe('Instance');
       expect(v?.query).toBe('label_values(up, instance)');
-      expect(v?.regex).toBe('/.*/')
+      expect(v?.regex).toBe('/.*/');
       expect(v?.multi).toBe(true);
       expect(v?.includeAll).toBe(true);
       expect(v?.current).toBe('localhost:9090');
@@ -676,9 +667,7 @@ describe('importClassic', () => {
       expect(result.dashboard.panels).toEqual([]);
       expect(result.dashboard.variables).toEqual([]);
       expect(result.dashboard.timeRange).toEqual({ from: 'now-1h', to: 'now', refresh: null });
-      expect(result.warnings).toEqual([
-        'Failed to parse Grafana Classic JSON — dashboard may be in an unsupported format',
-      ]);
+      expect(result.warnings).toEqual(['Failed to parse Grafana Classic JSON — dashboard may be in an unsupported format']);
     });
   });
 
@@ -746,12 +735,8 @@ describe('importClassic', () => {
       });
 
       expect(result.dashboard.panels).toHaveLength(6);
-      expect(result.dashboard.panels.map(p => p.type)).toEqual([
-        'timeseries', 'stat', 'table', 'gauge', 'timeseries', 'stat',
-      ]);
-      expect(result.dashboard.panels.map(p => p.id)).toEqual([
-        'panel-0', 'panel-1', 'panel-2', 'panel-3', 'panel-4', 'panel-5',
-      ]);
+      expect(result.dashboard.panels.map(p => p.type)).toEqual(['timeseries', 'stat', 'table', 'gauge', 'timeseries', 'stat']);
+      expect(result.dashboard.panels.map(p => p.id)).toEqual(['panel-0', 'panel-1', 'panel-2', 'panel-3', 'panel-4', 'panel-5']);
       expect(result.warnings).toHaveLength(1);
       expect(result.warnings[0]).toContain('heatmap');
     });

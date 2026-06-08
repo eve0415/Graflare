@@ -35,7 +35,7 @@ app.get('/', async c => {
   const orgId = c.get('orgId');
 
   const rows = await db.select().from(contactPoints).where(eq(contactPoints.orgId, orgId));
-  return c.json(rows.map(r => (Object.assign(r, { settings: redactSettings(r.settings) }))));
+  return c.json(rows.map(r => Object.assign(r, { settings: redactSettings(r.settings) })));
 });
 
 app.get('/:id', sValidator('param', contactPointIdParamSchema, onValidationError), async c => {
@@ -104,9 +104,16 @@ app.put('/:id', sValidator('param', contactPointIdParamSchema, onValidationError
     updates['settings'] = await encryptSettingsCredentials(data.settings, c.env.ENCRYPTION_KEY);
   }
 
-  await db.update(contactPoints).set(updates).where(and(eq(contactPoints.id, id), eq(contactPoints.orgId, orgId)));
+  await db
+    .update(contactPoints)
+    .set(updates)
+    .where(and(eq(contactPoints.id, id), eq(contactPoints.orgId, orgId)));
 
-  const updated = await db.select().from(contactPoints).where(and(eq(contactPoints.id, id), eq(contactPoints.orgId, orgId))).limit(1);
+  const updated = await db
+    .select()
+    .from(contactPoints)
+    .where(and(eq(contactPoints.id, id), eq(contactPoints.orgId, orgId)))
+    .limit(1);
   return c.json({ ...updated[0], settings: redactSettings(updated[0].settings) });
 });
 

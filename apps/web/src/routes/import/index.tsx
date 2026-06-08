@@ -66,30 +66,39 @@ const ImportPage = () => {
     }
   }, []);
 
-  const handleTextChange = useCallback((e: React.ChangeEvent<HTMLTextAreaElement>) => {
-    handleParse(e.target.value);
-  }, [handleParse]);
+  const handleTextChange = useCallback(
+    (e: React.ChangeEvent<HTMLTextAreaElement>) => {
+      handleParse(e.target.value);
+    },
+    [handleParse],
+  );
 
-  const handleFileUpload = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (file === undefined) return;
+  const handleFileUpload = useCallback(
+    (e: React.ChangeEvent<HTMLInputElement>) => {
+      const file = e.target.files?.[0];
+      if (file === undefined) return;
 
-    void (async () => {
-      const text = await file.text();
-      handleParse(text);
-    })();
-  }, [handleParse]);
+      void (async () => {
+        const text = await file.text();
+        handleParse(text);
+      })();
+    },
+    [handleParse],
+  );
 
-  const handleDrop = useCallback((e: React.DragEvent) => {
-    e.preventDefault();
-    const [file] = e.dataTransfer.files;
-    if (file === undefined) return;
+  const handleDrop = useCallback(
+    (e: React.DragEvent) => {
+      e.preventDefault();
+      const [file] = e.dataTransfer.files;
+      if (file === undefined) return;
 
-    void (async () => {
-      const text = await file.text();
-      handleParse(text);
-    })();
-  }, [handleParse]);
+      void (async () => {
+        const text = await file.text();
+        handleParse(text);
+      })();
+    },
+    [handleParse],
+  );
 
   const handleDragOver = useCallback((e: React.DragEvent) => {
     e.preventDefault();
@@ -99,9 +108,12 @@ const ImportPage = () => {
     fileInputRef.current?.click();
   }, []);
 
-  const handleDropZoneKeyDown = useCallback((e: React.KeyboardEvent) => {
-    if (e.key === 'Enter' || e.key === ' ') handleClickUpload();
-  }, [handleClickUpload]);
+  const handleDropZoneKeyDown = useCallback(
+    (e: React.KeyboardEvent) => {
+      if (e.key === 'Enter' || e.key === ' ') handleClickUpload();
+    },
+    [handleClickUpload],
+  );
 
   const handleImport = useCallback(() => {
     if (parsed === null) return;
@@ -137,9 +149,7 @@ const ImportPage = () => {
   return (
     <div className='mx-auto max-w-2xl space-y-6'>
       <h1 className='text-2xl font-semibold tracking-tight'>Import Dashboard</h1>
-      <p className='text-muted-foreground text-sm'>
-        Import a Grafana dashboard from JSON. Supports Classic, V1 Resource, and V2 Resource formats.
-      </p>
+      <p className='text-muted-foreground text-sm'>Import a Grafana dashboard from JSON. Supports Classic, V1 Resource, and V2 Resource formats.</p>
 
       <button
         type='button'
@@ -152,18 +162,13 @@ const ImportPage = () => {
       >
         <Upload className='text-muted-foreground h-8 w-8' />
         <p className='text-muted-foreground text-sm'>Drop a JSON file here or click to upload</p>
-        <input
-          ref={fileInputRef}
-          type='file'
-          accept='.json'
-          className='hidden'
-          onChange={handleFileUpload}
-          aria-label='Upload JSON file'
-        />
+        <input ref={fileInputRef} type='file' accept='.json' className='hidden' onChange={handleFileUpload} aria-label='Upload JSON file' />
       </button>
 
       <div className='space-y-2'>
-        <label htmlFor='json-input' className='text-sm font-medium'>Or paste JSON</label>
+        <label htmlFor='json-input' className='text-sm font-medium'>
+          Or paste JSON
+        </label>
         <textarea
           id='json-input'
           className='border-border bg-background h-48 w-full rounded-md border p-3 font-mono text-sm'
@@ -192,7 +197,9 @@ const ImportPage = () => {
           {warnings.length > 0 && (
             <div className='space-y-1'>
               {warnings.map((w, i) => (
-                <p key={String(i)} className='text-sm text-yellow-600'>⚠ {w}</p>
+                <p key={String(i)} className='text-sm text-yellow-600'>
+                  ⚠ {w}
+                </p>
               ))}
             </div>
           )}

@@ -20,7 +20,10 @@ app.get('/', sValidator('query', alertInstanceListQuerySchema, onValidationError
   if (query.ruleId !== undefined) conditions.push(eq(alertInstances.ruleId, query.ruleId));
   if (query.state !== undefined) conditions.push(eq(alertInstances.state, query.state));
 
-  const rows = await db.select().from(alertInstances).where(and(...conditions));
+  const rows = await db
+    .select()
+    .from(alertInstances)
+    .where(and(...conditions));
   return c.json(rows);
 });
 

@@ -129,9 +129,16 @@ app.post('/:id/versions/:version/restore', sValidator('param', dashboardVersionP
   }
   if ('folderId' in snapshot) restoreFields['folderId'] = snapshot.folderId;
 
-  await db.update(dashboards).set(restoreFields).where(and(eq(dashboards.id, id), eq(dashboards.orgId, orgId)));
+  await db
+    .update(dashboards)
+    .set(restoreFields)
+    .where(and(eq(dashboards.id, id), eq(dashboards.orgId, orgId)));
 
-  const updated = await db.select().from(dashboards).where(and(eq(dashboards.id, id), eq(dashboards.orgId, orgId))).limit(1);
+  const updated = await db
+    .select()
+    .from(dashboards)
+    .where(and(eq(dashboards.id, id), eq(dashboards.orgId, orgId)))
+    .limit(1);
 
   const versionId = crypto.randomUUID();
   await db.insert(dashboardVersions).values({

@@ -1,7 +1,17 @@
 import { defineConfig } from 'oxfmt';
 
 export default defineConfig({
-  ignorePatterns: ['**/dist', '**/.output', '**/.vinxi', '**/.wrangler', '**/drizzle', '**/worker-configuration.d.ts', '**/routeTree.gen.ts'],
+  ignorePatterns: [
+    '**/dist',
+    '**/.output',
+    '**/.vinxi',
+    '**/.wrangler',
+    '**/drizzle',
+    '**/worker-configuration.d.ts',
+    '**/routeTree.gen.ts',
+    '**/.claude',
+    '**/.agents',
+  ],
   arrowParens: 'avoid',
   singleQuote: true,
   jsxSingleQuote: true,

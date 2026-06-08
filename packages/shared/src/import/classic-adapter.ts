@@ -1,7 +1,7 @@
+import type { GrafanaBasePanel, GrafanaPanel, GrafanaVariable } from '../schemas/grafana-classic';
 import type { Panel, PanelQuery } from '../schemas/panel';
 import type { TimeRange } from '../schemas/time-range';
 import type { Variable } from '../schemas/variable';
-import type { GrafanaBasePanel, GrafanaPanel, GrafanaVariable } from '../schemas/grafana-classic';
 import type { ImportResult } from './types';
 
 import { grafanaClassicSchema } from '../schemas/grafana-classic';
@@ -47,9 +47,7 @@ const mapVariable = (v: GrafanaVariable): Variable | null => {
   else if (v.type === 'constant') type = 'constant';
 
   const query = typeof v.query === 'string' ? v.query : '';
-  const currentValue = typeof v.current.value === 'string'
-    ? v.current.value
-    : Array.isArray(v.current.value) ? v.current.value.join(',') : '';
+  const currentValue = typeof v.current.value === 'string' ? v.current.value : Array.isArray(v.current.value) ? v.current.value.join(',') : '';
 
   return {
     name: v.name,

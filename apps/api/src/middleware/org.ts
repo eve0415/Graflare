@@ -17,12 +17,15 @@ const orgMiddleware = (): MiddlewareHandler<AppEnv> => async (c: Context<AppEnv>
 
   const orgId = await emailToOrgId(user.email);
   const now = new Date();
-  await db.insert(organizations).values({
-    id: orgId,
-    name: user.email,
-    createdAt: now,
-    updatedAt: now,
-  }).onConflictDoNothing();
+  await db
+    .insert(organizations)
+    .values({
+      id: orgId,
+      name: user.email,
+      createdAt: now,
+      updatedAt: now,
+    })
+    .onConflictDoNothing();
 
   c.set('orgId', orgId);
   await next();

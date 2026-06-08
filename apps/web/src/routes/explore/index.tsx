@@ -4,10 +4,11 @@ import { createFileRoute } from '@tanstack/react-router';
 import { Columns2 } from 'lucide-react';
 import { useCallback, useState } from 'react';
 
-import { ExplorePane } from './-components/explore-pane';
 import { QueryBoundary } from '../-root/query-boundary';
-import { ExplorePaneSkeleton } from './-components/explore-pane-skeleton';
 import { TimeRangePicker } from '../-root/time-range-picker';
+
+import { ExplorePane } from './-components/explore-pane';
+import { ExplorePaneSkeleton } from './-components/explore-pane-skeleton';
 
 interface TimeRange {
   from: string;
@@ -32,12 +33,7 @@ const ExplorePage = () => {
         <div className='flex items-center gap-2'>
           <TimeRangePicker value={timeRange} onChange={setTimeRange} />
           <Separator orientation='vertical' className='!h-6' />
-          <Button
-            variant={split ? 'secondary' : 'ghost'}
-            size='sm'
-            onClick={toggleSplit}
-            aria-label={split ? 'Disable split view' : 'Enable split view'}
-          >
+          <Button variant={split ? 'secondary' : 'ghost'} size='sm' onClick={toggleSplit} aria-label={split ? 'Disable split view' : 'Enable split view'}>
             <Columns2 className='h-4 w-4' />
           </Button>
         </div>

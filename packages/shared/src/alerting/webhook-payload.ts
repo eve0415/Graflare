@@ -30,11 +30,7 @@ export interface AlertForPayload {
   generatorURL: string;
 }
 
-export function buildWebhookPayload(
-  alerts: AlertForPayload[],
-  receiver: string,
-  externalURL: string,
-): GrafanaWebhookPayload {
+export function buildWebhookPayload(alerts: AlertForPayload[], receiver: string, externalURL: string): GrafanaWebhookPayload {
   const webhookAlerts: WebhookAlert[] = alerts.map(a => ({
     status: a.state === 'Firing' ? 'firing' : 'resolved',
     labels: a.labels,

@@ -12,13 +12,7 @@ import {
   SidebarRail,
 } from '@graflare/ui/components/sidebar';
 import { Link, useLocation } from '@tanstack/react-router';
-import {
-  Bell,
-  Compass,
-  Database,
-  Import,
-  LayoutDashboard,
-} from 'lucide-react';
+import { Bell, Compass, Database, Import, LayoutDashboard } from 'lucide-react';
 
 import { ThemeToggle } from './theme-toggle';
 
@@ -39,9 +33,7 @@ export const AppSidebar = () => {
         <SidebarMenu>
           <SidebarMenuItem>
             <SidebarMenuButton size='lg' render={<Link to='/' />}>
-              <div className='bg-primary text-primary-foreground flex aspect-square size-8 items-center justify-center rounded-lg text-xs font-bold'>
-                G
-              </div>
+              <div className='bg-primary text-primary-foreground flex aspect-square size-8 items-center justify-center rounded-lg text-xs font-bold'>G</div>
               <div className='flex flex-col gap-0.5 leading-none'>
                 <span className='font-semibold'>Graflare</span>
                 <span className='text-muted-foreground text-xs'>Dashboards</span>

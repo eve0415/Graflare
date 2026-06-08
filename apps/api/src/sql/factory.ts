@@ -24,7 +24,8 @@ export const createSqlClient = async (
   const [ds] = rows;
   if (ds === undefined) return null;
 
-  let auth: { type: 'none' | 'basic' | 'bearer'; credentials?: { username?: string | undefined; password?: string | undefined; token?: string | undefined } } = { type: 'none' };
+  let auth: { type: 'none' | 'basic' | 'bearer'; credentials?: { username?: string | undefined; password?: string | undefined; token?: string | undefined } } =
+    { type: 'none' };
 
   if (ds.credentials) {
     const creds = datasourceCredentialsSchema.parse(JSON.parse(await decryptCredentials(ds.credentials, encryptionKey)));

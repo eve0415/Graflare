@@ -74,7 +74,11 @@ app.put('/:id', sValidator('param', folderIdParamSchema, onValidationError), sVa
     .set(updates)
     .where(and(eq(folders.id, id), eq(folders.orgId, orgId)));
 
-  const updated = await db.select().from(folders).where(and(eq(folders.id, id), eq(folders.orgId, orgId))).limit(1);
+  const updated = await db
+    .select()
+    .from(folders)
+    .where(and(eq(folders.id, id), eq(folders.orgId, orgId)))
+    .limit(1);
   return c.json(updated[0]);
 });
 

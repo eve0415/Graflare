@@ -1,7 +1,7 @@
 import type { Panel } from '@graflare/shared/schemas/panel';
+import type uPlot from 'uplot';
 
 import { useCallback, useMemo } from 'react';
-import type uPlot from 'uplot';
 
 import { QueryResultTable, formatPrometheusToTable } from '../../../-root/query-result-table';
 import { UPlotChart } from '../../../-root/uplot-chart';
@@ -18,12 +18,7 @@ interface TimeSeriesPanelProps {
 }
 
 export const TimeSeriesPanel = ({ panel, timeRange, refetchInterval, width, height }: TimeSeriesPanelProps) => {
-  const { data, isLoading, error, refetch } = usePanelData(
-    panel.datasourceId,
-    panel.queries,
-    timeRange,
-    refetchInterval,
-  );
+  const { data, isLoading, error, refetch } = usePanelData(panel.datasourceId, panel.queries, timeRange, refetchInterval);
 
   const chartResult = useMemo(() => {
     if (data === null || data === undefined) return null;
@@ -71,25 +66,30 @@ export const TimeSeriesPanel = ({ panel, timeRange, refetchInterval, width, heig
         })),
       ],
       bands: thresholdBands,
-      plugins: sorted.length > 0 ? [{
-        hooks: {
-          drawSeries: (u: uPlot) => {
-            const {ctx} = u;
-            for (const threshold of sorted) {
-              const y = u.valToPos(threshold.value, 'y', true);
-              ctx.save();
-              ctx.strokeStyle = threshold.color;
-              ctx.lineWidth = 1;
-              ctx.setLineDash([4, 4]);
-              ctx.beginPath();
-              ctx.moveTo(u.bbox.left, y);
-              ctx.lineTo(u.bbox.left + u.bbox.width, y);
-              ctx.stroke();
-              ctx.restore();
-            }
-          },
-        },
-      }] : [],
+      plugins:
+        sorted.length > 0
+          ? [
+              {
+                hooks: {
+                  drawSeries: (u: uPlot) => {
+                    const { ctx } = u;
+                    for (const threshold of sorted) {
+                      const y = u.valToPos(threshold.value, 'y', true);
+                      ctx.save();
+                      ctx.strokeStyle = threshold.color;
+                      ctx.lineWidth = 1;
+                      ctx.setLineDash([4, 4]);
+                      ctx.beginPath();
+                      ctx.moveTo(u.bbox.left, y);
+                      ctx.lineTo(u.bbox.left + u.bbox.width, y);
+                      ctx.stroke();
+                      ctx.restore();
+                    }
+                  },
+                },
+              },
+            ]
+          : [],
     };
   }, [width, height, chartResult, panel]);
 
@@ -98,7 +98,9 @@ export const TimeSeriesPanel = ({ panel, timeRange, refetchInterval, width, heig
     return formatPrometheusToTable(chartResult);
   }, [chartResult]);
 
-  const handleRetry = useCallback(() => { void refetch(); }, [refetch]);
+  const handleRetry = useCallback(() => {
+    void refetch();
+  }, [refetch]);
 
   const dataTable = useMemo(() => <QueryResultTable data={tableData} />, [tableData]);
 

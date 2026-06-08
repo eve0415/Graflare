@@ -96,9 +96,16 @@ app.put('/:id', sValidator('param', alertRuleIdParamSchema, onValidationError), 
   if (data.execErrState !== undefined) updates['execErrState'] = data.execErrState;
   if (data.isPaused !== undefined) updates['isPaused'] = data.isPaused;
 
-  await db.update(alertRules).set(updates).where(and(eq(alertRules.id, id), eq(alertRules.orgId, orgId)));
+  await db
+    .update(alertRules)
+    .set(updates)
+    .where(and(eq(alertRules.id, id), eq(alertRules.orgId, orgId)));
 
-  const updated = await db.select().from(alertRules).where(and(eq(alertRules.id, id), eq(alertRules.orgId, orgId))).limit(1);
+  const updated = await db
+    .select()
+    .from(alertRules)
+    .where(and(eq(alertRules.id, id), eq(alertRules.orgId, orgId)))
+    .limit(1);
   return c.json(updated[0]);
 });
 

@@ -157,9 +157,7 @@ describe('importV1', () => {
 
       const result = importV1(classicJson);
 
-      expect(result.warnings[0]).toBe(
-        'V1 Resource JSON did not match expected schema — falling back to Classic parser',
-      );
+      expect(result.warnings[0]).toBe('V1 Resource JSON did not match expected schema — falling back to Classic parser');
       expect(result.dashboard.title).toBe('Classic Dashboard');
       expect(result.dashboard.panels).toHaveLength(1);
     });
@@ -171,9 +169,7 @@ describe('importV1', () => {
         spec: validV1Dashboard.spec,
       });
 
-      expect(result.warnings[0]).toBe(
-        'V1 Resource JSON did not match expected schema — falling back to Classic parser',
-      );
+      expect(result.warnings[0]).toBe('V1 Resource JSON did not match expected schema — falling back to Classic parser');
     });
 
     it('includes classic warnings in fallback', () => {

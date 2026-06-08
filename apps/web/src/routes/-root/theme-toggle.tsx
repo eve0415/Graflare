@@ -31,12 +31,7 @@ export const ThemeToggle = () => {
   }, [theme, setTheme]);
 
   return (
-    <Button
-      variant='ghost'
-      size='icon'
-      aria-label={labels[theme]}
-      onClick={handleClick}
-    >
+    <Button variant='ghost' size='icon' aria-label={labels[theme]} onClick={handleClick}>
       <Icon className='h-4 w-4' />
     </Button>
   );

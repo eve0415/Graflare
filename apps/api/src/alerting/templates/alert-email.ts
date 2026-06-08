@@ -66,7 +66,11 @@ export function renderAlertEmailText(alerts: AlertEmailData[]): string {
 
   for (const a of alerts) {
     lines.push(`${a.state.toUpperCase()}: ${a.ruleName}`);
-    lines.push(`  Labels: ${Object.entries(a.labels).map(([k, v]) => `${k}=${v}`).join(', ')}`);
+    lines.push(
+      `  Labels: ${Object.entries(a.labels)
+        .map(([k, v]) => `${k}=${v}`)
+        .join(', ')}`,
+    );
     lines.push(`  Value: ${a.value} | Since: ${a.startsAt}`);
     if (a.dashboardURL) lines.push(`  Dashboard: ${a.dashboardURL}`);
     lines.push('');

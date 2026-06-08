@@ -59,9 +59,7 @@ export const PanelFrame = ({ title, loading, error, onRetry, children, dataTable
         )}
 
         {loading !== true && (error === undefined || error === null) && (
-          <Suspense fallback={suspenseFallback}>
-            {showDataTable && dataTableContent !== undefined ? dataTableContent : children}
-          </Suspense>
+          <Suspense fallback={suspenseFallback}>{showDataTable && dataTableContent !== undefined ? dataTableContent : children}</Suspense>
         )}
       </div>
     </div>

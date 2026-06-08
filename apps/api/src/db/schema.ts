@@ -210,10 +210,7 @@ export const annotations = sqliteTable(
     newState: text('new_state'),
     createdAt: integer('created_at', { mode: 'timestamp_ms' }).notNull(),
   },
-  table => [
-    index('annotations_org_dashboard_idx').on(table.orgId, table.dashboardId),
-    index('annotations_org_rule_idx').on(table.orgId, table.alertRuleId),
-  ],
+  table => [index('annotations_org_dashboard_idx').on(table.orgId, table.dashboardId), index('annotations_org_rule_idx').on(table.orgId, table.alertRuleId)],
 );
 
 export const dashboardVersions = sqliteTable(

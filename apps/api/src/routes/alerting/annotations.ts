@@ -22,7 +22,10 @@ app.get('/', sValidator('query', annotationListQuerySchema, onValidationError), 
   if (query.from !== undefined) conditions.push(gte(annotations.time, new Date(query.from)));
   if (query.to !== undefined) conditions.push(lte(annotations.time, new Date(query.to)));
 
-  let rows = await db.select().from(annotations).where(and(...conditions));
+  let rows = await db
+    .select()
+    .from(annotations)
+    .where(and(...conditions));
 
   if (query.tag !== undefined) {
     const { tag } = query;

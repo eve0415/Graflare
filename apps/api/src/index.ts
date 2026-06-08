@@ -7,15 +7,21 @@ import type { CreateContactPoint, UpdateContactPoint } from '@graflare/shared/sc
 import type { CreateDashboard, DashboardListQuery, ImportDashboard, UpdateDashboard } from '@graflare/shared/schemas/dashboard';
 import type { CreateDatasource, TestConnectionInline, UpdateDatasource } from '@graflare/shared/schemas/datasource';
 import type { CreateFolder, UpdateFolder } from '@graflare/shared/schemas/folder';
+import type {
+  DescribeDatabaseResponse,
+  DescribeTableResponse,
+  ListLabelValuesResponse,
+  ListLabelsResponse,
+  ListMetricsResponse,
+  ListTablesResponse,
+} from '@graflare/shared/schemas/introspection';
 import type { CreateMuteTiming, UpdateMuteTiming } from '@graflare/shared/schemas/mute-timing';
 import type { CreateNotificationPolicy, UpdateNotificationPolicy } from '@graflare/shared/schemas/notification-policy';
 import type { PrometheusResponse } from '@graflare/shared/schemas/prometheus';
 import type { CreateSilence, UpdateSilence } from '@graflare/shared/schemas/silence';
-import type { DescribeDatabaseResponse, DescribeTableResponse, ListLabelValuesResponse, ListLabelsResponse, ListMetricsResponse, ListTablesResponse } from '@graflare/shared/schemas/introspection';
 import type { SqlFormat, SqlResponse } from '@graflare/shared/schemas/sql';
 import type { DurableObjectNamespace } from 'cloudflare:workers';
 
-import { resolveTime } from '@graflare/shared/time/resolve';
 import { detectFormat, importDashboard as importDashboardFn } from '@graflare/shared/import';
 import { alertInstanceListQuerySchema, upsertAlertInstanceSchema } from '@graflare/shared/schemas/alert-instance';
 import { createAlertRuleSchema, updateAlertRuleSchema } from '@graflare/shared/schemas/alert-rule';
@@ -42,6 +48,7 @@ import { createNotificationPolicySchema, updateNotificationPolicySchema } from '
 import { prometheusResponseSchema } from '@graflare/shared/schemas/prometheus';
 import { createSilenceSchema, updateSilenceSchema } from '@graflare/shared/schemas/silence';
 import { expandSqlMacros } from '@graflare/shared/sql/macros';
+import { resolveTime } from '@graflare/shared/time/resolve';
 import { WorkerEntrypoint } from 'cloudflare:workers';
 import { and, desc, eq, gte, like, lte, sql } from 'drizzle-orm';
 import { Hono } from 'hono';
@@ -65,6 +72,7 @@ import {
 } from './db/schema';
 import { accessMiddleware, verifyJwt } from './middleware/access';
 import { emailToOrgId, orgMiddleware } from './middleware/org';
+import { createPrometheusClient } from './prometheus/factory';
 import { alertInstanceRoutes } from './routes/alerting/alert-instances';
 import { alertRuleGroupRoutes } from './routes/alerting/alert-rule-groups';
 import { alertRuleRoutes } from './routes/alerting/alert-rules';
@@ -80,7 +88,6 @@ import { datasourceRoutes } from './routes/datasources/datasources';
 import { datasourceTestRoutes } from './routes/datasources/datasources-test';
 import { proxyRoutes } from './routes/datasources/proxy';
 import { folderRoutes } from './routes/folders/folders';
-import { createPrometheusClient } from './prometheus/factory';
 import { slugify } from './slugify';
 import { SqlClient } from './sql/client';
 import { createSqlClient } from './sql/factory';
@@ -105,7 +112,6 @@ export interface AppEnv {
     orgId: string;
   };
 }
-
 
 const app = new Hono<AppEnv>();
 
@@ -491,10 +497,10 @@ export class GraflareAPI extends WorkerEntrypoint<Bindings> {
       const result = await client.query(q.sql, q.params);
       if (result.error !== undefined) return { tables: [], error: result.error };
 
-      const nameIdx = result.columns.findIndex((c) => c.name === 'name');
-      const schemaIdx = result.columns.findIndex((c) => c.name === 'schema');
+      const nameIdx = result.columns.findIndex(c => c.name === 'name');
+      const schemaIdx = result.columns.findIndex(c => c.name === 'schema');
 
-      const tables = result.rows.map((row) => ({
+      const tables = result.rows.map(row => ({
         name: String(row[nameIdx] ?? ''),
         ...(schemaIdx !== -1 && row[schemaIdx] !== null ? { schema: String(row[schemaIdx]) } : {}),
       }));
@@ -529,11 +535,11 @@ export class GraflareAPI extends WorkerEntrypoint<Bindings> {
       const result = await client.query(q.sql, q.params);
       if (result.error !== undefined) return { columns: [], error: result.error };
 
-      const nameIdx = result.columns.findIndex((c) => c.name === 'name');
-      const typeIdx = result.columns.findIndex((c) => c.name === 'type');
-      const nullableIdx = result.columns.findIndex((c) => c.name === 'nullable');
+      const nameIdx = result.columns.findIndex(c => c.name === 'name');
+      const typeIdx = result.columns.findIndex(c => c.name === 'type');
+      const nullableIdx = result.columns.findIndex(c => c.name === 'nullable');
 
-      const columns = result.rows.map((row) => ({
+      const columns = result.rows.map(row => ({
         name: String(row[nameIdx] ?? ''),
         type: String(row[typeIdx] ?? ''),
         nullable: Number(row[nullableIdx]) === 1,
@@ -569,9 +575,9 @@ export class GraflareAPI extends WorkerEntrypoint<Bindings> {
       const tablesResult = await client.query(tq.sql, tq.params);
       if (tablesResult.error !== undefined) return { tables: {}, error: tablesResult.error };
 
-      const nameIdx = tablesResult.columns.findIndex((c) => c.name === 'name');
-      const schemaIdx = tablesResult.columns.findIndex((c) => c.name === 'schema');
-      const tableList = tablesResult.rows.map((row) => ({
+      const nameIdx = tablesResult.columns.findIndex(c => c.name === 'name');
+      const schemaIdx = tablesResult.columns.findIndex(c => c.name === 'schema');
+      const tableList = tablesResult.rows.map(row => ({
         name: String(row[nameIdx] ?? ''),
         ...(schemaIdx !== -1 && row[schemaIdx] !== null ? { schema: String(row[schemaIdx]) } : {}),
       }));
@@ -582,11 +588,11 @@ export class GraflareAPI extends WorkerEntrypoint<Bindings> {
         const result = await client.query(dq.sql, dq.params);
         if (result.error !== undefined) continue;
 
-        const colNameIdx = result.columns.findIndex((c) => c.name === 'name');
-        const typeIdx = result.columns.findIndex((c) => c.name === 'type');
-        const nullableIdx = result.columns.findIndex((c) => c.name === 'nullable');
+        const colNameIdx = result.columns.findIndex(c => c.name === 'name');
+        const typeIdx = result.columns.findIndex(c => c.name === 'type');
+        const nullableIdx = result.columns.findIndex(c => c.name === 'nullable');
 
-        tables[table.name] = result.rows.map((row) => ({
+        tables[table.name] = result.rows.map(row => ({
           name: String(row[colNameIdx] ?? ''),
           type: String(row[typeIdx] ?? ''),
           nullable: Number(row[nullableIdx]) === 1,
@@ -741,9 +747,18 @@ export class GraflareAPI extends WorkerEntrypoint<Bindings> {
       try {
         const { parentId: parentFolderId } = found;
         await this.db.batch([
-          this.db.update(folders).set({ parentId: parentFolderId }).where(and(eq(folders.parentId, id), eq(folders.orgId, orgId))),
-          this.db.update(dashboards).set({ folderId: parentFolderId }).where(and(eq(dashboards.folderId, id), eq(dashboards.orgId, orgId))),
-          this.db.update(alertRuleGroups).set({ folderId: parentFolderId }).where(and(eq(alertRuleGroups.folderId, id), eq(alertRuleGroups.orgId, orgId))),
+          this.db
+            .update(folders)
+            .set({ parentId: parentFolderId })
+            .where(and(eq(folders.parentId, id), eq(folders.orgId, orgId))),
+          this.db
+            .update(dashboards)
+            .set({ folderId: parentFolderId })
+            .where(and(eq(dashboards.folderId, id), eq(dashboards.orgId, orgId))),
+          this.db
+            .update(alertRuleGroups)
+            .set({ folderId: parentFolderId })
+            .where(and(eq(alertRuleGroups.folderId, id), eq(alertRuleGroups.orgId, orgId))),
           this.db.delete(folders).where(and(eq(folders.id, id), eq(folders.orgId, orgId))),
         ]);
       } catch (error) {
@@ -877,9 +892,16 @@ export class GraflareAPI extends WorkerEntrypoint<Bindings> {
     if (updates.timeRange !== undefined) setData['timeRange'] = updates.timeRange;
 
     try {
-      await this.db.update(dashboards).set(setData).where(and(eq(dashboards.id, id), eq(dashboards.orgId, orgId)));
+      await this.db
+        .update(dashboards)
+        .set(setData)
+        .where(and(eq(dashboards.id, id), eq(dashboards.orgId, orgId)));
 
-      const updated = await this.db.select().from(dashboards).where(and(eq(dashboards.id, id), eq(dashboards.orgId, orgId))).limit(1);
+      const updated = await this.db
+        .select()
+        .from(dashboards)
+        .where(and(eq(dashboards.id, id), eq(dashboards.orgId, orgId)))
+        .limit(1);
       if (updated[0] === undefined) return null;
 
       const versionId = crypto.randomUUID();
@@ -998,9 +1020,16 @@ export class GraflareAPI extends WorkerEntrypoint<Bindings> {
     if ('folderId' in snapshot) restoreFields['folderId'] = snapshot.folderId;
 
     try {
-      await this.db.update(dashboards).set(restoreFields).where(and(eq(dashboards.id, dashboardId), eq(dashboards.orgId, orgId)));
+      await this.db
+        .update(dashboards)
+        .set(restoreFields)
+        .where(and(eq(dashboards.id, dashboardId), eq(dashboards.orgId, orgId)));
 
-      const updated = await this.db.select().from(dashboards).where(and(eq(dashboards.id, dashboardId), eq(dashboards.orgId, orgId))).limit(1);
+      const updated = await this.db
+        .select()
+        .from(dashboards)
+        .where(and(eq(dashboards.id, dashboardId), eq(dashboards.orgId, orgId)))
+        .limit(1);
       if (updated[0] === undefined) return null;
 
       const versionId = crypto.randomUUID();
@@ -1748,13 +1777,19 @@ export class GraflareAPI extends WorkerEntrypoint<Bindings> {
     const now = new Date();
 
     if (parsed.dashboardId !== undefined) {
-      const dash = await this.db.select({ id: dashboards.id }).from(dashboards)
-        .where(and(eq(dashboards.id, parsed.dashboardId), eq(dashboards.orgId, orgId))).limit(1);
+      const dash = await this.db
+        .select({ id: dashboards.id })
+        .from(dashboards)
+        .where(and(eq(dashboards.id, parsed.dashboardId), eq(dashboards.orgId, orgId)))
+        .limit(1);
       if (dash.length === 0) throw new Error('Dashboard not found');
     }
     if (parsed.alertRuleId !== undefined) {
-      const rule = await this.db.select({ id: alertRules.id }).from(alertRules)
-        .where(and(eq(alertRules.id, parsed.alertRuleId), eq(alertRules.orgId, orgId))).limit(1);
+      const rule = await this.db
+        .select({ id: alertRules.id })
+        .from(alertRules)
+        .where(and(eq(alertRules.id, parsed.alertRuleId), eq(alertRules.orgId, orgId)))
+        .limit(1);
       if (rule.length === 0) throw new Error('Alert rule not found');
     }
 

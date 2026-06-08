@@ -17,9 +17,7 @@ const validV2Dashboard = {
         spec: {
           title: 'CPU Usage',
           data: {
-            queries: [
-              { refId: 'A', expr: 'rate(cpu[5m])', legendFormat: '{{instance}}' },
-            ],
+            queries: [{ refId: 'A', expr: 'rate(cpu[5m])', legendFormat: '{{instance}}' }],
           },
         },
       },
@@ -52,9 +50,7 @@ describe('importV2', () => {
       expect(panel?.type).toBe('timeseries');
       expect(panel?.title).toBe('CPU Usage');
       expect(panel?.description).toBe('');
-      expect(panel?.queries).toEqual([
-        { refId: 'A', expr: 'rate(cpu[5m])', legendFormat: '{{instance}}' },
-      ]);
+      expect(panel?.queries).toEqual([{ refId: 'A', expr: 'rate(cpu[5m])', legendFormat: '{{instance}}' }]);
       expect(panel?.gridPos).toEqual({ x: 0, y: 0, w: 12, h: 8 });
       expect(panel?.thresholds).toEqual([]);
       expect(panel?.displayOptions).toEqual({});
@@ -142,9 +138,7 @@ describe('importV2', () => {
 
       expect(result.dashboard.panels).toHaveLength(1);
       expect(result.dashboard.panels[0]?.type).toBe('stat');
-      expect(result.warnings).toEqual([
-        'Unsupported panel type "Heatmap" (element "hm") — converted to placeholder stat panel',
-      ]);
+      expect(result.warnings).toEqual(['Unsupported panel type "Heatmap" (element "hm") — converted to placeholder stat panel']);
     });
   });
 
@@ -293,10 +287,7 @@ describe('importV2', () => {
               spec: {
                 title: 'Auto',
                 data: {
-                  queries: [
-                    { expr: 'up' },
-                    { expr: 'down' },
-                  ],
+                  queries: [{ expr: 'up' }, { expr: 'down' }],
                 },
               },
             },
@@ -425,9 +416,7 @@ describe('importV2', () => {
         ...validV2Dashboard,
         spec: {
           ...validV2Dashboard.spec,
-          variables: [
-            { name: '', type: 'query', label: 'Ghost', query: 'test' },
-          ],
+          variables: [{ name: '', type: 'query', label: 'Ghost', query: 'test' }],
         },
       });
 
@@ -498,12 +487,8 @@ describe('importV2', () => {
       });
 
       expect(result.dashboard.panels).toHaveLength(5);
-      expect(result.dashboard.panels.map(p => p.type)).toEqual([
-        'timeseries', 'stat', 'table', 'gauge', 'stat',
-      ]);
-      expect(result.dashboard.panels.map(p => p.id)).toEqual([
-        'panel-0', 'panel-1', 'panel-2', 'panel-3', 'panel-4',
-      ]);
+      expect(result.dashboard.panels.map(p => p.type)).toEqual(['timeseries', 'stat', 'table', 'gauge', 'stat']);
+      expect(result.dashboard.panels.map(p => p.id)).toEqual(['panel-0', 'panel-1', 'panel-2', 'panel-3', 'panel-4']);
       expect(result.warnings).toHaveLength(1);
       expect(result.warnings[0]).toContain('Heatmap');
     });

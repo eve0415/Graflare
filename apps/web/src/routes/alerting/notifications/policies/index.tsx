@@ -67,38 +67,39 @@ const PoliciesPage = () => {
     [router],
   );
 
-  const policyRows = useMemo(
-    () => {
-      const result = [];
-      for (const policy of rootPolicies) {
-        const childList = childPolicies.get(policy.id) ?? [];
-        const children = [];
-        for (const child of childList) {
-          children.push({
-            id: child.id,
-            matchers: child.matchers,
-            contactPointId: child.contactPointId,
-            cpName: resolveCpName(cpMap, child.contactPointId, 'No contact point'),
-            onDelete: () => { handleDelete(child.id); },
-          });
-        }
-        result.push({
-          id: policy.id,
-          contactPointId: policy.contactPointId,
-          matchers: policy.matchers,
-          groupBy: policy.groupBy,
-          groupWaitS: policy.groupWaitS,
-          groupIntervalS: policy.groupIntervalS,
-          repeatIntervalS: policy.repeatIntervalS,
-          cpName: resolveCpName(cpMap, policy.contactPointId, 'Default policy'),
-          onDelete: () => { handleDelete(policy.id); },
-          children,
+  const policyRows = useMemo(() => {
+    const result = [];
+    for (const policy of rootPolicies) {
+      const childList = childPolicies.get(policy.id) ?? [];
+      const children = [];
+      for (const child of childList) {
+        children.push({
+          id: child.id,
+          matchers: child.matchers,
+          contactPointId: child.contactPointId,
+          cpName: resolveCpName(cpMap, child.contactPointId, 'No contact point'),
+          onDelete: () => {
+            handleDelete(child.id);
+          },
         });
       }
-      return result;
-    },
-    [rootPolicies, cpMap, childPolicies, handleDelete],
-  );
+      result.push({
+        id: policy.id,
+        contactPointId: policy.contactPointId,
+        matchers: policy.matchers,
+        groupBy: policy.groupBy,
+        groupWaitS: policy.groupWaitS,
+        groupIntervalS: policy.groupIntervalS,
+        repeatIntervalS: policy.repeatIntervalS,
+        cpName: resolveCpName(cpMap, policy.contactPointId, 'Default policy'),
+        onDelete: () => {
+          handleDelete(policy.id);
+        },
+        children,
+      });
+    }
+    return result;
+  }, [rootPolicies, cpMap, childPolicies, handleDelete]);
 
   return (
     <div className='space-y-4'>
@@ -127,8 +128,7 @@ const PoliciesPage = () => {
                   ))}
                 </div>
                 <div className='text-muted-foreground text-xs'>
-                  Group by: {policy.groupBy.join(', ')} | Wait: {policy.groupWaitS}s | Interval:{' '}
-                  {policy.groupIntervalS}s | Repeat: {policy.repeatIntervalS}s
+                  Group by: {policy.groupBy.join(', ')} | Wait: {policy.groupWaitS}s | Interval: {policy.groupIntervalS}s | Repeat: {policy.repeatIntervalS}s
                 </div>
                 {policy.children.length > 0 && (
                   <div className='ml-4 space-y-2 border-l pl-4'>
@@ -162,10 +162,7 @@ const PoliciesPage = () => {
 
 export const Route = createFileRoute('/alerting/notifications/policies/')({
   loader: ({ context }) =>
-    Promise.all([
-      context.queryClient.ensureQueryData(notificationPoliciesQueryOptions()),
-      context.queryClient.ensureQueryData(contactPointsQueryOptions()),
-    ]),
+    Promise.all([context.queryClient.ensureQueryData(notificationPoliciesQueryOptions()), context.queryClient.ensureQueryData(contactPointsQueryOptions())]),
   pendingComponent: PoliciesSkeleton,
   component: PoliciesPage,
 });

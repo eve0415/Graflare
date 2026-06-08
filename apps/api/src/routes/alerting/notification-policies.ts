@@ -47,40 +47,52 @@ app.post('/', sValidator('json', createNotificationPolicySchema, onValidationErr
   return c.json(rows[0], 201);
 });
 
-app.put('/:id', sValidator('param', notificationPolicyIdParamSchema, onValidationError), sValidator('json', updateNotificationPolicySchema, onValidationError), async c => {
-  const db = createDb(c.env.DB);
-  const orgId = c.get('orgId');
-  const { id } = c.req.valid('param');
+app.put(
+  '/:id',
+  sValidator('param', notificationPolicyIdParamSchema, onValidationError),
+  sValidator('json', updateNotificationPolicySchema, onValidationError),
+  async c => {
+    const db = createDb(c.env.DB);
+    const orgId = c.get('orgId');
+    const { id } = c.req.valid('param');
 
-  const existing = await db
-    .select()
-    .from(notificationPolicies)
-    .where(and(eq(notificationPolicies.id, id), eq(notificationPolicies.orgId, orgId)))
-    .limit(1);
+    const existing = await db
+      .select()
+      .from(notificationPolicies)
+      .where(and(eq(notificationPolicies.id, id), eq(notificationPolicies.orgId, orgId)))
+      .limit(1);
 
-  if (existing.length === 0) {
-    return c.json({ error: 'Not found' }, 404);
-  }
+    if (existing.length === 0) {
+      return c.json({ error: 'Not found' }, 404);
+    }
 
-  const data = c.req.valid('json');
-  const now = new Date();
-  const updates: Record<string, unknown> = { updatedAt: now };
+    const data = c.req.valid('json');
+    const now = new Date();
+    const updates: Record<string, unknown> = { updatedAt: now };
 
-  if (data.parentId !== undefined) updates['parentId'] = data.parentId;
-  if (data.contactPointId !== undefined) updates['contactPointId'] = data.contactPointId;
-  if (data.groupBy !== undefined) updates['groupBy'] = data.groupBy;
-  if (data.matchers !== undefined) updates['matchers'] = data.matchers;
-  if (data.muteTimingIds !== undefined) updates['muteTimingIds'] = data.muteTimingIds;
-  if (data.groupWaitS !== undefined) updates['groupWaitS'] = data.groupWaitS;
-  if (data.groupIntervalS !== undefined) updates['groupIntervalS'] = data.groupIntervalS;
-  if (data.repeatIntervalS !== undefined) updates['repeatIntervalS'] = data.repeatIntervalS;
-  if (data.continueMatching !== undefined) updates['continueMatching'] = data.continueMatching;
+    if (data.parentId !== undefined) updates['parentId'] = data.parentId;
+    if (data.contactPointId !== undefined) updates['contactPointId'] = data.contactPointId;
+    if (data.groupBy !== undefined) updates['groupBy'] = data.groupBy;
+    if (data.matchers !== undefined) updates['matchers'] = data.matchers;
+    if (data.muteTimingIds !== undefined) updates['muteTimingIds'] = data.muteTimingIds;
+    if (data.groupWaitS !== undefined) updates['groupWaitS'] = data.groupWaitS;
+    if (data.groupIntervalS !== undefined) updates['groupIntervalS'] = data.groupIntervalS;
+    if (data.repeatIntervalS !== undefined) updates['repeatIntervalS'] = data.repeatIntervalS;
+    if (data.continueMatching !== undefined) updates['continueMatching'] = data.continueMatching;
 
-  await db.update(notificationPolicies).set(updates).where(and(eq(notificationPolicies.id, id), eq(notificationPolicies.orgId, orgId)));
+    await db
+      .update(notificationPolicies)
+      .set(updates)
+      .where(and(eq(notificationPolicies.id, id), eq(notificationPolicies.orgId, orgId)));
 
-  const updated = await db.select().from(notificationPolicies).where(and(eq(notificationPolicies.id, id), eq(notificationPolicies.orgId, orgId))).limit(1);
-  return c.json(updated[0]);
-});
+    const updated = await db
+      .select()
+      .from(notificationPolicies)
+      .where(and(eq(notificationPolicies.id, id), eq(notificationPolicies.orgId, orgId)))
+      .limit(1);
+    return c.json(updated[0]);
+  },
+);
 
 app.delete('/:id', sValidator('param', notificationPolicyIdParamSchema, onValidationError), async c => {
   const db = createDb(c.env.DB);

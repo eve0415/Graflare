@@ -72,9 +72,7 @@ const SilencesPage = () => {
             <Card key={row.id}>
               <CardHeader className='flex flex-row items-center justify-between pb-2'>
                 <CardTitle className='flex items-center gap-2 text-sm font-medium'>
-                  <Badge variant={row.isActive ? 'default' : 'secondary'}>
-                    {row.isActive ? 'Active' : 'Expired'}
-                  </Badge>
+                  <Badge variant={row.isActive ? 'default' : 'secondary'}>{row.isActive ? 'Active' : 'Expired'}</Badge>
                   {row.comment === '' ? 'No comment' : row.comment}
                 </CardTitle>
                 <Button variant='ghost' size='xs' onClick={row.onDelete} disabled={deleting === row.id}>
@@ -90,8 +88,7 @@ const SilencesPage = () => {
                   ))}
                 </div>
                 <div className='text-muted-foreground text-xs'>
-                  {new Date(row.startsAt * 1000).toLocaleString()} &mdash;{' '}
-                  {new Date(row.endsAt * 1000).toLocaleString()}
+                  {new Date(row.startsAt * 1000).toLocaleString()} &mdash; {new Date(row.endsAt * 1000).toLocaleString()}
                   {row.createdBy !== '' && <> | Created by {row.createdBy}</>}
                 </div>
               </CardContent>

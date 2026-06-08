@@ -86,9 +86,16 @@ app.put('/:id', sValidator('param', silenceIdParamSchema, onValidationError), sV
   if (data.comment !== undefined) updates['comment'] = data.comment;
   if (data.createdBy !== undefined) updates['createdBy'] = data.createdBy;
 
-  await db.update(silences).set(updates).where(and(eq(silences.id, id), eq(silences.orgId, orgId)));
+  await db
+    .update(silences)
+    .set(updates)
+    .where(and(eq(silences.id, id), eq(silences.orgId, orgId)));
 
-  const updated = await db.select().from(silences).where(and(eq(silences.id, id), eq(silences.orgId, orgId))).limit(1);
+  const updated = await db
+    .select()
+    .from(silences)
+    .where(and(eq(silences.id, id), eq(silences.orgId, orgId)))
+    .limit(1);
   return c.json(updated[0]);
 });
 

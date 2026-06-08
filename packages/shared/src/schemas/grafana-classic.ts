@@ -62,10 +62,7 @@ const grafanaVariableSchema = z.object({
   multi: z._default(z.boolean(), false),
   includeAll: z._default(z.boolean(), false),
   current: z._default(grafanaCurrentSchema, { value: '' }),
-  options: z._default(
-    z.array(z.object({ value: z._default(z.string(), '') })),
-    [],
-  ),
+  options: z._default(z.array(z.object({ value: z._default(z.string(), '') })), []),
 });
 
 export type GrafanaVariable = z.infer<typeof grafanaVariableSchema>;

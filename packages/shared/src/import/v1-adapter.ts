@@ -10,10 +10,7 @@ export const importV1 = (json: Record<string, unknown>): ImportResult => {
     const fallback = importClassic(json);
     return {
       dashboard: fallback.dashboard,
-      warnings: [
-        'V1 Resource JSON did not match expected schema — falling back to Classic parser',
-        ...fallback.warnings,
-      ],
+      warnings: ['V1 Resource JSON did not match expected schema — falling back to Classic parser', ...fallback.warnings],
     };
   }
 

@@ -67,18 +67,21 @@ describe('contact-point routes', () => {
   it('creates a webhook contact point with encrypted password', async () => {
     const app = createApp();
     const res = await app.request(
-      req('/', json({
-        name: 'Webhook',
-        type: 'webhook',
-        settings: { type: 'webhook', url: 'https://hooks.example.com/alert', password: 'my-secret' },
-      })),
+      req(
+        '/',
+        json({
+          name: 'Webhook',
+          type: 'webhook',
+          settings: { type: 'webhook', url: 'https://hooks.example.com/alert', password: 'my-secret' },
+        }),
+      ),
       {},
       testBindings,
     );
     expect(res.status).toBe(201);
     const body: unknown = await res.json();
     if (typeof body !== 'object' || body === null || !('settings' in body)) throw new Error('bad shape');
-    const {settings} = body;
+    const { settings } = body;
     if (typeof settings !== 'object' || settings === null) throw new Error('bad settings');
     expect(settings).toHaveProperty('password', '******');
 
@@ -94,11 +97,14 @@ describe('contact-point routes', () => {
   it('lists contact points with redacted credentials', async () => {
     const app = createApp();
     await app.request(
-      req('/', json({
-        name: 'Webhook',
-        type: 'webhook',
-        settings: { type: 'webhook', url: 'https://hooks.example.com/alert', password: 'secret' },
-      })),
+      req(
+        '/',
+        json({
+          name: 'Webhook',
+          type: 'webhook',
+          settings: { type: 'webhook', url: 'https://hooks.example.com/alert', password: 'secret' },
+        }),
+      ),
       {},
       testBindings,
     );
@@ -107,7 +113,7 @@ describe('contact-point routes', () => {
     expect(res.status).toBe(200);
     const body: unknown = await res.json();
     if (!Array.isArray(body) || body.length === 0) throw new Error('expected array');
-    const {settings} = body[0];
+    const { settings } = body[0];
     expect(settings.password).toBe('******');
   });
 

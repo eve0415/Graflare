@@ -1,7 +1,7 @@
+import type { V2Element, V2Variable } from '../schemas/grafana-v2';
 import type { Panel, PanelQuery } from '../schemas/panel';
 import type { TimeRange } from '../schemas/time-range';
 import type { Variable } from '../schemas/variable';
-import type { V2Element, V2Variable } from '../schemas/grafana-v2';
 import type { ImportResult } from './types';
 
 import { grafanaV2Schema } from '../schemas/grafana-v2';
@@ -59,9 +59,7 @@ export const importV2 = (json: Record<string, unknown>): ImportResult => {
   const { description } = spec;
   const tags = Object.entries(metadata.labels).map(([k, v]) => `${k}:${v}`);
 
-  const layoutMap = new Map(
-    spec.layout.items.map(item => [item.element, item]),
-  );
+  const layoutMap = new Map(spec.layout.items.map(item => [item.element, item]));
 
   const panels: Panel[] = [];
   let panelIndex = 0;

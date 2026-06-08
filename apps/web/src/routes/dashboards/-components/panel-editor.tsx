@@ -11,8 +11,8 @@ import { Plus, Trash2, X } from 'lucide-react';
 import { useCallback, useState } from 'react';
 
 import { databaseSchemaQueryOptions } from '../../-root/introspection-queries';
-import { QueryCodeEditor } from '../../explore/-components/query-code-editor';
 import { datasourcesQueryOptions } from '../../datasources/-queries';
+import { QueryCodeEditor } from '../../explore/-components/query-code-editor';
 
 const PANEL_TYPE_OPTIONS = [
   { value: 'timeseries', label: 'Time Series' },
@@ -29,13 +29,12 @@ interface PanelEditorProps {
 }
 
 const VALID_DIALECTS = new Set<string>(['postgres', 'sqlite']);
-const isValidDialect = (value: string | null | undefined): value is DatasourceDialect =>
-  typeof value === 'string' && VALID_DIALECTS.has(value);
+const isValidDialect = (value: string | null | undefined): value is DatasourceDialect => typeof value === 'string' && VALID_DIALECTS.has(value);
 
 export const PanelEditor = ({ panel, open, onClose, onSave }: PanelEditorProps) => {
   const [draft, setDraft] = useState<Panel>(panel);
   const dsQuery = useQuery(datasourcesQueryOptions());
-  const selectedDs = dsQuery.data?.find((d) => d.id === draft.datasourceId);
+  const selectedDs = dsQuery.data?.find(d => d.id === draft.datasourceId);
   const rawType = selectedDs?.type ?? 'prometheus';
   const dsType: DatasourceType = rawType === 'sql' ? 'sql' : 'prometheus';
   const dsDialect = isValidDialect(selectedDs?.dialect) ? selectedDs.dialect : undefined;

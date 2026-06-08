@@ -14,12 +14,7 @@ interface TablePanelProps {
 }
 
 export const TablePanel = ({ panel, timeRange, refetchInterval }: TablePanelProps) => {
-  const { data, isLoading, error, refetch } = usePanelData(
-    panel.datasourceId,
-    panel.queries,
-    timeRange,
-    refetchInterval,
-  );
+  const { data, isLoading, error, refetch } = usePanelData(panel.datasourceId, panel.queries, timeRange, refetchInterval);
 
   const tableData = useMemo(() => {
     if (data === null || data === undefined) return { columns: [], rows: [] };
@@ -27,8 +22,8 @@ export const TablePanel = ({ panel, timeRange, refetchInterval }: TablePanelProp
     for (const res of data) {
       if ('columns' in res && 'rows' in res && !('status' in res)) {
         return {
-          columns: res.columns.map((c) => c.name),
-          rows: res.rows.map((row) => row.map((v) => (v === null ? '' : String(v)))),
+          columns: res.columns.map(c => c.name),
+          rows: res.rows.map(row => row.map(v => (v === null ? '' : String(v)))),
         };
       }
     }
@@ -47,15 +42,12 @@ export const TablePanel = ({ panel, timeRange, refetchInterval }: TablePanelProp
     return formatPrometheusToTable(allResults);
   }, [data]);
 
-  const handleRetry = useCallback(() => { void refetch(); }, [refetch]);
+  const handleRetry = useCallback(() => {
+    void refetch();
+  }, [refetch]);
 
   return (
-    <PanelFrame
-      title={panel.title}
-      loading={isLoading}
-      error={error instanceof Error ? error.message : null}
-      onRetry={handleRetry}
-    >
+    <PanelFrame title={panel.title} loading={isLoading} error={error instanceof Error ? error.message : null} onRetry={handleRetry}>
       <QueryResultTable data={tableData} />
     </PanelFrame>
   );

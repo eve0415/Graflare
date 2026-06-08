@@ -59,13 +59,19 @@ const IntervalEditor = ({
   onWeekdayToggle: (index: number, day: number) => void;
   onMonthToggle: (index: number, month: number) => void;
 }) => {
-  const handleRemove = useCallback(() => { onRemove(index); }, [index, onRemove]);
+  const handleRemove = useCallback(() => {
+    onRemove(index);
+  }, [index, onRemove]);
   const handleStart = useCallback(
-    (e: React.ChangeEvent<HTMLInputElement>) => { onStartTimeChange(index, e.target.value); },
+    (e: React.ChangeEvent<HTMLInputElement>) => {
+      onStartTimeChange(index, e.target.value);
+    },
     [index, onStartTimeChange],
   );
   const handleEnd = useCallback(
-    (e: React.ChangeEvent<HTMLInputElement>) => { onEndTimeChange(index, e.target.value); },
+    (e: React.ChangeEvent<HTMLInputElement>) => {
+      onEndTimeChange(index, e.target.value);
+    },
     [index, onEndTimeChange],
   );
 
@@ -87,11 +93,15 @@ const IntervalEditor = ({
 
       <div className='grid grid-cols-2 gap-3'>
         <div className='space-y-1'>
-          <Label htmlFor={`start-${index}`} className='text-xs'>Start Time</Label>
+          <Label htmlFor={`start-${index}`} className='text-xs'>
+            Start Time
+          </Label>
           <Input id={`start-${index}`} value={interval.startTime} onChange={handleStart} placeholder='00:00' />
         </div>
         <div className='space-y-1'>
-          <Label htmlFor={`end-${index}`} className='text-xs'>End Time</Label>
+          <Label htmlFor={`end-${index}`} className='text-xs'>
+            End Time
+          </Label>
           <Input id={`end-${index}`} value={interval.endTime} onChange={handleEnd} placeholder='24:00' />
         </div>
       </div>
@@ -114,20 +124,17 @@ const WeekdayPicker = ({
   onToggle: (index: number, day: number) => void;
 }) => {
   const handlers = useMemo(
-    () => WEEKDAYS.map(day => () => { onToggle(intervalIndex, day.value); }),
+    () =>
+      WEEKDAYS.map(day => () => {
+        onToggle(intervalIndex, day.value);
+      }),
     [intervalIndex, onToggle],
   );
 
   return (
     <div className='flex flex-wrap gap-1'>
       {WEEKDAYS.map((day, i) => (
-        <Button
-          key={day.value}
-          type='button'
-          variant={weekdays.includes(day.value) ? 'default' : 'outline'}
-          size='xs'
-          onClick={handlers[i]}
-        >
+        <Button key={day.value} type='button' variant={weekdays.includes(day.value) ? 'default' : 'outline'} size='xs' onClick={handlers[i]}>
           {day.label}
         </Button>
       ))}
@@ -135,30 +142,19 @@ const WeekdayPicker = ({
   );
 };
 
-const MonthPicker = ({
-  months,
-  intervalIndex,
-  onToggle,
-}: {
-  months: number[];
-  intervalIndex: number;
-  onToggle: (index: number, month: number) => void;
-}) => {
+const MonthPicker = ({ months, intervalIndex, onToggle }: { months: number[]; intervalIndex: number; onToggle: (index: number, month: number) => void }) => {
   const handlers = useMemo(
-    () => MONTHS.map(month => () => { onToggle(intervalIndex, month.value); }),
+    () =>
+      MONTHS.map(month => () => {
+        onToggle(intervalIndex, month.value);
+      }),
     [intervalIndex, onToggle],
   );
 
   return (
     <div className='flex flex-wrap gap-1'>
       {MONTHS.map((month, i) => (
-        <Button
-          key={month.value}
-          type='button'
-          variant={months.includes(month.value) ? 'default' : 'outline'}
-          size='xs'
-          onClick={handlers[i]}
-        >
+        <Button key={month.value} type='button' variant={months.includes(month.value) ? 'default' : 'outline'} size='xs' onClick={handlers[i]}>
           {month.label}
         </Button>
       ))}
@@ -257,7 +253,9 @@ const NewMuteTimingPage = () => {
     }));
   }, []);
 
-  const handleCancel = useCallback(() => { void navigate({ to: '/alerting/mute-timings' }); }, [navigate]);
+  const handleCancel = useCallback(() => {
+    void navigate({ to: '/alerting/mute-timings' });
+  }, [navigate]);
 
   return (
     <form onSubmit={handleSubmit}>

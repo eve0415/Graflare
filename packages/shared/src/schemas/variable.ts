@@ -4,13 +4,7 @@ export const variableTypeSchema = z.enum(['query', 'custom', 'constant']);
 
 export type VariableType = z.infer<typeof variableTypeSchema>;
 
-export const variableSortSchema = z.enum([
-  'disabled',
-  'alphabetical-asc',
-  'alphabetical-desc',
-  'numerical-asc',
-  'numerical-desc',
-]);
+export const variableSortSchema = z.enum(['disabled', 'alphabetical-asc', 'alphabetical-desc', 'numerical-asc', 'numerical-desc']);
 
 export type VariableSort = z.infer<typeof variableSortSchema>;
 

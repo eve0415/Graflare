@@ -51,12 +51,7 @@ function hashLabels(labels: Record<string, string>): string {
   return sorted;
 }
 
-export function evaluateCondition(
-  data: PrometheusQueryData,
-  reducer: ConditionReducer,
-  operator: ConditionOperator,
-  threshold: number,
-): EvaluationResult[] {
+export function evaluateCondition(data: PrometheusQueryData, reducer: ConditionReducer, operator: ConditionOperator, threshold: number): EvaluationResult[] {
   const results: EvaluationResult[] = [];
 
   if (data.resultType === 'vector') {
@@ -64,8 +59,8 @@ export function evaluateCondition(
     for (const item of data.result) {
       if (typeof item !== 'object' || item === null) continue;
       if (!('metric' in item) || !('value' in item)) continue;
-      const {metric} = item;
-      const {value} = item;
+      const { metric } = item;
+      const { value } = item;
       if (typeof metric !== 'object' || metric === null) continue;
       if (!Array.isArray(value) || value.length < 2) continue;
       const numVal = Number.parseFloat(String(value[1]));
@@ -82,8 +77,8 @@ export function evaluateCondition(
     for (const item of data.result) {
       if (typeof item !== 'object' || item === null) continue;
       if (!('metric' in item) || !('values' in item)) continue;
-      const {metric} = item;
-      const {values} = item;
+      const { metric } = item;
+      const { values } = item;
       if (typeof metric !== 'object' || metric === null) continue;
       if (!Array.isArray(values)) continue;
       const numValues = values

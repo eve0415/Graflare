@@ -10,6 +10,7 @@ import { useCallback, useState } from 'react';
 import { restoreDashboardVersion } from '../-api';
 import { dashboardVersionsQueryOptions } from '../-queries';
 import { QueryBoundary } from '../../-root/query-boundary';
+
 import { VersionHistorySkeleton } from './version-history-skeleton';
 
 const versionHistoryFallback = <VersionHistorySkeleton />;
@@ -57,10 +58,19 @@ export const DashboardSettings = ({ open, onClose, dashboardId, title, descripti
     setDraftTags(e.target.value);
   }, []);
 
-  const handleOpenChange = useCallback((isOpen: boolean) => { if (!isOpen) onClose(); }, [onClose]);
+  const handleOpenChange = useCallback(
+    (isOpen: boolean) => {
+      if (!isOpen) onClose();
+    },
+    [onClose],
+  );
 
-  const showGeneral = useCallback(() => { setTab('general'); }, []);
-  const showVersions = useCallback(() => { setTab('versions'); }, []);
+  const showGeneral = useCallback(() => {
+    setTab('general');
+  }, []);
+  const showVersions = useCallback(() => {
+    setTab('versions');
+  }, []);
 
   return (
     <Dialog open={open} onOpenChange={handleOpenChange}>
@@ -105,7 +115,9 @@ export const DashboardSettings = ({ open, onClose, dashboardId, title, descripti
             <Separator />
 
             <div className='flex justify-end gap-2'>
-              <Button variant='outline' onClick={onClose}>Cancel</Button>
+              <Button variant='outline' onClick={onClose}>
+                Cancel
+              </Button>
               <Button onClick={handleSave}>Save</Button>
             </div>
           </div>
@@ -121,32 +133,27 @@ export const DashboardSettings = ({ open, onClose, dashboardId, title, descripti
   );
 };
 
-const VersionHistory = ({
-  dashboardId,
-  onRestore,
-  onClose,
-}: {
-  dashboardId: string;
-  onRestore?: (() => void) | undefined;
-  onClose: () => void;
-}) => {
+const VersionHistory = ({ dashboardId, onRestore, onClose }: { dashboardId: string; onRestore?: (() => void) | undefined; onClose: () => void }) => {
   const { data: versions } = useSuspenseQuery(dashboardVersionsQueryOptions(dashboardId));
 
   const [restoring, setRestoring] = useState<number | null>(null);
 
-  const handleRestore = useCallback((version: number) => {
-    const run = async () => {
-      setRestoring(version);
-      try {
-        await restoreDashboardVersion({ data: { dashboardId, version } });
-        onRestore?.();
-        onClose();
-      } finally {
-        setRestoring(null);
-      }
-    };
-    void run();
-  }, [dashboardId, onRestore, onClose]);
+  const handleRestore = useCallback(
+    (version: number) => {
+      const run = async () => {
+        setRestoring(version);
+        try {
+          await restoreDashboardVersion({ data: { dashboardId, version } });
+          onRestore?.();
+          onClose();
+        } finally {
+          setRestoring(null);
+        }
+      };
+      void run();
+    },
+    [dashboardId, onRestore, onClose],
+  );
 
   if (versions.length === 0) {
     return <p className='text-muted-foreground py-4 text-center text-sm'>No version history available.</p>;
@@ -181,12 +188,7 @@ const VersionRow = ({
         {version.message && <span className='text-muted-foreground ml-2 text-xs'>{version.message}</span>}
         {version.createdBy && <span className='text-muted-foreground ml-2 text-xs'>by {version.createdBy}</span>}
       </div>
-      <Button
-        variant='ghost'
-        size='xs'
-        onClick={handleClick}
-        disabled={restoring !== null}
-      >
+      <Button variant='ghost' size='xs' onClick={handleClick} disabled={restoring !== null}>
         <RotateCcw className='mr-1 h-3 w-3' />
         {restoring === version.version ? 'Restoring...' : 'Restore'}
       </Button>

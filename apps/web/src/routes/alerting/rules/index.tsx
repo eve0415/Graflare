@@ -58,9 +58,7 @@ const AlertRulesListPage = () => {
       ) : (
         Array.from(rulesByGroup.entries()).map(([groupId, groupRules]) => (
           <div key={groupId} className='space-y-2'>
-            <h3 className='text-sm font-medium text-muted-foreground'>
-              {groupMap.get(groupId) ?? 'Unknown Group'}
-            </h3>
+            <h3 className='text-muted-foreground text-sm font-medium'>{groupMap.get(groupId) ?? 'Unknown Group'}</h3>
             <Table>
               <TableHeader>
                 <TableRow>
@@ -75,13 +73,9 @@ const AlertRulesListPage = () => {
                   <TableRow key={rule.id}>
                     <TableCell className='font-medium'>{rule.title}</TableCell>
                     <TableCell>
-                      <Badge variant={rule.isPaused ? 'secondary' : 'default'}>
-                        {rule.isPaused ? 'Paused' : 'Active'}
-                      </Badge>
+                      <Badge variant={rule.isPaused ? 'secondary' : 'default'}>{rule.isPaused ? 'Paused' : 'Active'}</Badge>
                     </TableCell>
-                    <TableCell className='text-muted-foreground text-sm'>
-                      {rule.forDurationS}s
-                    </TableCell>
+                    <TableCell className='text-muted-foreground text-sm'>{rule.forDurationS}s</TableCell>
                     <TableCell>
                       <Button variant='ghost' size='xs'>
                         Edit
@@ -100,10 +94,7 @@ const AlertRulesListPage = () => {
 
 export const Route = createFileRoute('/alerting/rules/')({
   loader: ({ context }) =>
-    Promise.all([
-      context.queryClient.ensureQueryData(alertRulesQueryOptions()),
-      context.queryClient.ensureQueryData(alertRuleGroupsQueryOptions()),
-    ]),
+    Promise.all([context.queryClient.ensureQueryData(alertRulesQueryOptions()), context.queryClient.ensureQueryData(alertRuleGroupsQueryOptions())]),
   pendingComponent: AlertRulesListSkeleton,
   component: AlertRulesListPage,
 });

@@ -17,9 +17,7 @@ const NotificationsLayout = () => {
               key={tab.to}
               to={tab.to}
               className={`rounded-md px-3 py-1.5 text-sm font-medium transition-colors ${
-                isActive
-                  ? 'bg-primary text-primary-foreground'
-                  : 'text-muted-foreground hover:text-foreground hover:bg-muted'
+                isActive ? 'bg-primary text-primary-foreground' : 'text-muted-foreground hover:text-foreground hover:bg-muted'
               }`}
             >
               {tab.label}

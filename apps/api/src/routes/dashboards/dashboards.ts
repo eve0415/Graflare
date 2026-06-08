@@ -1,11 +1,6 @@
 import type { AppEnv } from '../../index';
 
-import {
-  createDashboardSchema,
-  dashboardIdParamSchema,
-  dashboardListQuerySchema,
-  updateDashboardSchema,
-} from '@graflare/shared/schemas/dashboard';
+import { createDashboardSchema, dashboardIdParamSchema, dashboardListQuerySchema, updateDashboardSchema } from '@graflare/shared/schemas/dashboard';
 import { sValidator } from '@hono/standard-validator';
 import { and, eq, like } from 'drizzle-orm';
 import { Hono } from 'hono';
@@ -49,7 +44,7 @@ app.get('/', sValidator('query', dashboardListQuerySchema, onValidationError), a
     .where(and(...conditions));
 
   if (query.tag !== undefined) {
-    const {tag} = query;
+    const { tag } = query;
     rows = rows.filter(r => r.tags.includes(tag));
   }
 
@@ -151,9 +146,16 @@ app.put('/:id', sValidator('param', dashboardIdParamSchema, onValidationError), 
   if (updates.variables !== undefined) setData['variables'] = updates.variables;
   if (updates.timeRange !== undefined) setData['timeRange'] = updates.timeRange;
 
-  await db.update(dashboards).set(setData).where(and(eq(dashboards.id, id), eq(dashboards.orgId, orgId)));
+  await db
+    .update(dashboards)
+    .set(setData)
+    .where(and(eq(dashboards.id, id), eq(dashboards.orgId, orgId)));
 
-  const updated = await db.select().from(dashboards).where(and(eq(dashboards.id, id), eq(dashboards.orgId, orgId))).limit(1);
+  const updated = await db
+    .select()
+    .from(dashboards)
+    .where(and(eq(dashboards.id, id), eq(dashboards.orgId, orgId)))
+    .limit(1);
 
   const versionId = crypto.randomUUID();
   await db.insert(dashboardVersions).values({
