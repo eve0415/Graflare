@@ -2,8 +2,10 @@ import type { AlertEmailData } from './templates/alert-email';
 import type { ContactPointSettings } from '@graflare/shared/schemas/alerting';
 import type { WorkflowEvent, WorkflowStep } from 'cloudflare:workers';
 
+import { buildDiscordPayload } from '@graflare/shared/alerting/discord-payload';
 import { matchLabels } from '@graflare/shared/alerting/matchers';
 import { isMuted } from '@graflare/shared/alerting/mute-check';
+import { buildSlackPayload } from '@graflare/shared/alerting/slack-payload';
 import { buildWebhookPayload } from '@graflare/shared/alerting/webhook-payload';
 import { contactPointSettingsSchema, labelMatchersSchema, labelsMapSchema, muteTimeIntervalsSchema, stringListSchema } from '@graflare/shared/schemas/alerting';
 import { WorkflowEntrypoint } from 'cloudflare:workers';
@@ -152,54 +154,99 @@ export class NotificationWorkflow extends WorkflowEntrypoint<Env, NotificationWo
     const { settings } = contactPoint;
 
     await step.do('deliver', { retries: { limit: 5, delay: '10 seconds', backoff: 'exponential' } }, async () => {
-      if (settings.type === 'webhook') {
-        const payloadAlerts = filteredAlerts.map(a => ({
-          state: a.state,
-          labels: { ...params.ruleLabels, ...a.labels },
-          annotations: params.ruleAnnotations,
-          value: a.value,
-          activeAt: a.activeAt,
-          fingerprint: a.labelsHash,
-          generatorURL: `${params.externalURL}/alerting/rules`,
-        }));
+      // Shared payload shape for the HTTP-based receivers (webhook/slack/discord).
+      const payloadAlerts = filteredAlerts.map(a => ({
+        state: a.state,
+        labels: { ...params.ruleLabels, ...a.labels },
+        annotations: params.ruleAnnotations,
+        value: a.value,
+        activeAt: a.activeAt,
+        fingerprint: a.labelsHash,
+        generatorURL: `${params.externalURL}/alerting/rules`,
+      }));
 
-        const payload = buildWebhookPayload(payloadAlerts, contactPoint.name, params.externalURL);
+      const encryptionKey = this.env.ENCRYPTION_KEY;
 
-        const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+      switch (settings.type) {
+        case 'webhook': {
+          const payload = buildWebhookPayload(payloadAlerts, contactPoint.name, params.externalURL);
 
-        if (settings.password.length > 0) {
-          const decryptedPass = await decryptCredentials(settings.password, this.env.ENCRYPTION_KEY);
-          headers['Authorization'] = `Basic ${btoa(`${settings.username}:${decryptedPass}`)}`;
+          const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+
+          if (settings.password.length > 0) {
+            const decryptedPass = await decryptCredentials(settings.password, encryptionKey);
+            headers['Authorization'] = `Basic ${btoa(`${settings.username}:${decryptedPass}`)}`;
+          }
+
+          const res = await fetch(settings.url, { method: settings.method, headers, body: JSON.stringify(payload) });
+          if (!res.ok) {
+            throw new Error(`Webhook delivery failed: ${res.status}`);
+          }
+          return;
         }
 
-        const res = await fetch(settings.url, { method: settings.method, headers, body: JSON.stringify(payload) });
-        if (!res.ok) {
-          throw new Error(`Webhook delivery failed: ${res.status}`);
+        case 'slack': {
+          if (settings.webhookUrl.length === 0) return;
+          const url = await decryptCredentials(settings.webhookUrl, encryptionKey);
+          const payload = buildSlackPayload(payloadAlerts, contactPoint.name, params.externalURL, {
+            channel: settings.channel,
+            username: settings.username,
+          });
+
+          const res = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
+          if (!res.ok) {
+            throw new Error(`Slack delivery failed: ${res.status}`);
+          }
+          return;
         }
-      } else {
-        if (settings.addresses.length === 0) return;
 
-        const emailAlerts: AlertEmailData[] = filteredAlerts.map(a => ({
-          ruleName: params.ruleName,
-          state: a.state === 'Firing' ? 'Firing' : 'Resolved',
-          labels: { ...params.ruleLabels, ...a.labels },
-          value: a.value,
-          startsAt: a.activeAt === null ? 'N/A' : new Date(a.activeAt).toISOString(),
-          externalURL: params.externalURL,
-        }));
+        case 'discord': {
+          if (settings.webhookUrl.length === 0) return;
+          const url = await decryptCredentials(settings.webhookUrl, encryptionKey);
+          const payload = buildDiscordPayload(payloadAlerts, contactPoint.name, params.externalURL, {
+            username: settings.username,
+            avatarUrl: settings.avatarUrl,
+          });
 
-        const html = renderAlertEmailHtml(emailAlerts);
-        const text = renderAlertEmailText(emailAlerts);
-        const hasFiring = filteredAlerts.some(a => a.state === 'Firing');
-        const subject = `[${hasFiring ? 'FIRING' : 'RESOLVED'}] ${params.ruleName}`;
+          const res = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
+          if (!res.ok) {
+            throw new Error(`Discord delivery failed: ${res.status}`);
+          }
+          return;
+        }
 
-        await this.env.EMAIL.send({
-          to: settings.addresses,
-          from: { email: 'alerts@graflare.dev', name: 'Graflare Alerts' },
-          subject,
-          html,
-          text,
-        });
+        case 'email': {
+          if (settings.addresses.length === 0) return;
+
+          const emailAlerts: AlertEmailData[] = filteredAlerts.map(a => ({
+            ruleName: params.ruleName,
+            state: a.state === 'Firing' ? 'Firing' : 'Resolved',
+            labels: { ...params.ruleLabels, ...a.labels },
+            value: a.value,
+            startsAt: a.activeAt === null ? 'N/A' : new Date(a.activeAt).toISOString(),
+            externalURL: params.externalURL,
+          }));
+
+          const html = renderAlertEmailHtml(emailAlerts);
+          const text = renderAlertEmailText(emailAlerts);
+          const hasFiring = filteredAlerts.some(a => a.state === 'Firing');
+          const subject = `[${hasFiring ? 'FIRING' : 'RESOLVED'}] ${params.ruleName}`;
+
+          await this.env.EMAIL.send({
+            to: settings.addresses,
+            from: { email: 'alerts@graflare.dev', name: 'Graflare Alerts' },
+            subject,
+            html,
+            text,
+          });
+          return;
+        }
+
+        default: {
+          // Exhaustiveness guard: a new contact-point type must add a branch above.
+          const _exhaustive: never = settings;
+          throw new Error(`Unsupported contact point type: ${JSON.stringify(_exhaustive)}`);
+        }
       }
     });
 

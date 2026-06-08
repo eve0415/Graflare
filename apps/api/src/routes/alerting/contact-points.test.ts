@@ -1,4 +1,5 @@
 import type { AppEnv } from '../../index';
+import type { ContactPointSettings } from '@graflare/shared/schemas/alerting';
 
 import { env } from 'cloudflare:workers';
 import { eq } from 'drizzle-orm';
@@ -47,12 +48,35 @@ const readId = (value: unknown): string => {
 };
 
 /** Asserts the value is a webhook settings object and returns its password. */
-const webhookPassword = (
-  settings: { type: 'email'; addresses: string[] } | { type: 'webhook'; url: string; method: 'POST' | 'PUT'; username: string; password: string } | undefined,
-): string => {
+const webhookPassword = (settings: ContactPointSettings | undefined): string => {
   if (settings?.type !== 'webhook') throw new Error('expected webhook settings');
   return settings.password;
 };
+
+/** Asserts the value is slack/discord settings and returns its webhookUrl (the secret). */
+const webhookUrlOf = (settings: ContactPointSettings | undefined): string => {
+  if (settings?.type !== 'slack' && settings?.type !== 'discord') throw new Error('expected slack/discord settings');
+  return settings.webhookUrl;
+};
+
+/** Extracts settings.webhookUrl from a parsed contact-point value (response body or list item). */
+const extractWebhookUrl = (value: unknown): string => {
+  if (
+    typeof value !== 'object' ||
+    value === null ||
+    !('settings' in value) ||
+    typeof value.settings !== 'object' ||
+    value.settings === null ||
+    !('webhookUrl' in value.settings) ||
+    typeof value.settings.webhookUrl !== 'string'
+  ) {
+    throw new Error('bad shape: missing settings.webhookUrl string');
+  }
+  return value.settings.webhookUrl;
+};
+
+/** Returns the settings.webhookUrl from a slack/discord contact-point response body. */
+const readWebhookUrl = async (res: Response): Promise<string> => extractWebhookUrl(await res.json());
 
 /** Returns the password field from a webhook contact-point response body. */
 const readWebhookPassword = async (res: Response): Promise<string> => {
@@ -262,6 +286,111 @@ describe('contact-point routes', () => {
     const storedAfter = webhookPassword(after[0]?.settings);
     expect(storedAfter).not.toBe(storedBefore);
     expect(storedAfter).not.toBe('rotated');
+    expect(storedAfter).not.toBe('******');
+  });
+
+  it('encrypts and redacts the slack webhookUrl on create + read paths (GET + list)', async () => {
+    const app = createApp();
+    const createRes = await app.request(
+      req('/', json({ name: 'Slack', type: 'slack', settings: { type: 'slack', webhookUrl: 'https://hooks.slack.com/services/T/B/x', channel: '#ops' } })),
+      {},
+      testBindings,
+    );
+    expect(createRes.status).toBe(201);
+    const createBody: unknown = await createRes.json();
+    const id = readId(createBody);
+    // Create response must already be redacted, never the cleartext URL.
+    expect(extractWebhookUrl(createBody)).toBe('******');
+
+    // Stored value must be ciphertext, not cleartext and not the sentinel.
+    const db = createDb(env.DB);
+    const [stored] = await db.select().from(contactPoints).where(eq(contactPoints.id, id));
+    const storedUrl = webhookUrlOf(stored?.settings);
+    expect(storedUrl).not.toBe('https://hooks.slack.com/services/T/B/x');
+    expect(storedUrl).not.toBe('******');
+
+    // GET by id is redacted.
+    const getRes = await app.request(req(`/${id}`), {}, testBindings);
+    expect(await readWebhookUrl(getRes)).toBe('******');
+
+    // LIST is redacted.
+    const listRes = await app.request(req('/'), {}, testBindings);
+    const [firstItem] = await parseJsonArray(listRes);
+    expect(extractWebhookUrl(firstItem)).toBe('******');
+  });
+
+  it('redacts the discord webhookUrl on the read path', async () => {
+    const app = createApp();
+    const createRes = await app.request(
+      req('/', json({ name: 'Discord', type: 'discord', settings: { type: 'discord', webhookUrl: 'https://discord.com/api/webhooks/1/secret' } })),
+      {},
+      testBindings,
+    );
+    expect(createRes.status).toBe(201);
+    const id = readId(await createRes.json());
+
+    const getRes = await app.request(req(`/${id}`), {}, testBindings);
+    expect(await readWebhookUrl(getRes)).toBe('******');
+  });
+
+  it('preserves the encrypted slack webhookUrl when the form resubmits the sentinel', async () => {
+    const app = createApp();
+    const createRes = await app.request(
+      req('/', json({ name: 'Slack', type: 'slack', settings: { type: 'slack', webhookUrl: 'https://hooks.slack.com/services/T/B/x' } })),
+      {},
+      testBindings,
+    );
+    const id = readId(await createRes.json());
+
+    const db = createDb(env.DB);
+    const before = await db.select().from(contactPoints).where(eq(contactPoints.id, id));
+    const storedBefore = webhookUrlOf(before[0]?.settings);
+
+    // Edit resends the unchanged URL as the sentinel; only the channel changes.
+    const res = await app.request(
+      req(`/${id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ settings: { type: 'slack', webhookUrl: '******', channel: '#changed' } }),
+      }),
+      {},
+      testBindings,
+    );
+    expect(res.status).toBe(200);
+
+    const after = await db.select().from(contactPoints).where(eq(contactPoints.id, id));
+    // Stored ciphertext untouched — sentinel must NOT be encrypted.
+    expect(webhookUrlOf(after[0]?.settings)).toBe(storedBefore);
+  });
+
+  it('re-encrypts the discord webhookUrl when the form submits a real new value', async () => {
+    const app = createApp();
+    const createRes = await app.request(
+      req('/', json({ name: 'Discord', type: 'discord', settings: { type: 'discord', webhookUrl: 'https://discord.com/api/webhooks/1/old' } })),
+      {},
+      testBindings,
+    );
+    const id = readId(await createRes.json());
+
+    const db = createDb(env.DB);
+    const before = await db.select().from(contactPoints).where(eq(contactPoints.id, id));
+    const storedBefore = webhookUrlOf(before[0]?.settings);
+
+    const res = await app.request(
+      req(`/${id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ settings: { type: 'discord', webhookUrl: 'https://discord.com/api/webhooks/1/new' } }),
+      }),
+      {},
+      testBindings,
+    );
+    expect(res.status).toBe(200);
+
+    const after = await db.select().from(contactPoints).where(eq(contactPoints.id, id));
+    const storedAfter = webhookUrlOf(after[0]?.settings);
+    expect(storedAfter).not.toBe(storedBefore);
+    expect(storedAfter).not.toBe('https://discord.com/api/webhooks/1/new');
     expect(storedAfter).not.toBe('******');
   });
 

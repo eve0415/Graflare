@@ -9,7 +9,7 @@ import { Link } from '@tanstack/react-router';
 import { Plus, Trash2 } from 'lucide-react';
 import { useCallback, useState } from 'react';
 
-type ContactPointType = 'email' | 'webhook';
+type ContactPointType = 'email' | 'webhook' | 'slack' | 'discord';
 type WebhookMethod = 'POST' | 'PUT';
 
 interface EmailForm {
@@ -25,18 +25,34 @@ interface WebhookForm {
   password: string;
 }
 
-export interface FormState {
-  name: string;
-  settings: EmailForm | WebhookForm;
+interface SlackForm {
+  type: 'slack';
+  webhookUrl: string;
+  channel: string;
+  username: string;
 }
 
-const isContactPointType = (v: string): v is ContactPointType => v === 'email' || v === 'webhook';
+interface DiscordForm {
+  type: 'discord';
+  webhookUrl: string;
+  username: string;
+  avatarUrl: string;
+}
+
+export interface FormState {
+  name: string;
+  settings: EmailForm | WebhookForm | SlackForm | DiscordForm;
+}
+
+const isContactPointType = (v: string): v is ContactPointType => v === 'email' || v === 'webhook' || v === 'slack' || v === 'discord';
 
 const isWebhookMethod = (v: string): v is WebhookMethod => v === 'POST' || v === 'PUT';
 
 const CONTACT_POINT_TYPE_OPTIONS = [
   { value: 'email', label: 'Email' },
   { value: 'webhook', label: 'Webhook' },
+  { value: 'slack', label: 'Slack' },
+  { value: 'discord', label: 'Discord' },
 ] as const;
 
 const WEBHOOK_METHOD_OPTIONS = [
@@ -49,16 +65,50 @@ export const defaultContactPointForm: FormState = {
   settings: { type: 'email', addresses: [''] },
 };
 
-/** Maps a loaded contact point into form state, keeping settings exactly as returned (webhook password is the '******' sentinel when set). */
+/** Maps a loaded contact point into form state, keeping settings exactly as returned (the stored secret is the '******' sentinel when set). */
 export const contactPointToForm = (cp: Pick<ContactPoint, 'name' | 'settings'>): FormState => {
   const { settings } = cp;
-  if (settings.type === 'email') {
-    return { name: cp.name, settings: { type: 'email', addresses: settings.addresses.length > 0 ? settings.addresses : [''] } };
+  switch (settings.type) {
+    case 'email':
+      return { name: cp.name, settings: { type: 'email', addresses: settings.addresses.length > 0 ? settings.addresses : [''] } };
+    case 'webhook':
+      return {
+        name: cp.name,
+        settings: { type: 'webhook', url: settings.url, method: settings.method, username: settings.username, password: settings.password },
+      };
+    case 'slack':
+      return { name: cp.name, settings: { type: 'slack', webhookUrl: settings.webhookUrl, channel: settings.channel, username: settings.username } };
+    case 'discord':
+      return { name: cp.name, settings: { type: 'discord', webhookUrl: settings.webhookUrl, username: settings.username, avatarUrl: settings.avatarUrl } };
   }
-  return {
-    name: cp.name,
-    settings: { type: 'webhook', url: settings.url, method: settings.method, username: settings.username, password: settings.password },
-  };
+};
+
+/** Initial empty form settings for a freshly-selected type. Exhaustive — a new type is a compile error here. */
+const defaultSettingsFor = (type: ContactPointType): FormState['settings'] => {
+  switch (type) {
+    case 'email':
+      return { type: 'email', addresses: [''] };
+    case 'webhook':
+      return { type: 'webhook', url: '', method: 'POST', username: '', password: '' };
+    case 'slack':
+      return { type: 'slack', webhookUrl: '', channel: '', username: '' };
+    case 'discord':
+      return { type: 'discord', webhookUrl: '', username: '', avatarUrl: '' };
+  }
+};
+
+/** Maps the discriminated form settings to the API payload. Exhaustive — a new type is a compile error here. */
+const formSettingsToPayload = (settings: FormState['settings']): CreateContactPoint['settings'] => {
+  switch (settings.type) {
+    case 'email':
+      return { type: 'email', addresses: settings.addresses.filter(a => a.trim() !== '') };
+    case 'webhook':
+      return { type: 'webhook', url: settings.url, method: settings.method, username: settings.username, password: settings.password };
+    case 'slack':
+      return { type: 'slack', webhookUrl: settings.webhookUrl, channel: settings.channel, username: settings.username };
+    case 'discord':
+      return { type: 'discord', webhookUrl: settings.webhookUrl, username: settings.username, avatarUrl: settings.avatarUrl };
+  }
 };
 
 const AddressRow = ({
@@ -115,15 +165,7 @@ export const ContactPointForm = ({ initialForm, submitLabel, onSubmit }: Props) 
       const run = async () => {
         setSubmitting(true);
         try {
-          const { settings } = form;
-          await onSubmit({
-            name: form.name,
-            type: settings.type,
-            settings:
-              settings.type === 'email'
-                ? { type: 'email', addresses: settings.addresses.filter(a => a.trim() !== '') }
-                : { type: 'webhook', url: settings.url, method: settings.method, username: settings.username, password: settings.password },
-          });
+          await onSubmit({ name: form.name, type: form.settings.type, settings: formSettingsToPayload(form.settings) });
         } finally {
           setSubmitting(false);
         }
@@ -139,13 +181,8 @@ export const ContactPointForm = ({ initialForm, submitLabel, onSubmit }: Props) 
   }, []);
 
   const handleTypeChange = useCallback((value: string | null) => {
-    if (value !== null && isContactPointType(value)) {
-      if (value === 'email') {
-        setForm(prev => ({ ...prev, settings: { type: 'email', addresses: [''] } }));
-      } else {
-        setForm(prev => ({ ...prev, settings: { type: 'webhook', url: '', method: 'POST', username: '', password: '' } }));
-      }
-    }
+    if (value === null || !isContactPointType(value)) return;
+    setForm(prev => ({ ...prev, settings: defaultSettingsFor(value) }));
   }, []);
 
   const handleAddAddress = useCallback(() => {
@@ -205,6 +242,54 @@ export const ContactPointForm = ({ initialForm, submitLabel, onSubmit }: Props) 
     setForm(prev => {
       if (prev.settings.type !== 'webhook') return prev;
       return { ...prev, settings: { ...prev.settings, password: value } };
+    });
+  }, []);
+
+  const handleSlackWebhookUrlChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+    const { value } = e.target;
+    setForm(prev => {
+      if (prev.settings.type !== 'slack') return prev;
+      return { ...prev, settings: { ...prev.settings, webhookUrl: value } };
+    });
+  }, []);
+
+  const handleSlackChannelChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+    const { value } = e.target;
+    setForm(prev => {
+      if (prev.settings.type !== 'slack') return prev;
+      return { ...prev, settings: { ...prev.settings, channel: value } };
+    });
+  }, []);
+
+  const handleSlackUsernameChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+    const { value } = e.target;
+    setForm(prev => {
+      if (prev.settings.type !== 'slack') return prev;
+      return { ...prev, settings: { ...prev.settings, username: value } };
+    });
+  }, []);
+
+  const handleDiscordWebhookUrlChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+    const { value } = e.target;
+    setForm(prev => {
+      if (prev.settings.type !== 'discord') return prev;
+      return { ...prev, settings: { ...prev.settings, webhookUrl: value } };
+    });
+  }, []);
+
+  const handleDiscordUsernameChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+    const { value } = e.target;
+    setForm(prev => {
+      if (prev.settings.type !== 'discord') return prev;
+      return { ...prev, settings: { ...prev.settings, username: value } };
+    });
+  }, []);
+
+  const handleDiscordAvatarUrlChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+    const { value } = e.target;
+    setForm(prev => {
+      if (prev.settings.type !== 'discord') return prev;
+      return { ...prev, settings: { ...prev.settings, avatarUrl: value } };
     });
   }, []);
 
@@ -294,6 +379,56 @@ export const ContactPointForm = ({ initialForm, submitLabel, onSubmit }: Props) 
                 <Label htmlFor='webhookPassword'>Password (optional)</Label>
                 <Input id='webhookPassword' type='password' value={form.settings.password} onChange={handleWebhookPasswordChange} />
                 {isEdit && <p className='text-muted-foreground text-xs'>Leave as ****** to keep the current password.</p>}
+              </div>
+            </>
+          )}
+
+          {form.settings.type === 'slack' && (
+            <>
+              <div className='space-y-2'>
+                <Label htmlFor='slackWebhookUrl'>Webhook URL</Label>
+                <Input
+                  id='slackWebhookUrl'
+                  type='text'
+                  value={form.settings.webhookUrl}
+                  onChange={handleSlackWebhookUrlChange}
+                  placeholder='https://hooks.slack.com/services/...'
+                  required
+                />
+                {isEdit && <p className='text-muted-foreground text-xs'>Leave as ****** to keep the current URL.</p>}
+              </div>
+              <div className='space-y-2'>
+                <Label htmlFor='slackChannel'>Channel (optional)</Label>
+                <Input id='slackChannel' value={form.settings.channel} onChange={handleSlackChannelChange} placeholder='#alerts' />
+              </div>
+              <div className='space-y-2'>
+                <Label htmlFor='slackUsername'>Username (optional)</Label>
+                <Input id='slackUsername' value={form.settings.username} onChange={handleSlackUsernameChange} placeholder='Graflare' />
+              </div>
+            </>
+          )}
+
+          {form.settings.type === 'discord' && (
+            <>
+              <div className='space-y-2'>
+                <Label htmlFor='discordWebhookUrl'>Webhook URL</Label>
+                <Input
+                  id='discordWebhookUrl'
+                  type='text'
+                  value={form.settings.webhookUrl}
+                  onChange={handleDiscordWebhookUrlChange}
+                  placeholder='https://discord.com/api/webhooks/...'
+                  required
+                />
+                {isEdit && <p className='text-muted-foreground text-xs'>Leave as ****** to keep the current URL.</p>}
+              </div>
+              <div className='space-y-2'>
+                <Label htmlFor='discordUsername'>Username (optional)</Label>
+                <Input id='discordUsername' value={form.settings.username} onChange={handleDiscordUsernameChange} placeholder='Graflare' />
+              </div>
+              <div className='space-y-2'>
+                <Label htmlFor='discordAvatarUrl'>Avatar URL (optional)</Label>
+                <Input id='discordAvatarUrl' type='text' value={form.settings.avatarUrl} onChange={handleDiscordAvatarUrlChange} placeholder='https://...' />
               </div>
             </>
           )}

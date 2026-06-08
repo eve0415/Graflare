@@ -44,7 +44,7 @@ export type ExecErrState = z.infer<typeof execErrState>;
 export const alertInstanceState = z.enum(['Normal', 'Pending', 'Firing', 'Resolved']);
 export type AlertInstanceState = z.infer<typeof alertInstanceState>;
 
-export const contactPointType = z.enum(['email', 'webhook']);
+export const contactPointType = z.enum(['email', 'webhook', 'slack', 'discord']);
 export type ContactPointType = z.infer<typeof contactPointType>;
 
 const emailContactSettings = z.object({
@@ -60,7 +60,24 @@ const webhookContactSettings = z.object({
   password: z._default(z.string().check(z.maxLength(1024)), ''),
 });
 
-export const contactPointSettingsSchema = z.union([emailContactSettings, webhookContactSettings]);
+// webhookUrl is the secret: it holds AES ciphertext at rest and must round-trip the
+// '******' redaction sentinel on edit, so it is a plain bounded string (not z.url()).
+// URL-shape validation belongs at the form layer, where the value is always cleartext.
+const slackContactSettings = z.object({
+  type: z.literal('slack'),
+  webhookUrl: z.string().check(z.maxLength(2048)),
+  channel: z._default(z.string().check(z.maxLength(256)), ''),
+  username: z._default(z.string().check(z.maxLength(256)), ''),
+});
+
+const discordContactSettings = z.object({
+  type: z.literal('discord'),
+  webhookUrl: z.string().check(z.maxLength(2048)),
+  username: z._default(z.string().check(z.maxLength(256)), ''),
+  avatarUrl: z._default(z.string().check(z.maxLength(2048)), ''),
+});
+
+export const contactPointSettingsSchema = z.union([emailContactSettings, webhookContactSettings, slackContactSettings, discordContactSettings]);
 export type ContactPointSettings = z.infer<typeof contactPointSettingsSchema>;
 
 export const muteTimeIntervalSchema = z.object({

@@ -15,6 +15,9 @@ export const secretOf = (s: ContactPointSettings): string | null => {
       return null;
     case 'webhook':
       return s.password;
+    case 'slack':
+    case 'discord':
+      return s.webhookUrl;
   }
 };
 
@@ -25,6 +28,9 @@ export const withSecret = (s: ContactPointSettings, secret: string): ContactPoin
       return s;
     case 'webhook':
       return { ...s, password: secret };
+    case 'slack':
+    case 'discord':
+      return { ...s, webhookUrl: secret };
   }
 };
 

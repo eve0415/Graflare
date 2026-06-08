@@ -34,6 +34,12 @@ const webhookPassword = (settings: ContactPointSettings | undefined): string => 
   return settings.password;
 };
 
+/** Asserts the value is slack/discord settings and returns its (stored) webhookUrl. */
+const webhookUrlOf = (settings: ContactPointSettings | undefined): string => {
+  if (settings?.type !== 'slack' && settings?.type !== 'discord') throw new Error('expected slack/discord settings');
+  return settings.webhookUrl;
+};
+
 const newWebhook = (password: string): CreateWebhookInput => ({
   name: 'Hook',
   type: 'webhook',
@@ -107,5 +113,35 @@ describe('contact-point RPC secret handling', () => {
 
     const listed = await api.listContactPoints('jwt');
     expect(webhookPassword(listed[0]?.settings)).toBe('******');
+  });
+
+  it('redacts the slack webhookUrl on the RPC read paths and never returns cleartext', async () => {
+    const api = makeApi();
+    const created = must(
+      await api.createContactPoint('jwt', {
+        name: 'Slack',
+        type: 'slack',
+        settings: { type: 'slack', webhookUrl: 'https://hooks.slack.com/services/T/B/x', channel: '#ops', username: '' },
+      }),
+    );
+    const { id } = created;
+
+    expect(webhookUrlOf(created.settings)).toBe('******');
+    expect(webhookUrlOf(must(await api.getContactPoint('jwt', id)).settings)).toBe('******');
+    const listed = await api.listContactPoints('jwt');
+    expect(webhookUrlOf(listed[0]?.settings)).toBe('******');
+  });
+
+  it('redacts the discord webhookUrl on the RPC read paths and never returns cleartext', async () => {
+    const api = makeApi();
+    const created = must(
+      await api.createContactPoint('jwt', {
+        name: 'Discord',
+        type: 'discord',
+        settings: { type: 'discord', webhookUrl: 'https://discord.com/api/webhooks/1/secret', username: '', avatarUrl: '' },
+      }),
+    );
+    expect(webhookUrlOf(created.settings)).toBe('******');
+    expect(webhookUrlOf(must(await api.getContactPoint('jwt', created.id)).settings)).toBe('******');
   });
 });
