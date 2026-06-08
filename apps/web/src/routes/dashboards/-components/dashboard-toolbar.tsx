@@ -63,7 +63,7 @@ export const DashboardToolbar = ({
 
   return (
     <div className='flex items-center justify-between border-b px-4 py-2'>
-      <h2 className='text-lg font-semibold'>{title}</h2>
+      <h1 className='text-lg font-semibold'>{title}</h1>
 
       <div className='flex items-center gap-2'>
         <TimeRangePicker value={timeRange} onChange={onTimeRangeChange} />
