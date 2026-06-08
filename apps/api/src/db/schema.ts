@@ -1,4 +1,4 @@
-import type { AlertCondition, AlertQuery, ContactPointSettings, LabelMatcher, MuteTimeInterval } from '@graflare/shared/schemas/alerting';
+import type { AlertCondition, AlertQuery, ContactPointSettings, ExecErrState, LabelMatcher, MuteTimeInterval, NoDataState } from '@graflare/shared/schemas/alerting';
 import type { Panel } from '@graflare/shared/schemas/panel';
 import type { Variable } from '@graflare/shared/schemas/variable';
 
@@ -100,8 +100,8 @@ export const alertRules = sqliteTable(
     labels: text('labels', { mode: 'json' }).notNull().$type<Record<string, string>>().default({}),
     annotations: text('annotations', { mode: 'json' }).notNull().$type<Record<string, string>>().default({}),
     forDurationS: integer('for_duration_s').notNull().default(0),
-    noDataState: text('no_data_state').notNull().default('Alerting'),
-    execErrState: text('exec_err_state').notNull().default('Alerting'),
+    noDataState: text('no_data_state').notNull().$type<NoDataState>().default('Alerting'),
+    execErrState: text('exec_err_state').notNull().$type<ExecErrState>().default('Alerting'),
     isPaused: integer('is_paused', { mode: 'boolean' }).notNull().default(false),
     createdAt: integer('created_at', { mode: 'timestamp_ms' }).notNull(),
     updatedAt: integer('updated_at', { mode: 'timestamp_ms' }).notNull(),
