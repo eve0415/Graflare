@@ -11,9 +11,12 @@ import { createDb } from '../../db';
 import { contactPoints } from '../../db/schema';
 import { onValidationError } from '../../middleware/validate';
 
+/** Sentinel the API returns in place of a stored webhook password; the edit form sends it back unchanged to keep the existing password. */
+const REDACTED = '******';
+
 const redactSettings = (settings: ContactPointSettings): ContactPointSettings => {
   if (settings.type !== 'webhook' || settings.password.length === 0) return settings;
-  return { ...settings, password: '******' };
+  return { ...settings, password: REDACTED };
 };
 
 const encryptSettingsCredentials = async (settings: ContactPointSettings, encryptionKey: string): Promise<ContactPointSettings> => {
@@ -84,7 +87,8 @@ app.put('/:id', sValidator('param', contactPointIdParamSchema, onValidationError
     .where(and(eq(contactPoints.id, id), eq(contactPoints.orgId, orgId)))
     .limit(1);
 
-  if (existing.length === 0) {
+  const [existingRow] = existing;
+  if (existingRow === undefined) {
     return c.json({ error: 'Not found' }, 404);
   }
 
@@ -95,7 +99,14 @@ app.put('/:id', sValidator('param', contactPointIdParamSchema, onValidationError
   if (data.name !== undefined) updates['name'] = data.name;
   if (data.type !== undefined) updates['type'] = data.type;
   if (data.settings !== undefined) {
-    updates['settings'] = await encryptSettingsCredentials(data.settings, c.env.ENCRYPTION_KEY);
+    const incoming = data.settings;
+    if (incoming.type === 'webhook' && incoming.password === REDACTED) {
+      // Password unchanged in the form — keep the existing ENCRYPTED password, don't re-encrypt the sentinel.
+      const prev = existingRow.settings;
+      updates['settings'] = { ...incoming, password: prev.type === 'webhook' ? prev.password : '' };
+    } else {
+      updates['settings'] = await encryptSettingsCredentials(incoming, c.env.ENCRYPTION_KEY);
+    }
   }
 
   await db

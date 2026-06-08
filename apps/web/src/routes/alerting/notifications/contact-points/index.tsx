@@ -1,5 +1,5 @@
 import { Badge } from '@graflare/ui/components/badge';
-import { Button } from '@graflare/ui/components/button';
+import { Button, buttonVariants } from '@graflare/ui/components/button';
 import { Skeleton } from '@graflare/ui/components/skeleton';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@graflare/ui/components/table';
 import { useSuspenseQuery } from '@tanstack/react-query';
@@ -28,6 +28,7 @@ const ContactPointsPage = () => {
         id: cp.id,
         name: cp.name,
         type: cp.type,
+        params: { id: cp.id },
         onDelete: () => {
           const run = async () => {
             setDeleting(cp.id);
@@ -76,9 +77,9 @@ const ContactPointsPage = () => {
                 </TableCell>
                 <TableCell>
                   <div className='flex gap-1'>
-                    <Button variant='ghost' size='xs'>
+                    <Link to='/alerting/notifications/contact-points/$id' params={row.params} className={buttonVariants({ variant: 'ghost', size: 'xs' })}>
                       Edit
-                    </Button>
+                    </Link>
                     <Button variant='ghost' size='xs' onClick={row.onDelete} disabled={deleting === row.id}>
                       Delete
                     </Button>

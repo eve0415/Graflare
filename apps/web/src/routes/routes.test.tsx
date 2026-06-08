@@ -5,7 +5,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { routeTree } from '../routeTree.gen';
 
-import { alertRuleQueryOptions } from './alerting/-queries';
+import { alertRuleQueryOptions, contactPointQueryOptions } from './alerting/-queries';
 
 afterEach(cleanup);
 
@@ -157,6 +157,34 @@ describe('routes', () => {
     } finally {
       vi.mocked(alertRuleQueryOptions).mockImplementation((id: string) =>
         queryOptions({ queryKey: ['alert-rule', id], queryFn: (): Promise<typeof rule | null> => Promise.resolve(null) }),
+      );
+    }
+  });
+
+  it('renders the edit form pre-filled at /alerting/notifications/contact-points/:id', async () => {
+    const contactPoint = {
+      id: 'cp-1',
+      orgId: 'org-1',
+      name: 'On-call Webhook',
+      type: 'webhook',
+      // Settings as the redacting API returns them: password is the '******' sentinel when set.
+      settings: { type: 'webhook', url: 'https://hooks.example.com/alert', method: 'POST', username: '', password: '******' },
+      createdAt: 0,
+      updatedAt: 0,
+    };
+    vi.mocked(contactPointQueryOptions).mockReturnValue(
+      queryOptions({ queryKey: ['contact-point', contactPoint.id], queryFn: (): Promise<typeof contactPoint | null> => Promise.resolve(contactPoint) }),
+    );
+
+    try {
+      await renderWithRouter('/alerting/notifications/contact-points/cp-1');
+      await waitFor(() => {
+        expect(screen.getByLabelText('Name')).toBe(screen.getByDisplayValue('On-call Webhook'));
+        expect(screen.getByLabelText('URL')).toBe(screen.getByDisplayValue('https://hooks.example.com/alert'));
+      });
+    } finally {
+      vi.mocked(contactPointQueryOptions).mockImplementation((id: string) =>
+        queryOptions({ queryKey: ['contact-point', id], queryFn: (): Promise<typeof contactPoint | null> => Promise.resolve(null) }),
       );
     }
   });

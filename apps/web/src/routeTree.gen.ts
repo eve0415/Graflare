@@ -35,6 +35,7 @@ import { Route as AlertingMuteTimingsNewRouteImport } from './routes/alerting/mu
 import { Route as AlertingNotificationsPoliciesIndexRouteImport } from './routes/alerting/notifications/policies/index'
 import { Route as AlertingNotificationsContactPointsIndexRouteImport } from './routes/alerting/notifications/contact-points/index'
 import { Route as AlertingNotificationsContactPointsNewRouteImport } from './routes/alerting/notifications/contact-points/new'
+import { Route as AlertingNotificationsContactPointsIdRouteImport } from './routes/alerting/notifications/contact-points/$id'
 
 const AlertingRouteRoute = AlertingRouteRouteImport.update({
   id: '/alerting',
@@ -172,6 +173,12 @@ const AlertingNotificationsContactPointsNewRoute =
     path: '/contact-points/new',
     getParentRoute: () => AlertingNotificationsRouteRoute,
   } as any)
+const AlertingNotificationsContactPointsIdRoute =
+  AlertingNotificationsContactPointsIdRouteImport.update({
+    id: '/contact-points/$id',
+    path: '/contact-points/$id',
+    getParentRoute: () => AlertingNotificationsRouteRoute,
+  } as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
@@ -197,6 +204,7 @@ export interface FileRoutesByFullPath {
   '/alerting/silences/': typeof AlertingSilencesIndexRoute
   '/dashboards/$id/': typeof DashboardsIdIndexRoute
   '/datasources/$id/': typeof DatasourcesIdIndexRoute
+  '/alerting/notifications/contact-points/$id': typeof AlertingNotificationsContactPointsIdRoute
   '/alerting/notifications/contact-points/new': typeof AlertingNotificationsContactPointsNewRoute
   '/alerting/notifications/contact-points/': typeof AlertingNotificationsContactPointsIndexRoute
   '/alerting/notifications/policies/': typeof AlertingNotificationsPoliciesIndexRoute
@@ -222,6 +230,7 @@ export interface FileRoutesByTo {
   '/alerting/silences': typeof AlertingSilencesIndexRoute
   '/dashboards/$id': typeof DashboardsIdIndexRoute
   '/datasources/$id': typeof DatasourcesIdIndexRoute
+  '/alerting/notifications/contact-points/$id': typeof AlertingNotificationsContactPointsIdRoute
   '/alerting/notifications/contact-points/new': typeof AlertingNotificationsContactPointsNewRoute
   '/alerting/notifications/contact-points': typeof AlertingNotificationsContactPointsIndexRoute
   '/alerting/notifications/policies': typeof AlertingNotificationsPoliciesIndexRoute
@@ -251,6 +260,7 @@ export interface FileRoutesById {
   '/alerting/silences/': typeof AlertingSilencesIndexRoute
   '/dashboards/$id/': typeof DashboardsIdIndexRoute
   '/datasources/$id/': typeof DatasourcesIdIndexRoute
+  '/alerting/notifications/contact-points/$id': typeof AlertingNotificationsContactPointsIdRoute
   '/alerting/notifications/contact-points/new': typeof AlertingNotificationsContactPointsNewRoute
   '/alerting/notifications/contact-points/': typeof AlertingNotificationsContactPointsIndexRoute
   '/alerting/notifications/policies/': typeof AlertingNotificationsPoliciesIndexRoute
@@ -281,6 +291,7 @@ export interface FileRouteTypes {
     | '/alerting/silences/'
     | '/dashboards/$id/'
     | '/datasources/$id/'
+    | '/alerting/notifications/contact-points/$id'
     | '/alerting/notifications/contact-points/new'
     | '/alerting/notifications/contact-points/'
     | '/alerting/notifications/policies/'
@@ -306,6 +317,7 @@ export interface FileRouteTypes {
     | '/alerting/silences'
     | '/dashboards/$id'
     | '/datasources/$id'
+    | '/alerting/notifications/contact-points/$id'
     | '/alerting/notifications/contact-points/new'
     | '/alerting/notifications/contact-points'
     | '/alerting/notifications/policies'
@@ -334,6 +346,7 @@ export interface FileRouteTypes {
     | '/alerting/silences/'
     | '/dashboards/$id/'
     | '/datasources/$id/'
+    | '/alerting/notifications/contact-points/$id'
     | '/alerting/notifications/contact-points/new'
     | '/alerting/notifications/contact-points/'
     | '/alerting/notifications/policies/'
@@ -536,11 +549,19 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AlertingNotificationsContactPointsNewRouteImport
       parentRoute: typeof AlertingNotificationsRouteRoute
     }
+    '/alerting/notifications/contact-points/$id': {
+      id: '/alerting/notifications/contact-points/$id'
+      path: '/contact-points/$id'
+      fullPath: '/alerting/notifications/contact-points/$id'
+      preLoaderRoute: typeof AlertingNotificationsContactPointsIdRouteImport
+      parentRoute: typeof AlertingNotificationsRouteRoute
+    }
   }
 }
 
 interface AlertingNotificationsRouteRouteChildren {
   AlertingNotificationsIndexRoute: typeof AlertingNotificationsIndexRoute
+  AlertingNotificationsContactPointsIdRoute: typeof AlertingNotificationsContactPointsIdRoute
   AlertingNotificationsContactPointsNewRoute: typeof AlertingNotificationsContactPointsNewRoute
   AlertingNotificationsContactPointsIndexRoute: typeof AlertingNotificationsContactPointsIndexRoute
   AlertingNotificationsPoliciesIndexRoute: typeof AlertingNotificationsPoliciesIndexRoute
@@ -549,6 +570,8 @@ interface AlertingNotificationsRouteRouteChildren {
 const AlertingNotificationsRouteRouteChildren: AlertingNotificationsRouteRouteChildren =
   {
     AlertingNotificationsIndexRoute: AlertingNotificationsIndexRoute,
+    AlertingNotificationsContactPointsIdRoute:
+      AlertingNotificationsContactPointsIdRoute,
     AlertingNotificationsContactPointsNewRoute:
       AlertingNotificationsContactPointsNewRoute,
     AlertingNotificationsContactPointsIndexRoute:

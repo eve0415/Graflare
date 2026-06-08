@@ -1,6 +1,7 @@
 import type { AppEnv } from '../../index';
 
 import { env } from 'cloudflare:workers';
+import { eq } from 'drizzle-orm';
 import { Hono } from 'hono';
 import { beforeEach, describe, expect, it } from 'vitest';
 
@@ -199,6 +200,69 @@ describe('contact-point routes', () => {
     expect(res.status).toBe(200);
     const body: unknown = await res.json();
     expect(body).toHaveProperty('name', 'After');
+  });
+
+  it('preserves the encrypted webhook password when the form resubmits the redaction sentinel', async () => {
+    const app = createApp();
+    const createRes = await app.request(
+      req('/', json({ name: 'Hook', type: 'webhook', settings: { type: 'webhook', url: 'https://hooks.example.com/a', password: 'secret' } })),
+      {},
+      testBindings,
+    );
+    const id = readId(await createRes.json());
+
+    const db = createDb(env.DB);
+    const before = await db.select().from(contactPoints).where(eq(contactPoints.id, id));
+    const storedBefore = webhookPassword(before[0]?.settings);
+
+    // Edit form sends the unchanged password back as the '******' sentinel; only the name changes.
+    const res = await app.request(
+      req(`/${id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name: 'Hook Renamed', settings: { type: 'webhook', url: 'https://hooks.example.com/a', password: '******' } }),
+      }),
+      {},
+      testBindings,
+    );
+    expect(res.status).toBe(200);
+
+    const after = await db.select().from(contactPoints).where(eq(contactPoints.id, id));
+    const [afterRow] = after;
+    expect(afterRow?.name).toBe('Hook Renamed');
+    // Read directly via the DB (not the redacting API): the stored ciphertext must be untouched.
+    expect(webhookPassword(afterRow?.settings)).toBe(storedBefore);
+  });
+
+  it('re-encrypts the webhook password when the form submits a real new value', async () => {
+    const app = createApp();
+    const createRes = await app.request(
+      req('/', json({ name: 'Hook', type: 'webhook', settings: { type: 'webhook', url: 'https://hooks.example.com/a', password: 'secret' } })),
+      {},
+      testBindings,
+    );
+    const id = readId(await createRes.json());
+
+    const db = createDb(env.DB);
+    const before = await db.select().from(contactPoints).where(eq(contactPoints.id, id));
+    const storedBefore = webhookPassword(before[0]?.settings);
+
+    const res = await app.request(
+      req(`/${id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ settings: { type: 'webhook', url: 'https://hooks.example.com/a', password: 'rotated' } }),
+      }),
+      {},
+      testBindings,
+    );
+    expect(res.status).toBe(200);
+
+    const after = await db.select().from(contactPoints).where(eq(contactPoints.id, id));
+    const storedAfter = webhookPassword(after[0]?.settings);
+    expect(storedAfter).not.toBe(storedBefore);
+    expect(storedAfter).not.toBe('rotated');
+    expect(storedAfter).not.toBe('******');
   });
 
   it('deletes a contact point', async () => {
