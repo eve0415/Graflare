@@ -10,7 +10,7 @@ import { QueryResultTable, formatPrometheusToTable } from '../../../-root/query-
 
 import { extractResultSeries } from './panel-data-extract';
 import { PanelFrame } from './panel-frame';
-import { usePanelData } from './use-panel-data';
+import { usePanelQuery } from './use-panel-query';
 
 interface TablePanelProps {
   panel: Panel;
@@ -36,13 +36,9 @@ const toTableData = (data: PanelDataResult[] | null | undefined): { columns: str
 };
 
 export const TablePanel = ({ panel, timeRange, refetchInterval }: TablePanelProps) => {
-  const { data, isLoading, error, refetch } = usePanelData(panel.datasourceId, panel.queries, timeRange, refetchInterval);
+  const { data, isLoading, error, handleRetry } = usePanelQuery(panel, timeRange, refetchInterval);
 
   const tableData = useMemo(() => toTableData(data), [data]);
-
-  const handleRetry = useCallback(() => {
-    void refetch();
-  }, [refetch]);
 
   // Column-level field config (defaults only — no per-column overrides yet): map
   // a cell, else format numeric cells; label cells (non-numeric) fall through raw.

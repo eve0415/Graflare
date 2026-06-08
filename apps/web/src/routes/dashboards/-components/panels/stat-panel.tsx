@@ -2,11 +2,11 @@ import type { Panel } from '@graflare/shared/schemas/panel';
 
 import { formatValue } from '@graflare/shared/format/value-format';
 import { applyValueMappings } from '@graflare/shared/format/value-mappings';
-import { useCallback, useMemo } from 'react';
+import { useMemo } from 'react';
 
 import { firstScalar, getThresholdColor, readableTextColor } from './panel-data-extract';
 import { PanelFrame } from './panel-frame';
-import { usePanelData } from './use-panel-data';
+import { usePanelQuery } from './use-panel-query';
 
 interface StatPanelProps {
   panel: Panel;
@@ -15,15 +15,11 @@ interface StatPanelProps {
 }
 
 export const StatPanel = ({ panel, timeRange, refetchInterval }: StatPanelProps) => {
-  const { data, isLoading, error, refetch } = usePanelData(panel.datasourceId, panel.queries, timeRange, refetchInterval);
+  const { data, isLoading, error, handleRetry } = usePanelQuery(panel, timeRange, refetchInterval);
 
   // Latest scalar of the first series, kept as the raw token (stat displays the
   // string verbatim when it isn't numeric).
   const value = useMemo(() => firstScalar(data), [data]);
-
-  const handleRetry = useCallback(() => {
-    void refetch();
-  }, [refetch]);
 
   const { defaults } = panel.fieldConfig;
   const numericValue = value === null ? Number.NaN : Number(value);

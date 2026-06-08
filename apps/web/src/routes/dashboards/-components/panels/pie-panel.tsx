@@ -4,11 +4,11 @@ import type { Panel } from '@graflare/shared/schemas/panel';
 
 import { formatValue } from '@graflare/shared/format/value-format';
 import { applyValueMappings } from '@graflare/shared/format/value-mappings';
-import { useCallback, useMemo } from 'react';
+import { useMemo } from 'react';
 
 import { PanelFrame } from './panel-frame';
 import { pieSlices } from './pie-data';
-import { usePanelData } from './use-panel-data';
+import { usePanelQuery } from './use-panel-query';
 
 interface PiePanelProps {
   panel: Panel;
@@ -92,17 +92,13 @@ const PieLegendItem = ({ slice }: PieLegendItemProps) => {
 };
 
 export const PiePanel = ({ panel, timeRange, refetchInterval }: PiePanelProps) => {
-  const { data, isLoading, error, refetch } = usePanelData(panel.datasourceId, panel.queries, timeRange, refetchInterval);
+  const { data, isLoading, error, handleRetry } = usePanelQuery(panel, timeRange, refetchInterval);
 
   const { defaults } = panel.fieldConfig;
   const isDonut = panel.displayOptions.pie?.display === 'donut';
   const legend = panel.displayOptions.pie?.legend ?? 'right';
 
   const slices = useMemo(() => pieSlices(data, SLICE_PALETTE).map(slice => toDisplaySlice(slice, defaults)), [data, defaults]);
-
-  const handleRetry = useCallback(() => {
-    void refetch();
-  }, [refetch]);
 
   // A single full-circle slice can't be drawn as a wedge (start === end renders
   // nothing), so it becomes a plain circle.

@@ -2,11 +2,11 @@ import type { Panel } from '@graflare/shared/schemas/panel';
 
 import { formatValue } from '@graflare/shared/format/value-format';
 import { applyValueMappings } from '@graflare/shared/format/value-mappings';
-import { useCallback, useMemo } from 'react';
+import { useMemo } from 'react';
 
 import { firstScalar, getThresholdColor } from './panel-data-extract';
 import { PanelFrame } from './panel-frame';
-import { usePanelData } from './use-panel-data';
+import { usePanelQuery } from './use-panel-query';
 
 interface GaugePanelProps {
   panel: Panel;
@@ -28,7 +28,7 @@ const describeArc = (startAngle: number, endAngle: number, radius: number): stri
 };
 
 export const GaugePanel = ({ panel, timeRange, refetchInterval }: GaugePanelProps) => {
-  const { data, isLoading, error, refetch } = usePanelData(panel.datasourceId, panel.queries, timeRange, refetchInterval);
+  const { data, isLoading, error, handleRetry } = usePanelQuery(panel, timeRange, refetchInterval);
 
   // Latest scalar of the first series as a number; a non-numeric token coerces to
   // NaN (preserved downstream, where the gauge clamps/normalizes it).
@@ -46,10 +46,6 @@ export const GaugePanel = ({ panel, timeRange, refetchInterval }: GaugePanelProp
   const normalizedValue = value === null ? min : Math.max(min, Math.min(max, value));
   const percentage = (normalizedValue - min) / (max - min);
   const angle = -90 + percentage * 180;
-
-  const handleRetry = useCallback(() => {
-    void refetch();
-  }, [refetch]);
 
   // One pass over the mappings feeds both the center readout text and its color.
   const mapping = useMemo(() => applyValueMappings(value, defaults.mappings), [value, defaults.mappings]);

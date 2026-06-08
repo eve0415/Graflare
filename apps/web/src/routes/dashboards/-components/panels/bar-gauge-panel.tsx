@@ -4,12 +4,12 @@ import type { Panel } from '@graflare/shared/schemas/panel';
 
 import { formatValue } from '@graflare/shared/format/value-format';
 import { applyValueMappings } from '@graflare/shared/format/value-mappings';
-import { useCallback, useMemo } from 'react';
+import { useMemo } from 'react';
 
 import { barGaugeSegments } from './bar-gauge-data';
 import { getThresholdColor } from './panel-data-extract';
 import { PanelFrame } from './panel-frame';
-import { usePanelData } from './use-panel-data';
+import { usePanelQuery } from './use-panel-query';
 
 interface BarGaugePanelProps {
   panel: Panel;
@@ -66,7 +66,7 @@ const BarGaugeRow = ({ segment, min, max, defaults, thresholds, vertical }: BarG
 };
 
 export const BarGaugePanel = ({ panel, timeRange, refetchInterval }: BarGaugePanelProps) => {
-  const { data, isLoading, error, refetch } = usePanelData(panel.datasourceId, panel.queries, timeRange, refetchInterval);
+  const { data, isLoading, error, handleRetry } = usePanelQuery(panel, timeRange, refetchInterval);
 
   // Field config is the single home for the range, mirroring the gauge panel.
   const { defaults } = panel.fieldConfig;
@@ -75,10 +75,6 @@ export const BarGaugePanel = ({ panel, timeRange, refetchInterval }: BarGaugePan
   const vertical = panel.displayOptions.bargauge?.orientation === 'vertical';
 
   const segments = useMemo(() => barGaugeSegments(data, min, max), [data, min, max]);
-
-  const handleRetry = useCallback(() => {
-    void refetch();
-  }, [refetch]);
 
   return (
     <PanelFrame title={panel.title} panelId={panel.id} loading={isLoading} error={error instanceof Error ? error.message : null} onRetry={handleRetry}>
