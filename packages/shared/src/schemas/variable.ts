@@ -1,6 +1,10 @@
 import * as z from 'zod/mini';
 
-export const variableTypeSchema = z.enum(['query', 'custom', 'constant']);
+// `textbox`/`interval`/`datasource` reuse the flat shape: textbox seeds from `current`/`query`,
+// interval lists its choices in `options`, and datasource keeps an optional data-source-type
+// filter (e.g. 'prometheus') in `query`. No per-type fields are added, so dashboards saved
+// before these types parse unchanged. (`adhoc` is intentionally not yet supported.)
+export const variableTypeSchema = z.enum(['query', 'custom', 'constant', 'textbox', 'interval', 'datasource']);
 
 export type VariableType = z.infer<typeof variableTypeSchema>;
 
