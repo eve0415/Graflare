@@ -92,6 +92,7 @@ export const importV2 = (json: Record<string, unknown>): ImportResult => {
       gridPos,
       thresholds: [],
       displayOptions: {},
+      fieldConfig: { defaults: { unit: '', mappings: [] }, overrides: [] },
     });
 
     panelIndex += 1;

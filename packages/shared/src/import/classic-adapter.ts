@@ -86,6 +86,7 @@ const convertPanel = (gp: GrafanaBasePanel, index: number, warnings: string[]): 
     gridPos: clampGridPos(gp.gridPos),
     thresholds: mapThresholds(gp.fieldConfig),
     displayOptions: {},
+    fieldConfig: { defaults: { unit: '', mappings: [] }, overrides: [] },
   };
 };
 

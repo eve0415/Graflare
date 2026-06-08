@@ -18,6 +18,7 @@ const tablePanel = (expr: string): Panel => ({
   gridPos: { x: 0, y: 0, w: 12, h: 8 },
   thresholds: [],
   displayOptions: {},
+  fieldConfig: { defaults: { unit: '', mappings: [] }, overrides: [] },
 });
 
 const timeRange = { from: 'now-1h', to: 'now' };

@@ -127,6 +127,7 @@ const DashboardViewPage = () => {
       gridPos: { x: 0, y: 0, w: 12, h: 8 },
       thresholds: [],
       displayOptions: {},
+      fieldConfig: { defaults: { unit: '', mappings: [] }, overrides: [] },
     };
     setPanels(prev => [...prev, newPanel]);
     setEditingPanel(newPanel);

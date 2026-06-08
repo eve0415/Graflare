@@ -1,5 +1,6 @@
 import * as z from 'zod/mini';
 
+import { fieldConfigSchema } from './field-config';
 import { thresholdsSchema } from './threshold';
 
 export const panelTypeSchema = z.enum(['timeseries', 'stat', 'table', 'gauge']);
@@ -77,6 +78,7 @@ export const panelSchema = z.object({
   gridPos: gridPosSchema,
   thresholds: z._default(thresholdsSchema, []),
   displayOptions: z._default(displayOptionsSchema, {}),
+  fieldConfig: z._default(fieldConfigSchema, { defaults: { unit: '', mappings: [] }, overrides: [] }),
   description: z._default(z.string().check(z.maxLength(2048)), ''),
 });
 
