@@ -1,0 +1,6 @@
+# Revisions to ignore in `git blame` (bulk reformats, no logic changes).
+# Enable locally: git config blame.ignoreRevsFile .git-blame-ignore-revs
+# GitHub applies this automatically.
+
+# style: finish oxfmt tabs→spaces migration
+371c065ae9d6f49111e0dd6d8d5c092a3255bdad
