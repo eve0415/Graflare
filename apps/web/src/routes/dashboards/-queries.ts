@@ -5,11 +5,14 @@ import { getDashboard, listAnnotations, listDashboardVersions, listDashboards, l
 const STALE_30S = 30 * 1000;
 const STALE_5M = 5 * 60 * 1000;
 
-export const dashboardsQueryOptions = () =>
+export const dashboardsQueryOptions = (options?: { enabled?: boolean }) =>
   queryOptions({
     queryKey: ['dashboards'],
     queryFn: () => listDashboards(),
     staleTime: STALE_30S,
+    // Omit `enabled` entirely when unset — `exactOptionalPropertyTypes` rejects an
+    // explicit `undefined`, and an absent key already means "always enabled".
+    ...(options?.enabled === undefined ? {} : { enabled: options.enabled }),
   });
 
 export const dashboardQueryOptions = (id: string) =>
