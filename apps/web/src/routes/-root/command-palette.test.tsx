@@ -5,6 +5,8 @@ import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/re
 import { useCallback, useState } from 'react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
+import { expectNoA11yViolations } from '../../../tests/a11y';
+
 import { CommandPalette } from './command-palette';
 import { isMacPlatform } from './platform';
 import { resetRecentDashboardsCacheForTests } from './recent-dashboards-store';
@@ -231,5 +233,33 @@ describe('command palette', () => {
     await waitFor(() => {
       expect(navigateSpy).toHaveBeenCalledWith({ to: '/dashboards/$id', params: { id: 'id-disk' } });
     });
+  });
+
+  // The palette is a Dialog portal: its content mounts on document.body, so the axe scan and the
+  // listbox/status queries target the whole document, not the render container.
+  it('has no axe violations with results showing (status node not inside the listbox)', async () => {
+    renderOpen();
+    await waitFor(() => {
+      expect(screen.getByText('CPU Overview')).toBeDefined();
+    });
+    // Regression for aria-required-children: Base UI's Empty/Status render role=status and stay
+    // mounted with results, so nesting them in CommandList (role=listbox) put a status inside the
+    // listbox. They are now siblings of the list — assert no status descends from the listbox.
+    const listbox = screen.getByRole('listbox');
+    expect(listbox.querySelector('[role="status"]')).toBeNull();
+    await expectNoA11yViolations(document.body);
+  });
+
+  it('has no axe violations in the empty state (no results)', async () => {
+    renderOpen();
+    const input = screen.getByLabelText('Search commands');
+    fireEvent.change(input, { target: { value: 'zzzzzzz' } });
+    await waitFor(() => {
+      expect(screen.getByText(/No results/)).toBeDefined();
+    });
+    // An empty listbox (all groups filtered out) must stay valid — aria-required-children flags
+    // wrong children, not their absence — and the Empty status sits outside it.
+    expect(screen.getByRole('listbox').querySelector('[role="status"]')).toBeNull();
+    await expectNoA11yViolations(document.body);
   });
 });

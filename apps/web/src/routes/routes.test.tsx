@@ -3,6 +3,7 @@ import { RouterProvider, createMemoryHistory, createRouter } from '@tanstack/rea
 import { cleanup, render, screen, waitFor } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
+import { expectNoA11yViolations } from '../../tests/a11y';
 import { routeTree } from '../routeTree.gen';
 
 import { alertRuleQueryOptions, contactPointQueryOptions, notificationPoliciesQueryOptions } from './alerting/-queries';
@@ -43,6 +44,31 @@ describe('routes', () => {
       expect(screen.getByRole('heading', { name: 'Data Sources' })).toBeDefined();
     });
     expect(screen.getAllByRole('main')).toHaveLength(1);
+  });
+
+  it('wraps the sidebar in a labelled navigation landmark, with no orphaned content', async () => {
+    // Regression for axe `region`: the sidebar (logo/header, nav links, theme toggle) used to sit
+    // outside any landmark. It is now a `<nav aria-label="Primary">`. Asserting the landmark
+    // exists by its accessible name, then a clean axe pass covers `region` (nothing orphaned).
+    await renderWithRouter('/datasources');
+    await waitFor(() => {
+      expect(screen.getByRole('heading', { name: 'Data Sources' })).toBeDefined();
+    });
+    expect(screen.getByRole('navigation', { name: 'Primary' })).toBeDefined();
+    // The header breadcrumb is also a <nav> — two navs coexist, so this also guards
+    // landmark-unique (distinct accessible names) on a page where they render together.
+    await expectNoA11yViolations(document.body);
+  });
+
+  it('keeps landmarks valid on /alerting, where a route-level sub-nav adds a second nav', async () => {
+    // /alerting renders its own tab `<nav>` inside the page in addition to the sidebar nav and
+    // the breadcrumb nav. Guards that the sidebar landmark doesn't trip landmark-unique/region
+    // on a route that already has multiple navigation landmarks.
+    await renderWithRouter('/alerting');
+    await waitFor(() => {
+      expect(screen.getByRole('navigation', { name: 'Primary' })).toBeDefined();
+    });
+    await expectNoA11yViolations(document.body);
   });
 
   it('renders add data source form at /datasources/new', async () => {

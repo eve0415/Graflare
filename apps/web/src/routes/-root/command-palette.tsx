@@ -130,9 +130,15 @@ export const CommandPalette = ({ open, onOpenChange }: CommandPaletteProps) => {
           itemToStringValue={commandToLabel}
         >
           <CommandInput ref={inputRef} placeholder='Search pages, actions, dashboards…' aria-label='Search commands' />
+          {/* Empty + Status are SIBLINGS of the list, not children. Base UI's `List` renders the
+              `role=listbox`, and `aria-required-children` allows a listbox to own only
+              `option`/`group` — but `Empty`/`Status` render `role=status` and stay mounted even
+              with results (their live region must persist to announce). Nesting them inside the
+              list put a `role=status` inside `role=listbox` (a real violation, present in every
+              state). This sibling layout is exactly Base UI's documented Autocomplete anatomy. */}
+          <CommandEmpty>{dashboardsPending ? 'Loading…' : 'No results found.'}</CommandEmpty>
+          {dashboardsPending && <CommandStatus>Loading dashboards…</CommandStatus>}
           <CommandList>
-            <CommandEmpty>{dashboardsPending ? 'Loading…' : 'No results found.'}</CommandEmpty>
-            {dashboardsPending && <CommandStatus>Loading dashboards…</CommandStatus>}
             {groups.map(group => (
               <CommandGroup key={group.id} items={group.items}>
                 <CommandGroupLabel>{group.heading}</CommandGroupLabel>
