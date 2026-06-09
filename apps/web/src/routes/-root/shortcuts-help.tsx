@@ -63,7 +63,7 @@ const ShortcutRow = ({ shortcut, isMac }: ShortcutRowProps) => (
     <dd aria-label={comboLabel(shortcut.keys, isMac)} className='flex shrink-0 items-center gap-1'>
       {shortcut.keys.map((key, index) => (
         <Fragment key={key}>
-          {index > 0 && (
+          {index > 0 && shortcut.sequence !== true && (
             <span aria-hidden className='text-muted-foreground text-xs'>
               +
             </span>

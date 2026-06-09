@@ -34,6 +34,12 @@ export interface Shortcut {
   /** What the shortcut does — the `<dt>` term in the modal. */
   readonly description: string;
   readonly group: ShortcutGroupId;
+  /**
+   * True when the keys are pressed in SEQUENCE (e.g. `g` then `d`) rather than as a chord
+   * (`Mod`+`K`). The modal renders sequences as separate spaced keycaps with no `+`, so they
+   * don't read as a simultaneous press; the spoken label already says "g then d".
+   */
+  readonly sequence?: boolean;
 }
 
 /**
@@ -46,6 +52,7 @@ const navigationShortcuts: readonly Shortcut[] = navSequences.map(nav => ({
   keys: nav.chord.map(key => key.toLowerCase()),
   description: `Go to ${nav.label}`,
   group: 'navigation',
+  sequence: true,
 }));
 
 /**
