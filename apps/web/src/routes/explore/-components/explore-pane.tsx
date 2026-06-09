@@ -14,6 +14,7 @@ import { Skeleton } from '@graflare/ui/components/skeleton';
 import { useQuery, useSuspenseQuery } from '@tanstack/react-query';
 import { BarChart3, History, Play, Plus, Table2 } from 'lucide-react';
 import { Suspense, useCallback, useMemo, useState } from 'react';
+import { useContainerWidth } from 'react-grid-layout';
 
 import { chartThemeColors, themedAxis } from '../../-root/chart-theme';
 import { databaseSchemaQueryOptions } from '../../-root/introspection-queries';
@@ -77,6 +78,19 @@ interface TableResult {
 /** Positional label for a row: A, B, C, … by index. */
 const refIdFor = (index: number): string => String.fromCodePoint(65 + index);
 
+/** Chart canvas height in px (fixed; only width is responsive). */
+const CHART_HEIGHT = 300;
+/** Floor for the measured chart width so the canvas never collapses to nothing mid-resize. */
+const MIN_CHART_WIDTH = 100;
+
+/**
+ * uPlot needs a real pixel width — a CSS `w-full` alone won't size its canvas, which is why a
+ * fixed width used to be baked in and overflowed narrow viewports. Derive the canvas width from
+ * the measured container instead, mirroring the dashboard panels' measure-then-size path so the
+ * chart tracks the real column width at every resolution. Exported for a focused unit test.
+ */
+export const explorePaneChartWidth = (measuredWidth: number): number => Math.max(MIN_CHART_WIDTH, Math.floor(measuredWidth));
+
 const newRow = (seed?: { draft: string; mode: QueryEditorMode }): QueryRowEntry =>
   seed === undefined ? { id: crypto.randomUUID(), query: '' } : { id: crypto.randomUUID(), query: seed.draft, seedDraft: seed.draft, seedMode: seed.mode };
 
@@ -122,6 +136,11 @@ export const ExplorePane = ({ timeRange, label }: ExplorePaneProps) => {
   const { data: datasources } = useSuspenseQuery(datasourcesQueryOptions());
   const { resolved } = useTheme();
   const dsItems = useMemo(() => datasources.map(ds => ({ value: ds.id, label: ds.name })), [datasources]);
+
+  // The fork's WidthProvider replacement: a ResizeObserver yielding the live width of the chart
+  // container. `mounted` gates the chart on a real measurement so the (large) initialWidth fallback
+  // is never painted at a narrow viewport — the exact horizontal-overflow bug being fixed here.
+  const { width: chartContainerWidth, containerRef: chartContainerRef, mounted: chartMeasured } = useContainerWidth();
 
   const [datasourceId, setDatasourceId] = useState<string>(datasources[0]?.id ?? '');
   const [rows, setRows] = useState<QueryRowEntry[]>(() => [newRow()]);
@@ -356,13 +375,13 @@ export const ExplorePane = ({ timeRange, label }: ExplorePaneProps) => {
     const { from: fromSec, to: toSec } = resolveRange(timeRange.from, timeRange.to);
     const xRange = (): [number, number] => [fromSec, toSec];
     return {
-      width: 800,
-      height: 300,
+      width: explorePaneChartWidth(chartContainerWidth),
+      height: CHART_HEIGHT,
       scales: { x: { time: true, range: xRange } },
       axes: [{ ...themedAxis(colors) }, { ...themedAxis(colors) }],
       series: [{}, ...merged.labels.map((labelText, i) => ({ label: labelText, stroke: `hsl(${String(i * 60)}, 70%, 50%)` }))],
     };
-  }, [merged, resolved, timeRange.from, timeRange.to]);
+  }, [merged, resolved, timeRange.from, timeRange.to, chartContainerWidth]);
 
   // The table view. SQL-table results stack one table per ref id; otherwise the combined series
   // feed the existing prometheus formatter. The ref-id `Query` column appears only when more than
@@ -402,7 +421,11 @@ export const ExplorePane = ({ timeRange, label }: ExplorePaneProps) => {
   const canRemove = rows.length > 1;
 
   return (
-    <div className='space-y-3' aria-label={label}>
+    // `containerRef` lives on this ALWAYS-mounted pane root (not the chart wrapper, which only
+    // mounts once results exist) so the ResizeObserver attaches at mount and keeps reporting the
+    // live pane width — the chart canvas is then sized from it. Every block descendant down to the
+    // chart is this same content width, so measuring here gives the chart its exact width.
+    <div ref={chartContainerRef} className='space-y-3' aria-label={label}>
       <div className='flex items-center gap-2'>
         <Select value={datasourceId} onValueChange={handleDatasourceChange} items={dsItems}>
           <SelectTrigger className='w-48' aria-label='Select data source'>
@@ -504,11 +527,24 @@ export const ExplorePane = ({ timeRange, label }: ExplorePaneProps) => {
             </span>
           </div>
 
-          {resultView === 'graph' && tableResults === null && chartData[0] !== undefined && chartData[0].length > 0 && (
-            <Suspense fallback={chartFallback}>
-              <UPlotChart options={chartOptions} data={chartData} className='w-full' />
-            </Suspense>
-          )}
+          {resultView === 'graph' &&
+            tableResults === null &&
+            chartData[0] !== undefined &&
+            chartData[0].length > 0 && (
+              // `overflow-hidden` + `min-w-0` keep the fixed-pixel uPlot canvas from forcing the page
+              // wider than the viewport during the brief construct window before a resize settles.
+              // Render the chart only after the first measurement (`chartMeasured`) so the initialWidth
+              // fallback — far wider than a phone — is never painted.
+              <div className='min-w-0 overflow-hidden'>
+                {chartMeasured ? (
+                  <Suspense fallback={chartFallback}>
+                    <UPlotChart options={chartOptions} data={chartData} className='w-full' />
+                  </Suspense>
+                ) : (
+                  chartFallback
+                )}
+              </div>
+            )}
 
           {resultView === 'graph' && tableResults !== null && (
             <p className='text-muted-foreground text-sm'>Table format has no graph view. Switch the result view to see the rows.</p>

@@ -28,8 +28,11 @@ export const Breadcrumbs = () => {
 
   return (
     // Override the primitive's lowercase default to the conventional capitalised label.
-    <Breadcrumb aria-label='Breadcrumb'>
-      <BreadcrumbList>
+    // `min-w-0` + a single non-wrapping, clipped line let a deep trail truncate instead of
+    // forcing the header (and the whole content pane) wider than the viewport — the h-12 bar is
+    // too short to wrap to two lines, so the last crumb truncates with an ellipsis when cramped.
+    <Breadcrumb aria-label='Breadcrumb' className='min-w-0'>
+      <BreadcrumbList className='flex-nowrap overflow-hidden whitespace-nowrap'>
         {trail.map((crumb, index) => {
           const isLast = index === trail.length - 1;
           // `to` is the concrete, already-encoded pathname from the active match —
@@ -37,10 +40,12 @@ export const Breadcrumbs = () => {
           const key = crumb.to ?? `current:${crumb.label}`;
           return (
             <Fragment key={key}>
-              {index > 0 && <BreadcrumbSeparator />}
-              <BreadcrumbItem>
+              {index > 0 && <BreadcrumbSeparator className='shrink-0' />}
+              {/* Earlier crumbs stay intact; only the last (current page) truncates, so the trail
+                  reads "Home / … / Long Page Name…" rather than clipping mid-path. */}
+              <BreadcrumbItem className={isLast ? 'min-w-0' : 'shrink-0'}>
                 {isLast || crumb.to === undefined ? (
-                  <BreadcrumbPage>{crumb.label}</BreadcrumbPage>
+                  <BreadcrumbPage className='truncate'>{crumb.label}</BreadcrumbPage>
                 ) : (
                   <BreadcrumbLink render={<Link to={crumb.to}>{crumb.label}</Link>} />
                 )}

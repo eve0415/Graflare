@@ -36,12 +36,21 @@ const RootComponent = () => {
         <ThemeProvider>
           <SidebarProvider>
             <AppSidebar />
-            <SidebarInset>
+            {/* `min-w-0` lets the inset shrink below its content's min-content width instead of
+                growing past the viewport (the flex `min-width:auto` won't-shrink trap). Without it
+                a wide child — the header trail, a data table — forces horizontal page scroll at
+                tablet widths where the sidebar is still an expanded 16rem rail. */}
+            <SidebarInset className='min-w-0'>
               <header className='flex h-12 shrink-0 items-center gap-2 border-b px-4'>
-                <SidebarTrigger className='-ml-1' />
-                <Separator orientation='vertical' className='mr-2 !h-4' />
-                <Breadcrumbs />
-                <div className='ml-auto'>
+                <SidebarTrigger className='-ml-1 shrink-0' />
+                <Separator orientation='vertical' className='mr-2 !h-4 shrink-0' />
+                {/* `min-w-0 flex-1` lets the breadcrumb shrink (and truncate, see Breadcrumbs)
+                    below its content width so a deep trail can't push the fixed-width search
+                    trigger past the viewport — the tablet (768px, sidebar expanded) overflow fix. */}
+                <div className='min-w-0 flex-1'>
+                  <Breadcrumbs />
+                </div>
+                <div className='ml-auto shrink-0'>
                   <CommandPaletteTrigger onOpen={openPalette} />
                 </div>
               </header>

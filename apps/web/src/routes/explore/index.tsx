@@ -35,7 +35,7 @@ const ExplorePage = () => {
         </div>
       </div>
 
-      <div className={split ? 'grid grid-cols-2 gap-4' : ''}>
+      <div className={split ? 'grid grid-cols-1 gap-4 lg:grid-cols-2' : ''}>
         <QueryBoundary pendingFallback={explorePaneFallback}>
           <ExplorePane timeRange={timeRange} label='Explore pane 1' />
         </QueryBoundary>

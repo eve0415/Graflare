@@ -7,7 +7,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { MockCodeEditor } from '../../../../tests/mock-code-editor';
 
-import { ExplorePane } from './explore-pane';
+import { ExplorePane, explorePaneChartWidth } from './explore-pane';
 
 const PROM_DS: DatasourceRow = {
   id: 'ds-prom',
@@ -241,5 +241,29 @@ describe('explore pane multi-query', () => {
     });
     expect(proxyQuery.mock.calls[0]?.[0].data.params.query).toBe('seeded_metric');
     expect(readHistory()).toContain('seeded_metric');
+  });
+});
+
+// Regression guard for the mobile horizontal-overflow fix: the chart canvas width is derived from
+// the MEASURED container width, never a fixed 800/1280 that overflowed a narrow viewport. A real
+// pixel width is required for uPlot's canvas, so the derivation must track the container and only
+// floor it to a small minimum so the canvas never collapses mid-resize.
+describe('explorePaneChartWidth', () => {
+  it('returns the measured container width at a narrow (phone) viewport', () => {
+    // 342 = the Explore pane content width inside a 390px viewport — must NOT widen to 800/1280.
+    expect(explorePaneChartWidth(342)).toBe(342);
+  });
+
+  it('tracks a wider container so the chart grows on larger screens', () => {
+    expect(explorePaneChartWidth(1180)).toBe(1180);
+  });
+
+  it('floors to the minimum so a zero/near-zero measurement never collapses the canvas', () => {
+    expect(explorePaneChartWidth(0)).toBe(100);
+    expect(explorePaneChartWidth(40)).toBe(100);
+  });
+
+  it('floors fractional widths to whole pixels', () => {
+    expect(explorePaneChartWidth(341.7)).toBe(341);
   });
 });

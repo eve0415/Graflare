@@ -1,5 +1,6 @@
 import type { ReactNode } from 'react';
 
+import { createRef } from 'react';
 import { vi } from 'vitest';
 
 Object.defineProperty(globalThis, 'matchMedia', {
@@ -75,10 +76,15 @@ vi.mock('../src/lib/introspection', () => ({
 }));
 
 const MockGrid = ({ children }: { children: ReactNode }): ReactNode => children;
+// `useContainerWidth` wraps a ResizeObserver (absent in jsdom), so it's stubbed to report a fixed,
+// already-measured width. `mounted: true` lets width-gated children (e.g. the Explore chart) render.
+const noop = (): void => {};
+const mockUseContainerWidth = () => ({ width: 800, mounted: true, containerRef: createRef<HTMLDivElement>(), measureWidth: noop });
 vi.mock('react-grid-layout', () => ({
   default: MockGrid,
   Responsive: MockGrid,
   WidthProvider: () => MockGrid,
+  useContainerWidth: mockUseContainerWidth,
 }));
 
 vi.mock('react-grid-layout/css/styles.css', () => ({}));
