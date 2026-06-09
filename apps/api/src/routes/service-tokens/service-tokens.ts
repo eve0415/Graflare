@@ -65,15 +65,29 @@ app.post('/', sValidator('json', createServiceTokenSchema, onValidationError), a
   const createdAt = new Date();
   const expiresAt = created.expires_at === undefined ? null : new Date(created.expires_at);
 
-  await db.insert(accessServiceTokens).values({
-    id,
-    orgId,
-    cfTokenId: created.id,
-    clientId: created.client_id,
-    name: created.name,
-    createdAt,
-    expiresAt,
-  });
+  try {
+    await db.insert(accessServiceTokens).values({
+      id,
+      orgId,
+      cfTokenId: created.id,
+      clientId: created.client_id,
+      name: created.name,
+      createdAt,
+      expiresAt,
+    });
+  } catch (error) {
+    // The CF token exists but its link row didn't persist — it would be an
+    // orphaned live credential. Best-effort revoke it at Cloudflare; if that
+    // also fails, log the cf token id (NOT a secret) for manual cleanup. Mirrors
+    // the RPC createServiceToken path so the two don't drift.
+    console.error('POST /service-tokens: link insert failed; rolling back CF token', created.id, error);
+    try {
+      await cfClient(c.env).delete(created.id);
+    } catch (rollbackError) {
+      console.error('POST /service-tokens: rollback of orphaned CF token failed; manual cleanup needed for', created.id, rollbackError);
+    }
+    return c.json({ error: 'Failed to persist service token' }, 500);
+  }
 
   // The secret is returned ONCE here and never persisted.
   return c.json(

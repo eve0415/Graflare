@@ -53,6 +53,28 @@ const mockCf = (): void => {
   });
 };
 
+// Like mockCf, but each POST (create) hands back the next cf token id from the
+// list (default 'cf-tok-1' once exhausted). Lets a test mint two tokens that
+// share a client_id to force a duplicate-clientId link-insert collision.
+const mockCfPostIds = (postTokenIds: string[]): void => {
+  let posts = 0;
+  vi.spyOn(globalThis, 'fetch').mockImplementation((input, init) => {
+    const r = new Request(input, init);
+    cfCalls.push({ url: r.url, method: r.method });
+    if (r.method !== 'POST') return Promise.resolve(envelope({ id: 'ok' }));
+    const id = postTokenIds[posts] ?? 'cf-tok-1';
+    posts += 1;
+    return Promise.resolve(envelope({ ...createResult, id }));
+  });
+};
+
+// Predicate: is this a CF DELETE for the given cf token id? (module scope so the
+// `&&` isn't a conditional inside a test body)
+const isDeleteOf =
+  (cfTokenId: string) =>
+  (call: CfCall): boolean =>
+    call.method === 'DELETE' && call.url.includes(`/service_tokens/${cfTokenId}`);
+
 const createApp = (orgId: string) => {
   const app = new Hono<AppEnv>();
   app.use('/*', async (c, next) => {
@@ -223,6 +245,32 @@ describe('service-token routes', () => {
   it('rejects a malformed id on DELETE with 400', async () => {
     const res = await createApp(ORG_A).request(req('/not-a-uuid', { method: 'DELETE' }), {}, testBindings);
     expect(res.status).toBe(400);
+  });
+
+  it('rolls back the CF token when the link insert fails (no orphaned credential)', async () => {
+    // First create succeeds; the second reuses client_id 'client-1' (unique
+    // index) with a fresh cf token id, so its link insert collides and the route
+    // must revoke the just-minted CF token instead of leaving it orphaned.
+    mockCfPostIds(['cf-tok-1', 'cf-tok-dup']);
+
+    await createApp(ORG_A).request(
+      req('/', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name: 'first' }) }),
+      {},
+      testBindings,
+    );
+    const res = await createApp(ORG_A).request(
+      req('/', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name: 'dup' }) }),
+      {},
+      testBindings,
+    );
+    expect(res.status).toBe(500);
+
+    // The route revoked the orphaned CF token (cf-tok-dup) at Cloudflare.
+    expect(cfCalls.some(call => isDeleteOf('cf-tok-dup')(call))).toBe(true);
+
+    // Only the first token's link row survives.
+    const rows = await createDb(env.DB).select().from(accessServiceTokens).where(eq(accessServiceTokens.orgId, ORG_A));
+    expect(rows.map(r => r.cfTokenId)).toEqual(['cf-tok-1']);
   });
 
   it('returns 502 when Cloudflare create fails', async () => {
