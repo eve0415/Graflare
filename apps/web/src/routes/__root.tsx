@@ -11,6 +11,7 @@ import { AppSidebar } from './-root/app-sidebar';
 import { Breadcrumbs } from './-root/breadcrumbs';
 import { CommandPalette } from './-root/command-palette';
 import { CommandPaletteTrigger } from './-root/command-palette-trigger';
+import { KeyboardShortcuts } from './-root/keyboard-shortcuts';
 import { QueryBoundary } from './-root/query-boundary';
 import { ShortcutsHelp } from './-root/shortcuts-help';
 import { ThemeProvider } from './-root/theme-provider';
@@ -53,6 +54,7 @@ const RootComponent = () => {
           </SidebarProvider>
           <CommandPalette open={paletteOpen} onOpenChange={setPaletteOpen} />
           <ShortcutsHelp open={helpOpen} onOpenChange={setHelpOpen} />
+          <KeyboardShortcuts />
         </ThemeProvider>
         <TanStackRouterDevtools position='bottom-right' />
         <Scripts />

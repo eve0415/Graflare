@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
+import { navSequences } from './nav-sequences';
 import { MOD_KEY, groupShortcuts, shortcuts } from './shortcuts';
 
 describe('shortcuts registry', () => {
@@ -35,6 +36,30 @@ describe('shortcuts registry', () => {
   });
 });
 
+describe('navigation chord registry', () => {
+  const navigationRows = shortcuts.filter(s => s.group === 'navigation');
+
+  it('documents one navigation row per `g`-chord, in the same order', () => {
+    expect(navigationRows).toHaveLength(navSequences.length);
+    expect(navigationRows.map(row => row.description)).toEqual(navSequences.map(nav => `Go to ${nav.label}`));
+  });
+
+  it('lowercases each chord token so the row shows the `g d` keys users press', () => {
+    // Source of truth is the UPPERCASE binding chord; the registry must display its lowercase
+    // form, and the two can never disagree because the rows are derived from `navSequences`.
+    for (const [index, nav] of navSequences.entries()) {
+      expect(navigationRows[index]?.keys).toEqual(nav.chord.map(key => key.toLowerCase()));
+    }
+  });
+
+  it('starts every chord with `g`, matching the Grafana convention', () => {
+    for (const row of navigationRows) {
+      expect(row.keys[0]).toBe('g');
+      expect(row.keys).toHaveLength(2);
+    }
+  });
+});
+
 describe('groupShortcuts', () => {
   it('buckets shortcuts under their group with a human heading', () => {
     const groups = groupShortcuts(shortcuts);
@@ -43,6 +68,17 @@ describe('groupShortcuts', () => {
     expect(global).toBeDefined();
     expect(global?.heading).toBe('Global');
     expect(global?.shortcuts.length).toBe(shortcuts.filter(s => s.group === 'global').length);
+  });
+
+  it('buckets the navigation chords under a Navigation group, after Global', () => {
+    const groups = groupShortcuts(shortcuts);
+    const navigation = groups.find(g => g.id === 'navigation');
+    expect(navigation).toBeDefined();
+    expect(navigation?.heading).toBe('Navigation');
+    expect(navigation?.shortcuts.length).toBe(shortcuts.filter(s => s.group === 'navigation').length);
+    // Declared order puts Global before Navigation regardless of insertion order.
+    const ids = groups.map(g => g.id);
+    expect(ids.indexOf('global')).toBeLessThan(ids.indexOf('navigation'));
   });
 
   it('preserves each shortcut intact within its group', () => {

@@ -9,6 +9,8 @@
  * data means the same registry renders correctly on every platform and stays SSR-safe.
  */
 
+import { navSequences } from './nav-sequences';
+
 /**
  * The platform-resolved modifier token. Stored instead of a literal ⌘/Ctrl so the
  * displayed glyph follows the client platform (resolved via `isMacPlatform()` in the
@@ -20,7 +22,7 @@ export const MOD_KEY = 'Mod';
  * The buckets a shortcut can belong to. A union (not a free string) so the help modal
  * renders groups in a known order and a new group is an explicit, additive change.
  */
-export type ShortcutGroupId = 'global';
+export type ShortcutGroupId = 'global' | 'navigation';
 
 /** A single documented shortcut — one row in the help modal. */
 export interface Shortcut {
@@ -35,14 +37,28 @@ export interface Shortcut {
 }
 
 /**
+ * The Grafana-style `g`-prefix navigation chords, documented straight from the binding's
+ * source of truth ({@link navSequences}). Each chord's canonical UPPERCASE tokens are
+ * lowercased to the `g d` form users actually press, so these rows can never drift from the
+ * keys the binding (`keyboard-shortcuts.tsx`) listens for.
+ */
+const navigationShortcuts: readonly Shortcut[] = navSequences.map(nav => ({
+  keys: nav.chord.map(key => key.toLowerCase()),
+  description: `Go to ${nav.label}`,
+  group: 'navigation',
+}));
+
+/**
  * Every shortcut the app currently exposes. Order within a group is the display order.
  * Bindings themselves live with their components (e.g. `Mod+K` in `command-palette.tsx`,
- * `Shift+/` in `shortcuts-help.tsx`); this registry is the human-facing documentation.
+ * `Shift+/` in `shortcuts-help.tsx`, the `g`-chords in `keyboard-shortcuts.tsx`); this
+ * registry is the human-facing documentation.
  */
 export const shortcuts: readonly Shortcut[] = [
   { keys: [MOD_KEY, 'K'], description: 'Open the command palette', group: 'global' },
   { keys: ['?'], description: 'Open this keyboard shortcuts help', group: 'global' },
   { keys: ['Esc'], description: 'Close the open dialog or palette', group: 'global' },
+  ...navigationShortcuts,
 ];
 
 /** A group of shortcuts with a rendered heading, as consumed by the modal. */
@@ -57,7 +73,10 @@ export interface ShortcutGroup {
  * modal's section order is stable and intentional regardless of registry insertion order
  * — adding a group is an explicit entry, mirroring `command-data.ts`.
  */
-const GROUP_ORDER: readonly { readonly id: ShortcutGroupId; readonly heading: string }[] = [{ id: 'global', heading: 'Global' }];
+const GROUP_ORDER: readonly { readonly id: ShortcutGroupId; readonly heading: string }[] = [
+  { id: 'global', heading: 'Global' },
+  { id: 'navigation', heading: 'Navigation' },
+];
 
 /**
  * Bucket a flat shortcut list into ordered, headed groups for rendering. Groups follow

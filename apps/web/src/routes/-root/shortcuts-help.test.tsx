@@ -1,4 +1,4 @@
-import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { useCallback, useState } from 'react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
@@ -23,6 +23,14 @@ const EXPECTED_MOD_GLYPH = isMacPlatform() ? '⌘' : 'Ctrl';
 const EXPECTED_PALETTE_COMBO_LABEL = isMacPlatform() ? 'Command then K' : 'Control then K';
 
 const keycapText = (): readonly (string | null)[] => Array.from(document.querySelectorAll('kbd')).map(cap => cap.textContent);
+
+// The row (`<div>`) wrapping a shortcut's <dt>/<dd>. Resolved here, throwing on miss, so test
+// bodies can scope queries to a row without an inline `?.`/`??` (which trips no-conditional-in-test).
+const rowFor = (description: string): HTMLElement => {
+  const row = screen.getByText(description).closest('div');
+  if (!(row instanceof HTMLElement)) throw new Error(`no row found for "${description}"`);
+  return row;
+};
 
 const Harness = ({ initialOpen, onOpenChange }: { initialOpen: boolean; onOpenChange: (open: boolean) => void }) => {
   const [open, setOpen] = useState(initialOpen);
@@ -63,6 +71,18 @@ describe('shortcuts help overlay', () => {
     expect(screen.getByText('Open this keyboard shortcuts help')).toBeDefined();
     expect(screen.getByText('Close the open dialog or palette')).toBeDefined();
     expect(document.querySelectorAll('kbd').length).toBeGreaterThan(0);
+  });
+
+  it('renders the Navigation group with the `g`-chord rows', () => {
+    renderHelp(true);
+    expect(screen.getByRole('heading', { name: 'Navigation' })).toBeDefined();
+    // A representative chord row: scope to the "Go to Home" <dt>'s row so its keycaps and
+    // combo label can be read without conditionals.
+    const row = rowFor('Go to Home');
+    const dd = within(row).getByLabelText('g then h');
+    expect(dd.tagName).toBe('DD');
+    expect(Array.from(dd.querySelectorAll('kbd')).map(cap => cap.textContent)).toEqual(['g', 'h']);
+    expect(screen.getByText('Go to Dashboards')).toBeDefined();
   });
 
   it('uses <dt>/<dd> rows so each description is paired with its keycaps', () => {
