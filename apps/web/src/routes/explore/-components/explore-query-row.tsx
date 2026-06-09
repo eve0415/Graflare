@@ -5,8 +5,16 @@ import type { SqlBuilderState } from '@graflare/shared/sql/builder';
 
 import { generatePromQL } from '@graflare/shared/promql/generate';
 import { buildSql } from '@graflare/shared/sql/builder';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogTitle,
+} from '@graflare/ui/components/alert-dialog';
 import { Button } from '@graflare/ui/components/button';
-import { Dialog, DialogClose, DialogContent, DialogDescription, DialogFooter, DialogTitle } from '@graflare/ui/components/dialog';
 import { XIcon } from 'lucide-react';
 import { useCallback, useReducer, useState } from 'react';
 
@@ -171,16 +179,16 @@ export const ExploreQueryRow = ({ id, refId, datasourceId, isSql, dialect, schem
         </QueryEditorShell>
       </div>
 
-      <Dialog open={confirmReset} onOpenChange={setConfirmReset}>
-        <DialogContent>
-          <DialogTitle>Switch to Builder?</DialogTitle>
-          <DialogDescription>Your Code mode edits will be lost. The builder will reset to its current state.</DialogDescription>
-          <DialogFooter>
-            <DialogClose>Cancel</DialogClose>
-            <Button onClick={confirmModeReset}>Switch to Builder</Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      <AlertDialog open={confirmReset} onOpenChange={setConfirmReset}>
+        <AlertDialogContent>
+          <AlertDialogTitle>Switch to Builder?</AlertDialogTitle>
+          <AlertDialogDescription>Your Code mode edits will be lost. The builder will reset to its current state.</AlertDialogDescription>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={confirmModeReset}>Switch to Builder</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </fieldset>
   );
 };

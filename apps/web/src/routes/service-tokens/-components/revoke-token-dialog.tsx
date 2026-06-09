@@ -1,5 +1,13 @@
-import { Button } from '@graflare/ui/components/button';
-import { Dialog, DialogClose, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@graflare/ui/components/dialog';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@graflare/ui/components/alert-dialog';
 import { useCallback } from 'react';
 
 export interface RevokeTarget {
@@ -17,8 +25,9 @@ interface RevokeTokenDialogProps {
 
 /**
  * Confirm dialog for revoking a service token. Revoking deletes the credential at Cloudflare,
- * so any caller using it stops authenticating immediately. Unlike the reveal panel this dialog
- * is freely dismissable — cancelling is the safe default for a destructive action.
+ * so any caller using it stops authenticating immediately. As an alert dialog it forces an
+ * explicit Cancel/Revoke choice — an outside click won't dismiss it (Esc still cancels), so a
+ * stray click can't silently trigger or skip a destructive action.
  */
 export const RevokeTokenDialog = ({ target, onOpenChange, onConfirm, revoking }: RevokeTokenDialogProps) => {
   const handleConfirm = useCallback(() => {
@@ -26,23 +35,23 @@ export const RevokeTokenDialog = ({ target, onOpenChange, onConfirm, revoking }:
   }, [target, onConfirm]);
 
   return (
-    <Dialog open={target !== null} onOpenChange={onOpenChange}>
-      <DialogContent className='sm:max-w-md'>
-        <DialogHeader>
-          <DialogTitle>Revoke service token</DialogTitle>
-          <DialogDescription>
+    <AlertDialog open={target !== null} onOpenChange={onOpenChange}>
+      <AlertDialogContent className='sm:max-w-md'>
+        <AlertDialogHeader>
+          <AlertDialogTitle>Revoke service token</AlertDialogTitle>
+          <AlertDialogDescription>
             {target === null
               ? null
               : `Revoke “${target.name}”? Any automated caller using this token will immediately stop working. This cannot be undone — you’d need to create a new token.`}
-          </DialogDescription>
-        </DialogHeader>
-        <DialogFooter>
-          <DialogClose render={<Button variant='outline' />}>Cancel</DialogClose>
-          <Button variant='destructive' onClick={handleConfirm} disabled={revoking}>
+          </AlertDialogDescription>
+        </AlertDialogHeader>
+        <AlertDialogFooter>
+          <AlertDialogCancel>Cancel</AlertDialogCancel>
+          <AlertDialogAction variant='destructive' onClick={handleConfirm} disabled={revoking}>
             {revoking ? 'Revoking…' : 'Revoke token'}
-          </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
+          </AlertDialogAction>
+        </AlertDialogFooter>
+      </AlertDialogContent>
+    </AlertDialog>
   );
 };
