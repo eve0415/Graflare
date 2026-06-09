@@ -1,5 +1,7 @@
 import * as z from 'zod/mini';
 
+import { grafanaOverrideSchema } from './grafana-classic';
+
 const v2QuerySchema = z.object({
   refId: z._default(z.string(), ''),
   expr: z._default(z.string(), ''),
@@ -22,6 +24,15 @@ const v2ElementSpecSchema = z.object({
     { queries: [] },
   ),
   options: z.optional(v2ElementOptionsSchema),
+  // Per-field overrides, reusing the classic override shape. NB: this follows the adapter's
+  // existing simplified `element.spec` layout — canonical Grafana v2alpha1 nests fieldConfig
+  // under `vizConfig.spec`, which this adapter does not model for any field yet. Optional, so
+  // an element without it maps to `[]`.
+  fieldConfig: z.optional(
+    z.object({
+      overrides: z._default(z.array(grafanaOverrideSchema), []),
+    }),
+  ),
 });
 
 const v2ElementSchema = z.object({

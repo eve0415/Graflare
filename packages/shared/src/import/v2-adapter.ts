@@ -6,6 +6,7 @@ import type { ImportResult } from './types';
 
 import { grafanaV2Schema } from '../schemas/grafana-v2';
 
+import { mapOverrides } from './override-mapping';
 import { resolveVariableType, splitCsv } from './variable-mapping';
 
 // Grafana V2 element kinds whose lowercased name differs from our internal panel
@@ -145,7 +146,8 @@ export const importV2 = (json: Record<string, unknown>): ImportResult => {
       gridPos,
       thresholds: [],
       displayOptions,
-      fieldConfig: { defaults: { unit: '', mappings: [] }, overrides: [] },
+      // Carry per-field overrides across, warn-dropping unmappable matchers/properties.
+      fieldConfig: { defaults: { unit: '', mappings: [] }, overrides: mapOverrides(element.spec.fieldConfig?.overrides ?? [], warnings) },
     });
 
     panelIndex += 1;

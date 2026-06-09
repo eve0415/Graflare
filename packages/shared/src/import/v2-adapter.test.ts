@@ -606,4 +606,39 @@ describe('importV2', () => {
       expect(result.warnings[0]).toContain('NodeGraph');
     });
   });
+
+  describe('field overrides', () => {
+    const dashboardWith = (overrides: unknown[]) => ({
+      ...validV2Dashboard,
+      spec: {
+        ...validV2Dashboard.spec,
+        elements: {
+          cpu: {
+            kind: 'Table',
+            spec: { title: 'T', data: { queries: [{ refId: 'A', expr: 'up' }] }, fieldConfig: { overrides } },
+          },
+        },
+        layout: { items: [{ element: 'cpu', x: 0, y: 0, width: 12, height: 8 }] },
+      },
+    });
+
+    it('maps a byName unit override from element.spec.fieldConfig', () => {
+      const result = importV2(dashboardWith([{ matcher: { id: 'byName', options: 'cpu' }, properties: [{ id: 'unit', value: 'percent' }] }]));
+      expect(result.dashboard.panels[0]?.fieldConfig.overrides).toEqual([
+        { matcher: { id: 'byName', options: 'cpu' }, properties: [{ id: 'unit', value: 'percent' }] },
+      ]);
+      expect(result.warnings).toEqual([]);
+    });
+
+    it('warn-drops an unsupported matcher', () => {
+      const result = importV2(dashboardWith([{ matcher: { id: 'byValue', options: 'x' }, properties: [{ id: 'unit', value: 'percent' }] }]));
+      expect(result.dashboard.panels[0]?.fieldConfig.overrides).toEqual([]);
+      expect(result.warnings.some(w => w.includes('byValue'))).toBe(true);
+    });
+
+    it('defaults overrides to [] when an element omits fieldConfig', () => {
+      const result = importV2(validV2Dashboard);
+      expect(result.dashboard.panels[0]?.fieldConfig.overrides).toEqual([]);
+    });
+  });
 });

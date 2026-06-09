@@ -6,6 +6,7 @@ import type { ImportResult } from './types';
 
 import { grafanaClassicSchema } from '../schemas/grafana-classic';
 
+import { mapOverrides } from './override-mapping';
 import { resolveVariableType, splitCsv } from './variable-mapping';
 
 const PANEL_TYPE_MAP: Record<string, string> = {
@@ -133,7 +134,9 @@ const convertPanel = (gp: GrafanaBasePanel, index: number, warnings: string[]): 
     gridPos: clampGridPos(gp.gridPos),
     thresholds: mapThresholds(gp.fieldConfig),
     displayOptions,
-    fieldConfig: { defaults: { unit: '', mappings: [] }, overrides: [] },
+    // Defaults stay empty (consistent with thresholds being lifted to panel.thresholds); only
+    // per-field overrides are carried across, warn-dropping matchers/properties we can't model.
+    fieldConfig: { defaults: { unit: '', mappings: [] }, overrides: mapOverrides(gp.fieldConfig.overrides, warnings) },
   };
 };
 

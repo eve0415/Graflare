@@ -1,10 +1,11 @@
 import type { Panel } from '@graflare/shared/schemas/panel';
 
+import { resolveFieldConfig } from '@graflare/shared/format/resolve-field-config';
 import { formatValue } from '@graflare/shared/format/value-format';
 import { applyValueMappings } from '@graflare/shared/format/value-mappings';
 import { useMemo } from 'react';
 
-import { firstScalar, getThresholdColor } from './panel-data-extract';
+import { extractResultSeries, firstScalar, getThresholdColor } from './panel-data-extract';
 import { PanelFrame } from './panel-frame';
 import { usePanelQuery } from './use-panel-query';
 
@@ -37,10 +38,18 @@ export const GaugePanel = ({ panel, timeRange, refetchInterval }: GaugePanelProp
     return raw === null ? null : Number(raw);
   }, [data]);
 
-  // Field config is the single home for the gauge range now.
-  const { defaults } = panel.fieldConfig;
-  const min = defaults.min ?? 0;
-  const max = defaults.max ?? 100;
+  // Gauge shows a single value field (the first series); resolve its effective config
+  // against the panel overrides — the single home for the gauge range (min/max), unit and
+  // mappings. With no matching override this returns the defaults reference, so the memo
+  // deps below stay reference-stable (byte-identical to before overrides).
+  const { fieldConfig } = panel;
+  const config = useMemo(() => {
+    const [first] = extractResultSeries(data);
+    return resolveFieldConfig({ name: first?.metric.__name__ ?? '' }, fieldConfig);
+  }, [data, fieldConfig]);
+
+  const min = config.min ?? 0;
+  const max = config.max ?? 100;
   const showMarkers = panel.displayOptions.gauge?.showThresholdMarkers !== false;
 
   const normalizedValue = value === null ? min : Math.max(min, Math.min(max, value));
@@ -48,10 +57,10 @@ export const GaugePanel = ({ panel, timeRange, refetchInterval }: GaugePanelProp
   const angle = -90 + percentage * 180;
 
   // One pass over the mappings feeds both the center readout text and its color.
-  const mapping = useMemo(() => applyValueMappings(value, defaults.mappings), [value, defaults.mappings]);
-  const centerText = mapping?.text ?? (value === null ? '—' : formatValue(value, defaults));
-  const minLabel = formatValue(min, defaults);
-  const maxLabel = formatValue(max, defaults);
+  const mapping = useMemo(() => applyValueMappings(value, config.mappings), [value, config.mappings]);
+  const centerText = mapping?.text ?? (value === null ? '—' : formatValue(value, config));
+  const minLabel = formatValue(min, config);
+  const maxLabel = formatValue(max, config);
 
   const thresholdColor = mapping?.color ?? (value !== null && panel.thresholds.length > 0 ? getThresholdColor(value, panel.thresholds, '#4ade80') : '#4ade80');
 

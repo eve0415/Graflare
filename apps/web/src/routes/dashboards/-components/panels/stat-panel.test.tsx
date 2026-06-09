@@ -34,6 +34,27 @@ const instantValue = (raw: string): PanelDataResult[] => [
   { status: 'success', data: { resultType: 'vector', result: [{ metric: {}, value: [0, raw] }] } },
 ];
 
+// Same shape but with a series name (__name__), so a byName override can match the field.
+const namedInstantValue = (name: string, raw: string): PanelDataResult[] => [
+  { status: 'success', data: { resultType: 'vector', result: [{ metric: { __name__: name }, value: [0, raw] }] } },
+];
+
+// A stat panel whose defaults set no unit, but a byName override targets `seriesName`.
+const statPanelWithOverride = (seriesName: string): Panel => ({
+  id: 'p1',
+  type: 'stat',
+  title: 'Mem',
+  description: '',
+  queries: [{ refId: 'A', expr: 'mem', legendFormat: '', format: 'time_series' }],
+  gridPos: { x: 0, y: 0, w: 12, h: 8 },
+  thresholds: [],
+  displayOptions: {},
+  fieldConfig: {
+    defaults: { unit: '', mappings: [] },
+    overrides: [{ matcher: { id: 'byName', options: seriesName }, properties: [{ id: 'unit', value: 'bytes' }] }],
+  },
+});
+
 const timeRange = { from: 'now-1h', to: 'now' };
 
 afterEach(() => {
@@ -46,6 +67,21 @@ describe('stat-panel formatting', () => {
     mockUsePanelData.mockReturnValue({ data: instantValue('1536'), isLoading: false, error: null, refetch: vi.fn<() => void>() });
     render(<StatPanel panel={statPanel('bytes')} timeRange={timeRange} refetchInterval={false} />);
     expect(screen.getByText('1.5 KiB')).toBeDefined();
+  });
+
+  it('applies a byName override (matched on the series __name__) to format the value', () => {
+    // defaults set no unit; the override gives the `mem_bytes` field the bytes unit.
+    mockUsePanelData.mockReturnValue({ data: namedInstantValue('mem_bytes', '1536'), isLoading: false, error: null, refetch: vi.fn<() => void>() });
+    render(<StatPanel panel={statPanelWithOverride('mem_bytes')} timeRange={timeRange} refetchInterval={false} />);
+    expect(screen.getByText('1.5 KiB')).toBeDefined();
+  });
+
+  it('does not apply an override whose byName matcher does not match the series', () => {
+    mockUsePanelData.mockReturnValue({ data: namedInstantValue('cpu_secs', '1536'), isLoading: false, error: null, refetch: vi.fn<() => void>() });
+    render(<StatPanel panel={statPanelWithOverride('mem_bytes')} timeRange={timeRange} refetchInterval={false} />);
+    // No match → defaults (no unit) → raw number, never the bytes-formatted string.
+    expect(screen.getByText('1536')).toBeDefined();
+    expect(screen.queryByText('1.5 KiB')).toBeNull();
   });
 
   it('a matching value mapping text overrides the formatted value', () => {

@@ -60,15 +60,60 @@ export const fieldConfigDefaults = z.object({
 
 export type FieldConfigDefaults = z.infer<typeof fieldConfigDefaults>;
 
+// Per-field override matcher. Grafana's FieldMatcherID enum (grafana-data
+// transformations/matchers/ids.ts) is the source of truth; the enum below lists the
+// string-option matchers we can match against a Prometheus/SQL field at render time:
+//   - byName:       exact field-name equality (Grafana defaultOptions: '')
+//   - byRegexp:     pattern test on the field name (Grafana defaultOptions: '/.*/' )
+//   - byType:       match on the field's data type (e.g. 'number' / 'string' / 'time')
+//   - byFrameRefID: match every field of a query by its refId
+// `options` is a single string for all of these (mirrors Grafana's FieldMatcherInfo<string>).
+// Grafana's structured-option matchers (byNames/byTypes/byValue) carry an object, not a
+// string, and are intentionally out of scope this iteration — adding one is a new union
+// branch with its own `options` shape, never a change to the branches below.
+const fieldMatcherSchema = z.object({
+  id: z.enum(['byName', 'byRegexp', 'byType', 'byFrameRefID']),
+  options: z.string().check(z.maxLength(512)),
+});
+
+export type FieldMatcher = z.infer<typeof fieldMatcherSchema>;
+export type FieldMatcherId = FieldMatcher['id'];
+
+// A single override property: a literal-tagged value, one branch per FieldConfigDefaults
+// key (same union pattern as valueMappingSchema above). Each branch's `value` is typed to
+// the matching FieldConfigDefaults field — never `any` — so resolveFieldConfig can merge
+// it onto a FieldConfigDefaults via a `switch (id)` with no casts. The set is additive: a
+// new overridable field is a new branch and existing consumers keep narrowing exhaustively.
+// Grafana property ids we deliberately DON'T model here: `thresholds` and `color` live at
+// the panel level (panel.thresholds), not in fieldConfig.defaults, so they can't merge into
+// this shape; the import adapters warn-drop them rather than silently lose data.
+const unitProperty = z.object({ id: z.literal('unit'), value: z.string().check(z.maxLength(64)) });
+const decimalsProperty = z.object({ id: z.literal('decimals'), value: z.int().check(z.minimum(0), z.maximum(10)) });
+const minProperty = z.object({ id: z.literal('min'), value: z.number() });
+const maxProperty = z.object({ id: z.literal('max'), value: z.number() });
+const mappingsProperty = z.object({ id: z.literal('mappings'), value: z.array(valueMappingSchema) });
+
+export const fieldOverridePropertySchema = z.union([unitProperty, decimalsProperty, minProperty, maxProperty, mappingsProperty]);
+export type FieldOverrideProperty = z.infer<typeof fieldOverridePropertySchema>;
+export type FieldOverridePropertyId = FieldOverrideProperty['id'];
+
+// One override entry — Grafana's `{ matcher, properties }` shape verbatim. Every field the
+// matcher selects has these properties merged onto the resolved config; later entries in
+// the array win (Grafana precedence), so the array order is significant.
+export const fieldOverrideSchema = z.object({
+  matcher: fieldMatcherSchema,
+  properties: z._default(z.array(fieldOverridePropertySchema), []),
+});
+
+export type FieldOverride = z.infer<typeof fieldOverrideSchema>;
+
 export const fieldConfigSchema = z.object({
   defaults: z._default(fieldConfigDefaults, { unit: '', mappings: [] }),
-  // Per-field overrides are deferred to a follow-up: this is a forward-compat
-  // placeholder with NO apply logic this iteration. A passthrough object (not
-  // z.unknown()) on purpose — z.unknown() here makes the inferred Panel type blow
-  // past the instantiation-depth limit of the Service<GraflareAPI> RPC serializer,
-  // collapsing Dashboard to `never` at every web call site. A real override schema
-  // replaces this empty object when overrides land.
-  overrides: z._default(z.array(z.object({})), []),
+  // Per-field overrides: each entry's matcher selects fields by name/regexp/type/refId and
+  // sets the listed properties on top of `defaults` (see resolveFieldConfig in
+  // format/resolve-field-config.ts). Backward compatible — stored panels with `overrides: []`
+  // parse and resolve to `defaults` unchanged.
+  overrides: z._default(z.array(fieldOverrideSchema), []),
 });
 
 export type FieldConfig = z.infer<typeof fieldConfigSchema>;

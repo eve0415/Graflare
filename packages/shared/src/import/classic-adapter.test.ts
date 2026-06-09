@@ -853,3 +853,61 @@ describe('importClassic', () => {
     });
   });
 });
+
+// A classic dashboard with a single table panel carrying the given fieldConfig.overrides.
+const dashboardWithOverrides = (overrides: unknown[]) => ({
+  title: 'D',
+  panels: [
+    {
+      type: 'table',
+      title: 'T',
+      targets: [{ refId: 'A', expr: 'up' }],
+      gridPos: { x: 0, y: 0, w: 12, h: 8 },
+      fieldConfig: { defaults: { thresholds: { steps: [] } }, overrides },
+    },
+  ],
+});
+
+describe('importClassic — field overrides', () => {
+  it('maps a byName unit override onto the panel fieldConfig', () => {
+    const result = importClassic(dashboardWithOverrides([{ matcher: { id: 'byName', options: 'cpu' }, properties: [{ id: 'unit', value: 'percent' }] }]));
+    expect(result.dashboard.panels[0]?.fieldConfig.overrides).toEqual([
+      { matcher: { id: 'byName', options: 'cpu' }, properties: [{ id: 'unit', value: 'percent' }] },
+    ]);
+    expect(result.warnings).toEqual([]);
+  });
+
+  it('maps byRegexp / byType / byFrameRefID matchers', () => {
+    const result = importClassic(
+      dashboardWithOverrides([
+        { matcher: { id: 'byRegexp', options: '^cpu' }, properties: [{ id: 'decimals', value: 2 }] },
+        { matcher: { id: 'byType', options: 'number' }, properties: [{ id: 'min', value: 0 }] },
+        { matcher: { id: 'byFrameRefID', options: 'A' }, properties: [{ id: 'max', value: 100 }] },
+      ]),
+    );
+    expect(result.dashboard.panels[0]?.fieldConfig.overrides).toHaveLength(3);
+    expect(result.dashboard.panels[0]?.fieldConfig.overrides.map(o => o.matcher.id)).toEqual(['byRegexp', 'byType', 'byFrameRefID']);
+  });
+
+  it('warn-drops an unsupported matcher and an unsupported property', () => {
+    const result = importClassic(
+      dashboardWithOverrides([
+        { matcher: { id: 'byNames', options: { names: ['a'] } }, properties: [{ id: 'unit', value: 'percent' }] },
+        { matcher: { id: 'byName', options: 'cpu' }, properties: [{ id: 'color', value: { mode: 'fixed' } }] },
+      ]),
+    );
+    // First override (byNames) dropped whole; second's only property (color) dropped, so it
+    // carries no effect and is dropped too — net zero overrides, two warnings.
+    expect(result.dashboard.panels[0]?.fieldConfig.overrides).toEqual([]);
+    expect(result.warnings.some(w => w.includes('byNames'))).toBe(true);
+    expect(result.warnings.some(w => w.includes('color'))).toBe(true);
+  });
+
+  it('defaults overrides to [] when the panel omits fieldConfig entirely (fallback regression)', () => {
+    const result = importClassic({
+      title: 'D',
+      panels: [{ type: 'stat', title: 'X', targets: [{ refId: 'A', expr: 'up' }], gridPos: { x: 0, y: 0, w: 4, h: 4 } }],
+    });
+    expect(result.dashboard.panels[0]?.fieldConfig.overrides).toEqual([]);
+  });
+});

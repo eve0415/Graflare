@@ -1,10 +1,11 @@
 import type { Panel } from '@graflare/shared/schemas/panel';
 
+import { resolveFieldConfig } from '@graflare/shared/format/resolve-field-config';
 import { formatValue } from '@graflare/shared/format/value-format';
 import { applyValueMappings } from '@graflare/shared/format/value-mappings';
 import { useMemo } from 'react';
 
-import { firstScalar, getThresholdColor, readableTextColor } from './panel-data-extract';
+import { extractResultSeries, firstScalar, getThresholdColor, readableTextColor } from './panel-data-extract';
 import { PanelFrame } from './panel-frame';
 import { usePanelQuery } from './use-panel-query';
 
@@ -21,18 +22,26 @@ export const StatPanel = ({ panel, timeRange, refetchInterval }: StatPanelProps)
   // string verbatim when it isn't numeric).
   const value = useMemo(() => firstScalar(data), [data]);
 
-  const { defaults } = panel.fieldConfig;
+  // Stat shows a single value field (the first series); resolve that field's effective
+  // config against the panel overrides. With no matching override this is the defaults
+  // reference, so the memo deps below stay reference-stable (byte-identical to before).
+  const { fieldConfig } = panel;
+  const config = useMemo(() => {
+    const [first] = extractResultSeries(data);
+    return resolveFieldConfig({ name: first?.metric.__name__ ?? '' }, fieldConfig);
+  }, [data, fieldConfig]);
+
   const numericValue = value === null ? Number.NaN : Number(value);
   const isNumeric = Number.isFinite(numericValue);
   const colorMode = panel.displayOptions.stat?.colorMode ?? 'value';
   const textSize = panel.displayOptions.stat?.textSize ?? 48;
 
   // One pass over the mappings; both the displayed text and the color derive from it.
-  const mapping = useMemo(() => applyValueMappings(value, defaults.mappings), [value, defaults.mappings]);
+  const mapping = useMemo(() => applyValueMappings(value, config.mappings), [value, config.mappings]);
 
   // Display: a matching mapping's text wins; else format numeric values; else keep
   // the raw Prometheus token (or em-dash) — never a formatted unit on a non-number.
-  const displayText = mapping?.text ?? (isNumeric ? formatValue(numericValue, defaults) : (value ?? '—'));
+  const displayText = mapping?.text ?? (isNumeric ? formatValue(numericValue, config) : (value ?? '—'));
 
   // Color precedence: mapping color > threshold color > default.
   const thresholdColor = isNumeric && panel.thresholds.length > 0 ? getThresholdColor(numericValue, panel.thresholds, 'var(--color-foreground)') : undefined;
