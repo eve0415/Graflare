@@ -7,6 +7,10 @@ declare global {
   namespace Cloudflare {
     interface Env {
       TEST_MIGRATIONS: D1Migration[];
+      // Maintainer-provisioned secrets in production (set via `wrangler secret put`),
+      // mirrored as miniflare test bindings in vitest.config.ts so `...env` carries them.
+      CF_API_TOKEN: string;
+      CF_ACCOUNT_ID: string;
     }
   }
 }

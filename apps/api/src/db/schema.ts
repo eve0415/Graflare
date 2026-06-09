@@ -226,6 +226,26 @@ export const annotations = sqliteTable(
   table => [index('annotations_org_dashboard_idx').on(table.orgId, table.dashboardId), index('annotations_org_rule_idx').on(table.orgId, table.alertRuleId)],
 );
 
+// Public link between a Cloudflare-managed Access service token and an org.
+// We store NO secret — Cloudflare creates and validates the `client_secret`;
+// here we keep only the public `client_id` and the Cloudflare token id needed
+// to revoke it.
+export const accessServiceTokens = sqliteTable(
+  'access_service_tokens',
+  {
+    id: text('id').primaryKey(),
+    orgId: text('org_id')
+      .notNull()
+      .references(() => organizations.id),
+    cfTokenId: text('cf_token_id').notNull(),
+    clientId: text('client_id').notNull(),
+    name: text('name').notNull(),
+    createdAt: integer('created_at', { mode: 'timestamp_ms' }).notNull(),
+    expiresAt: integer('expires_at', { mode: 'timestamp_ms' }),
+  },
+  table => [index('access_service_tokens_org_idx').on(table.orgId), uniqueIndex('access_service_tokens_client_idx').on(table.clientId)],
+);
+
 export const dashboardVersions = sqliteTable(
   'dashboard_versions',
   {

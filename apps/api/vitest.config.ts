@@ -12,7 +12,13 @@ export default defineConfig(async () => {
       cloudflareTest({
         wrangler: { configPath: './wrangler.json' },
         miniflare: {
-          bindings: { TEST_MIGRATIONS: migrations },
+          bindings: {
+            TEST_MIGRATIONS: migrations,
+            // Maintainer-provisioned secrets in prod (set via `wrangler secret put`);
+            // mirrored here as test bindings so the service-token client/ops can run.
+            CF_API_TOKEN: 'test-cf-token',
+            CF_ACCOUNT_ID: 'test-account-id',
+          },
           d1Databases: { DB: 'test-db' },
           workers: [
             {
