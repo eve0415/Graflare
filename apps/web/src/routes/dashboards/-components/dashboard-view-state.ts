@@ -32,7 +32,7 @@ export const intervalToMs: Record<RefreshInterval, number | false> = {
 };
 
 /** Narrow an arbitrary string to a known refresh interval (a real guard over the tuple). */
-const isRefreshInterval = (value: string): value is RefreshInterval => (REFRESH_INTERVALS as readonly string[]).includes(value);
+const isRefreshInterval = (value: string): value is RefreshInterval => REFRESH_INTERVALS.some(interval => interval === value);
 
 const DEFAULT_FROM = 'now-1h';
 const DEFAULT_TO = 'now';
