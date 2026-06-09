@@ -1,6 +1,13 @@
 import type { FieldMatcherId, FieldOverride, FieldOverrideProperty } from '../schemas/field-config';
 import type { GrafanaOverride } from '../schemas/grafana-classic';
 
+// Generous bounds on what an imported dashboard can carry: each override compiles a RegExp
+// (byRegexp) and is iterated per series at render, so an unbounded array from a hostile/runaway
+// import is a CPU-cost lever. No real dashboard approaches these; past them we truncate WITH a
+// warning (the same honest-loss approach as the warn-drop below), never silently nor by rejecting.
+const MAX_OVERRIDES = 1000;
+const MAX_PROPERTIES_PER_OVERRIDE = 64;
+
 // Grafana FieldMatcherID → Graflare matcher id, limited to the string-option matchers we
 // resolve at render time (see fieldMatcherSchema). Grafana's structured-option matchers
 // (byNames/byTypes/byRegexpOrNames/byValue) and the no-argument ones (numeric/time/first/…)
@@ -57,7 +64,12 @@ const matcherOption = (options: unknown): string | null => (typeof options === '
 export const mapOverrides = (overrides: readonly GrafanaOverride[], warnings: string[]): FieldOverride[] => {
   const mapped: FieldOverride[] = [];
 
-  for (const o of overrides) {
+  const boundedOverrides = overrides.length > MAX_OVERRIDES ? overrides.slice(0, MAX_OVERRIDES) : overrides;
+  if (overrides.length > MAX_OVERRIDES) {
+    warnings.push(`Dashboard has ${String(overrides.length)} field overrides; only the first ${String(MAX_OVERRIDES)} were imported`);
+  }
+
+  for (const o of boundedOverrides) {
     const matcherId = MATCHER_ID_MAP[o.matcher.id];
     const option = matcherOption(o.matcher.options);
     if (matcherId === undefined || option === null) {
@@ -65,8 +77,15 @@ export const mapOverrides = (overrides: readonly GrafanaOverride[], warnings: st
       continue;
     }
 
+    const boundedProps = o.properties.length > MAX_PROPERTIES_PER_OVERRIDE ? o.properties.slice(0, MAX_PROPERTIES_PER_OVERRIDE) : o.properties;
+    if (o.properties.length > MAX_PROPERTIES_PER_OVERRIDE) {
+      warnings.push(
+        `Field override on "${option}" has ${String(o.properties.length)} properties; only the first ${String(MAX_PROPERTIES_PER_OVERRIDE)} were imported`,
+      );
+    }
+
     const properties: FieldOverrideProperty[] = [];
-    for (const p of o.properties) {
+    for (const p of boundedProps) {
       const prop = mapProperty(p.id, p.value, option, warnings);
       if (prop !== null) properties.push(prop);
     }

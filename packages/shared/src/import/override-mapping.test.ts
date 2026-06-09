@@ -109,4 +109,22 @@ describe('mapOverrides', () => {
     expect(out).toEqual([]);
     expect(warnings[0]).toContain('thresholds');
   });
+
+  describe('import bounds (DoS hardening)', () => {
+    it('truncates an over-large overrides array to the cap with a warning', () => {
+      const warnings: string[] = [];
+      const huge = Array.from({ length: 1001 }, () => override({ id: 'byName', options: 'cpu' }, [{ id: 'unit', value: 'bytes' }]));
+      const out = mapOverrides(huge, warnings);
+      expect(out).toHaveLength(1000);
+      expect(warnings.join('\n')).toContain('1001 field overrides; only the first 1000');
+    });
+
+    it('truncates an over-large properties array to the cap with a warning', () => {
+      const warnings: string[] = [];
+      const manyProps = Array.from({ length: 65 }, () => ({ id: 'unit', value: 'bytes' }));
+      const out = mapOverrides([override({ id: 'byName', options: 'cpu' }, manyProps)], warnings);
+      expect(out[0]?.properties).toHaveLength(64);
+      expect(warnings.join('\n')).toContain('65 properties; only the first 64');
+    });
+  });
 });
