@@ -8,6 +8,7 @@ import { TanStackRouterDevtools } from '@tanstack/react-router-devtools';
 import { useCallback, useState } from 'react';
 
 import { AppSidebar } from './-root/app-sidebar';
+import { Breadcrumbs } from './-root/breadcrumbs';
 import { CommandPalette } from './-root/command-palette';
 import { CommandPaletteTrigger } from './-root/command-palette-trigger';
 import { QueryBoundary } from './-root/query-boundary';
@@ -36,7 +37,7 @@ const RootComponent = () => {
               <header className='flex h-12 shrink-0 items-center gap-2 border-b px-4'>
                 <SidebarTrigger className='-ml-1' />
                 <Separator orientation='vertical' className='mr-2 !h-4' />
-                <span className='text-sm font-semibold'>Graflare</span>
+                <Breadcrumbs />
                 <div className='ml-auto'>
                   <CommandPaletteTrigger onOpen={openPalette} />
                 </div>
