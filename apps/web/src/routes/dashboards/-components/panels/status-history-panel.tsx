@@ -147,11 +147,11 @@ export const StatusHistoryPanel = ({ panel, timeRange, refetchInterval }: Status
   const rowHeight = display?.rowHeight ?? DEFAULT_ROW_HEIGHT;
   const colWidth = display?.colWidth ?? DEFAULT_COL_WIDTH;
 
-  // Each lane resolves its own config (per-field overrides) keyed on its label, inside
-  // the helper. With no overrides every lane resolves to the panel defaults reference —
-  // byte-identical formatting and colour to before.
-  const { fieldConfig } = panel;
-  const lanes = useMemo(() => statusHistoryCells(data, fieldConfig), [data, fieldConfig]);
+  // Each lane resolves its own config (per-field overrides) keyed on its label and the query
+  // refId, inside the helper. With no overrides every lane resolves to the panel defaults
+  // reference — byte-identical formatting and colour to before.
+  const { fieldConfig, queries } = panel;
+  const lanes = useMemo(() => statusHistoryCells(data, fieldConfig, queries), [data, fieldConfig, queries]);
   const layout = useMemo(() => layoutOf(lanes), [lanes]);
 
   // Accessible name for the grid-as-image: series count, so screen-reader users get a

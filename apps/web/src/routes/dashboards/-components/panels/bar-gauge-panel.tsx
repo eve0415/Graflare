@@ -74,12 +74,13 @@ export const BarGaugePanel = ({ panel, timeRange, refetchInterval }: BarGaugePan
   const { data, isLoading, error, handleRetry } = usePanelQuery(panel, timeRange, refetchInterval);
 
   // Each bar resolves its own range/unit/mappings inside the helper (keyed on the series
-  // label it derives), so per-field overrides apply per bar. With no overrides every
-  // series resolves to the panel defaults — byte-identical to before.
-  const { fieldConfig } = panel;
+  // label it derives, and the query refId for byFrameRefID), so per-field overrides apply
+  // per bar. With no overrides every series resolves to the panel defaults — byte-identical
+  // to before.
+  const { fieldConfig, queries } = panel;
   const vertical = panel.displayOptions.bargauge?.orientation === 'vertical';
 
-  const segments = useMemo(() => barGaugeSegments(data, fieldConfig), [data, fieldConfig]);
+  const segments = useMemo(() => barGaugeSegments(data, fieldConfig, queries), [data, fieldConfig, queries]);
 
   return (
     <PanelFrame title={panel.title} panelId={panel.id} loading={isLoading} error={error instanceof Error ? error.message : null} onRetry={handleRetry}>

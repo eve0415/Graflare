@@ -95,14 +95,14 @@ const PieLegendItem = ({ slice }: PieLegendItemProps) => {
 export const PiePanel = ({ panel, timeRange, refetchInterval }: PiePanelProps) => {
   const { data, isLoading, error, handleRetry } = usePanelQuery(panel, timeRange, refetchInterval);
 
-  const { fieldConfig } = panel;
+  const { fieldConfig, queries } = panel;
   const isDonut = panel.displayOptions.pie?.display === 'donut';
   const legend = panel.displayOptions.pie?.legend ?? 'right';
 
   // `pieSlices` resolves each series' effective config (per-field overrides) keyed on its
-  // label; `toDisplaySlice` formats from that. With no overrides each slice's config is
-  // the panel defaults reference — byte-identical to before.
-  const slices = useMemo(() => pieSlices(data, SLICE_PALETTE, fieldConfig).map(slice => toDisplaySlice(slice)), [data, fieldConfig]);
+  // label and the query refId; `toDisplaySlice` formats from that. With no overrides each
+  // slice's config is the panel defaults reference — byte-identical to before.
+  const slices = useMemo(() => pieSlices(data, SLICE_PALETTE, fieldConfig, queries).map(slice => toDisplaySlice(slice)), [data, fieldConfig, queries]);
 
   // A single full-circle slice can't be drawn as a wedge (start === end renders
   // nothing), so it becomes a plain circle.

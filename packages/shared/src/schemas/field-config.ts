@@ -71,8 +71,14 @@ export type FieldConfigDefaults = z.infer<typeof fieldConfigDefaults>;
 // Grafana's structured-option matchers (byNames/byTypes/byValue) carry an object, not a
 // string, and are intentionally out of scope this iteration — adding one is a new union
 // branch with its own `options` shape, never a change to the branches below.
+//
+// The canonical matcher-id set. The enum below is built FROM it, so this array is the single
+// source of truth for both the schema and the editor's matcher options/guards — a new matcher
+// id is added here once and the type, schema, and editor all follow.
+export const FIELD_OVERRIDE_MATCHER_IDS = ['byName', 'byRegexp', 'byType', 'byFrameRefID'] as const;
+
 const fieldMatcherSchema = z.object({
-  id: z.enum(['byName', 'byRegexp', 'byType', 'byFrameRefID']),
+  id: z.enum(FIELD_OVERRIDE_MATCHER_IDS),
   options: z.string().check(z.maxLength(512)),
 });
 
@@ -96,6 +102,22 @@ const mappingsProperty = z.object({ id: z.literal('mappings'), value: z.array(va
 export const fieldOverridePropertySchema = z.union([unitProperty, decimalsProperty, minProperty, maxProperty, mappingsProperty]);
 export type FieldOverrideProperty = z.infer<typeof fieldOverridePropertySchema>;
 export type FieldOverridePropertyId = FieldOverrideProperty['id'];
+
+// Compile-time guard that an id tuple lists EVERY FieldOverridePropertyId: the parameter type
+// resolves to the tuple only when `Exclude` of the listed ids from the union is `never`, else
+// to `never` (which no real tuple is assignable to). Returns the tuple unchanged, so the
+// canonical array below stays a precise readonly tuple — no cast, no unused assertion local.
+const exhaustivePropertyIds = <const T extends readonly FieldOverridePropertyId[]>(
+  ids: [Exclude<FieldOverridePropertyId, T[number]>] extends [never] ? T : never,
+): T => ids;
+
+// The canonical property-id set: the single source of truth for the editor's "Add property"
+// options and its id guard. Unlike the matcher ids, this can't build the schema (the union's
+// branches carry different `value` types, so the union is hand-listed above), so
+// `exhaustivePropertyIds` keeps the array and that union in lockstep — adding a 6th property to
+// the union without listing it here fails to compile, exactly where the editor would otherwise
+// silently stop offering it.
+export const FIELD_OVERRIDE_PROPERTY_IDS = exhaustivePropertyIds(['unit', 'decimals', 'min', 'max', 'mappings']);
 
 // Build a fresh, well-formed override property of the given id with a neutral starting value
 // (same factory pattern as makeValueMapping above; mirrors applyProperty's switch-on-id so the

@@ -5,7 +5,7 @@ import { formatValue } from '@graflare/shared/format/value-format';
 import { applyValueMappings } from '@graflare/shared/format/value-mappings';
 import { useMemo } from 'react';
 
-import { extractResultSeries, firstScalar, getThresholdColor, readableTextColor } from './panel-data-extract';
+import { extractResultSeriesWithQuery, firstScalar, getThresholdColor, readableTextColor, seriesDescriptor } from './panel-data-extract';
 import { PanelFrame } from './panel-frame';
 import { usePanelQuery } from './use-panel-query';
 
@@ -23,13 +23,16 @@ export const StatPanel = ({ panel, timeRange, refetchInterval }: StatPanelProps)
   const value = useMemo(() => firstScalar(data), [data]);
 
   // Stat shows a single value field (the first series); resolve that field's effective
-  // config against the panel overrides. With no matching override this is the defaults
-  // reference, so the memo deps below stay reference-stable (byte-identical to before).
-  const { fieldConfig } = panel;
+  // config against the panel overrides through the shared `seriesDescriptor`, so a byName /
+  // byRegexp / byFrameRefID override matches the SAME derived label every per-series panel
+  // keys on. With no series the descriptor name is '' (the no-data path is unchanged), and
+  // with no matching override this is the defaults reference, so the memo deps stay stable.
+  const { fieldConfig, queries } = panel;
   const config = useMemo(() => {
-    const [first] = extractResultSeries(data);
-    return resolveFieldConfig({ name: first?.metric.__name__ ?? '' }, fieldConfig);
-  }, [data, fieldConfig]);
+    const [first] = extractResultSeriesWithQuery(data, queries);
+    const descriptor = first === undefined ? { name: '' } : seriesDescriptor(first.series, 0, first.refId);
+    return resolveFieldConfig(descriptor, fieldConfig);
+  }, [data, queries, fieldConfig]);
 
   const numericValue = value === null ? Number.NaN : Number(value);
   const isNumeric = Number.isFinite(numericValue);

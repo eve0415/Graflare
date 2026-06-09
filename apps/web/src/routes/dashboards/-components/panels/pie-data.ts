@@ -1,9 +1,10 @@
 import type { PanelDataResult } from './use-panel-data';
 import type { FieldConfig, FieldConfigDefaults } from '@graflare/shared/schemas/field-config';
+import type { PanelQuery } from '@graflare/shared/schemas/panel';
 
 import { resolveFieldConfig } from '@graflare/shared/format/resolve-field-config';
 
-import { extractResultSeries, latestSample } from './panel-data-extract';
+import { extractResultSeriesWithQuery, latestSample, seriesDescriptor } from './panel-data-extract';
 
 // One wedge of a pie/donut: a labelled series, its latest value, that value's share
 // of the total (0..1), the cumulative sweep [startAngle, endAngle) in degrees
@@ -21,18 +22,6 @@ export interface PieSlice {
   config: FieldConfigDefaults;
 }
 
-// Derive a human label for a series: the metric name wins, else the first other
-// label value (e.g. instance), else a 1-based positional fallback. Mirrors the
-// bar-gauge labelling so the two panels read series the same way.
-const seriesLabel = (metric: Record<string, string>, index: number): string => {
-  const name = metric.__name__;
-  if (name !== undefined && name !== '') return name;
-  for (const [key, value] of Object.entries(metric)) {
-    if (key !== '__name__' && value !== '') return value;
-  }
-  return `Series ${String(index + 1)}`;
-};
-
 const FULL_CIRCLE = 360;
 
 /**
@@ -40,26 +29,31 @@ const FULL_CIRCLE = 360;
  * the renderer formats `value` (through each slice's resolved `config`) and draws the
  * arc. Each series contributes its latest sample; non-finite samples are dropped (so the
  * positional label/colour index tracks kept slices, and the arcs never run backward).
- * Each kept series resolves its own effective config against the panel overrides (keyed
- * on the label this helper derives — the same name the legend shows); with no matching
- * override that is the defaults reference, so the value labels are byte-identical to a
- * defaults-only panel. `fraction` is the value's share of the kept total; a zero (or
- * non-positive) total collapses every slice to a finite 0 fraction with zero-width angles
- * rather than dividing by zero. Angles are cumulative from 0, and the last kept slice
- * closes exactly on 360.
+ * Each kept series resolves its own effective config against the panel overrides via the
+ * shared `seriesDescriptor` (matched by the displayed label, and by query refId when
+ * `queries` is passed); with no matching override that is the defaults reference, so the
+ * value labels are byte-identical to a defaults-only panel. `fraction` is the value's share
+ * of the kept total; a zero (or non-positive) total collapses every slice to a finite 0
+ * fraction with zero-width angles rather than dividing by zero. Angles are cumulative from
+ * 0, and the last kept slice closes exactly on 360.
  */
-export const pieSlices = (data: PanelDataResult[] | null | undefined, palette: readonly string[], fieldConfig: FieldConfig): PieSlice[] => {
+export const pieSlices = (
+  data: PanelDataResult[] | null | undefined,
+  palette: readonly string[],
+  fieldConfig: FieldConfig,
+  queries?: readonly PanelQuery[],
+): PieSlice[] => {
   // First pass: keep finite latest samples with their label/colour/config, so the total
   // is taken over exactly the slices that will be drawn.
   const kept: { label: string; value: number; color: string; config: FieldConfigDefaults }[] = [];
-  for (const series of extractResultSeries(data)) {
+  for (const { series, refId } of extractResultSeriesWithQuery(data, queries)) {
     const sample = latestSample(series);
     if (sample === undefined) continue;
     const value = Number(sample[1]);
     if (!Number.isFinite(value)) continue;
     const color = palette.length === 0 ? '' : (palette[kept.length % palette.length] ?? '');
-    const label = seriesLabel(series.metric, kept.length);
-    kept.push({ label, value, color, config: resolveFieldConfig({ name: label }, fieldConfig) });
+    const descriptor = seriesDescriptor(series, kept.length, refId);
+    kept.push({ label: descriptor.name, value, color, config: resolveFieldConfig(descriptor, fieldConfig) });
   }
 
   const total = kept.reduce((sum, slice) => sum + slice.value, 0);

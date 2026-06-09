@@ -5,6 +5,7 @@ import type { Panel } from '@graflare/shared/schemas/panel';
 import { cleanup, render, screen } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
+import { barGaugeSegments } from './bar-gauge-data';
 import { StatPanel } from './stat-panel';
 
 // Mock the data hook so we feed the panel an exact Prometheus value and assert
@@ -37,6 +38,12 @@ const instantValue = (raw: string): PanelDataResult[] => [
 // Same shape but with a series name (__name__), so a byName override can match the field.
 const namedInstantValue = (name: string, raw: string): PanelDataResult[] => [
   { status: 'success', data: { resultType: 'vector', result: [{ metric: { __name__: name }, value: [0, raw] }] } },
+];
+
+// An instant series carrying an explicit metric label set (no __name__), so the derived
+// label (first other label value) is what an override must key on.
+const labelledInstant = (metric: Record<string, string>, raw: string): PanelDataResult[] => [
+  { status: 'success', data: { resultType: 'vector', result: [{ metric, value: [0, raw] }] } },
 ];
 
 // A stat panel whose defaults set no unit, but a byName override targets `seriesName`.
@@ -84,6 +91,15 @@ describe('stat-panel formatting', () => {
     expect(screen.queryByText('1.5 KiB')).toBeNull();
   });
 
+  it('applies a byName override matched on the DERIVED label of an instance-only series', () => {
+    // No __name__: stat now keys on the same derived label ('web-1') the per-series panels
+    // use, so an override authored against the displayed label matches. This is the intended
+    // behavior change — stat previously keyed on '' and never matched such a series.
+    mockUsePanelData.mockReturnValue({ data: labelledInstant({ instance: 'web-1' }, '1536'), isLoading: false, error: null, refetch: vi.fn<() => void>() });
+    render(<StatPanel panel={statPanelWithOverride('web-1')} timeRange={timeRange} refetchInterval={false} />);
+    expect(screen.getByText('1.5 KiB')).toBeDefined();
+  });
+
   it('a matching value mapping text overrides the formatted value', () => {
     const mappings: ValueMapping[] = [{ type: 'range', from: 1000, to: 2000, result: { text: 'HIGH', color: '#ff0000' } }];
     mockUsePanelData.mockReturnValue({ data: instantValue('1536'), isLoading: false, error: null, refetch: vi.fn<() => void>() });
@@ -104,5 +120,29 @@ describe('stat-panel formatting', () => {
     mockUsePanelData.mockReturnValue({ data: null, isLoading: false, error: null, refetch: vi.fn<() => void>() });
     render(<StatPanel panel={statPanel('bytes')} timeRange={timeRange} refetchInterval={false} />);
     expect(screen.getByText('—')).toBeDefined();
+  });
+});
+
+describe('cross-panel override consistency', () => {
+  // The latent bug this refactor fixes: stat/gauge keyed overrides on `metric.__name__ ?? ''`
+  // while the per-series panels keyed on a derived label, so the SAME byName override matched
+  // DIFFERENTLY across panel types. Both now route through the shared `seriesDescriptor`, so a
+  // byName override on the displayed label of an instance-only series matches identically.
+  it('a byName override on an instance-only series matches the same way in stat and bar-gauge', () => {
+    // The SAME panel + override drives both assertions, so we're proving one config matches
+    // identically across panel types. The instance-only series displays 'web-1', which the
+    // override targets — the case where stat used to key on '' and silently miss.
+    const panel = statPanelWithOverride('web-1');
+    const data = labelledInstant({ instance: 'web-1' }, '1536');
+
+    // Per-series panel (bar-gauge): the matched segment resolves the bytes unit.
+    const segments = barGaugeSegments(data, panel.fieldConfig);
+    expect(segments[0]?.config.unit).toBe('bytes');
+
+    // Single-value panel (stat): the same override now matches too — it formats 1536 bytes as
+    // "1.5 KiB" rather than the raw number it would have shown under the old '' keying.
+    mockUsePanelData.mockReturnValue({ data, isLoading: false, error: null, refetch: vi.fn<() => void>() });
+    render(<StatPanel panel={panel} timeRange={timeRange} refetchInterval={false} />);
+    expect(screen.getByText('1.5 KiB')).toBeDefined();
   });
 });

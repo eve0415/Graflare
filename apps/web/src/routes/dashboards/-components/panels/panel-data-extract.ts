@@ -1,4 +1,6 @@
 import type { PanelDataResult } from './use-panel-data';
+import type { FieldDescriptor } from '@graflare/shared/format/resolve-field-config';
+import type { PanelQuery } from '@graflare/shared/schemas/panel';
 
 // One Prometheus result row, flattened out of the `PanelDataResult` union: a label
 // set plus either an instant `value` tuple (vector) or a `values` array (matrix).
@@ -9,29 +11,78 @@ export interface ResultSeries {
   value?: [number, string];
 }
 
+// A result row paired with the refId of the query that produced it. `data[i]` is
+// index-aligned with `queries[i]` (both come from the same `Promise.all(queries.map(…))` in
+// usePanelData), so every series of response `i` carries `queries[i].refId` — the key a
+// byFrameRefID override matches. `refId` is optional: a caller that omits `queries` (or a
+// stray response past the query list) yields an untagged row, so byFrameRefID simply can't
+// match it — the pre-refId behavior.
+export interface QueriedSeries {
+  series: ResultSeries;
+  refId?: string;
+}
+
 /**
- * Pull every Prometheus result row out of a `PanelDataResult[]`, in order.
+ * Pull every Prometheus result row out of a `PanelDataResult[]`, in order, each tagged with
+ * the refId of the query that produced it (when `queries` is supplied).
  *
- * Walks the union exactly the way the panels did inline: `'status' in res` selects
- * the Prometheus responses (SQL `columns/rows` responses have no `status`), then
- * `status === 'success'` + a `result` array narrows to the query-data member, and
- * the per-row `object`/`metric` check rejects the bare `[number, string]` tuple a
- * scalar/string `resultType` carries. Error and empty responses contribute nothing.
+ * Walks the union exactly the way the panels did inline: `'status' in res` selects the
+ * Prometheus responses (SQL `columns/rows` responses have no `status`), then
+ * `status === 'success'` + a `result` array narrows to the query-data member, and the
+ * per-row `object`/`metric` check rejects the bare `[number, string]` tuple a scalar/string
+ * `resultType` carries. Error and empty responses contribute nothing. The response index is
+ * the query index (Promise.all preserves order), so `queries?.[i]?.refId` is the source
+ * query's refId — undefined when `queries` is omitted, leaving byFrameRefID unmatchable.
  */
-export const extractResultSeries = (data: PanelDataResult[] | null | undefined): ResultSeries[] => {
+export const extractResultSeriesWithQuery = (data: PanelDataResult[] | null | undefined, queries?: readonly PanelQuery[]): QueriedSeries[] => {
   if (data === null || data === undefined) return [];
 
-  const series: ResultSeries[] = [];
-  for (const res of data) {
+  const out: QueriedSeries[] = [];
+  for (const [i, res] of data.entries()) {
     if (!('status' in res)) continue;
     if (res.status !== 'success' || res.data === undefined || !('result' in res.data) || !Array.isArray(res.data.result)) continue;
+    const refId = queries?.[i]?.refId;
     for (const row of res.data.result) {
       if (typeof row === 'object' && row !== null && 'metric' in row) {
-        series.push(row);
+        out.push(refId === undefined ? { series: row } : { series: row, refId });
       }
     }
   }
-  return series;
+  return out;
+};
+
+/**
+ * Pull every Prometheus result row out of a `PanelDataResult[]`, in order — the refId-free
+ * view of `extractResultSeriesWithQuery`. Panels that don't resolve per-field overrides
+ * (bar-chart/histogram/heatmap) and the scalar/table readers keep this flat shape, so there
+ * stays exactly one union-walker.
+ */
+export const extractResultSeries = (data: PanelDataResult[] | null | undefined): ResultSeries[] => extractResultSeriesWithQuery(data).map(q => q.series);
+
+// The label-derivation rule shared by every per-series panel, factored out of the four data
+// helpers where it was verbatim-identical: the metric `__name__` wins, else the first other
+// label value (e.g. instance), else a 1-based positional fallback.
+const deriveSeriesLabel = (metric: Record<string, string>, index: number): string => {
+  const name = metric.__name__;
+  if (name !== undefined && name !== '') return name;
+  for (const [key, value] of Object.entries(metric)) {
+    if (key !== '__name__' && value !== '') return value;
+  }
+  return `Series ${String(index + 1)}`;
+};
+
+/**
+ * Describe a series as a field for override matching: its derived label as `name` (the single
+ * rule above) plus the source query's `refId` when known (so byFrameRefID can match).
+ * Prometheus series carry no data type, so `type` is omitted and byType can't match them.
+ *
+ * `index` is caller-supplied because the panels count positions differently: bar-gauge/pie
+ * index by KEPT (post-finite-filter) series, while state-timeline/status-history index by raw
+ * enumerate position. Passing it in preserves each panel's existing `Series N` numbering.
+ */
+export const seriesDescriptor = (series: ResultSeries, index: number, refId?: string): FieldDescriptor => {
+  const name = deriveSeriesLabel(series.metric, index);
+  return refId === undefined ? { name } : { name, refId };
 };
 
 // Latest sample of a series: an instant vector carries a single `value` tuple; a

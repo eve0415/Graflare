@@ -11,7 +11,7 @@ import type {
 import type { Panel, PanelQuery } from '@graflare/shared/schemas/panel';
 
 import { UNIT_CATALOG } from '@graflare/shared/format/value-format';
-import { makeFieldOverrideProperty, makeValueMapping } from '@graflare/shared/schemas/field-config';
+import { FIELD_OVERRIDE_MATCHER_IDS, FIELD_OVERRIDE_PROPERTY_IDS, makeFieldOverrideProperty, makeValueMapping } from '@graflare/shared/schemas/field-config';
 import { Button } from '@graflare/ui/components/button';
 import { Input } from '@graflare/ui/components/input';
 import { Label } from '@graflare/ui/components/label';
@@ -70,28 +70,36 @@ const SPECIAL_MATCH_OPTIONS = [
 const isMappingType = (v: string | null): v is ValueMappingType => v === 'value' || v === 'range' || v === 'regex' || v === 'special';
 const isSpecialMatch = (v: string | null): v is 'null' | 'nan' | 'empty' => v === 'null' || v === 'nan' || v === 'empty';
 
-// Field-override matcher kinds (field-config fieldMatcherSchema). `label` names the kind in the
-// type Select; `optionLabel`/`placeholder` adapt the single string-options input per matcher, so
-// the same `options: string` field reads naturally whether it holds a name, regex, type, or refId.
-const MATCHER_TYPE_OPTIONS = [
-  { value: 'byName', label: 'By name', optionLabel: 'Field name', placeholder: 'cpu_usage' },
-  { value: 'byRegexp', label: 'By regex', optionLabel: 'Regex', placeholder: '/cpu.*/' },
-  { value: 'byType', label: 'By type', optionLabel: 'Type', placeholder: 'number' },
-  { value: 'byFrameRefID', label: 'By query', optionLabel: 'Query refId', placeholder: 'A' },
-] as const;
+// Field-override matcher kinds (field-config fieldMatcherSchema). The id SET is single-sourced
+// from FIELD_OVERRIDE_MATCHER_IDS — only the per-kind copy lives here: `label` names the kind in
+// the type Select; `optionLabel`/`placeholder` adapt the single string-options input per matcher,
+// so the same `options: string` field reads naturally whether it holds a name, regex, type, or
+// refId. The Record is keyed by FieldMatcherId, so a new matcher id forces a copy entry here.
+const MATCHER_META: Record<FieldMatcherId, { label: string; optionLabel: string; placeholder: string }> = {
+  byName: { label: 'By name', optionLabel: 'Field name', placeholder: 'cpu_usage' },
+  byRegexp: { label: 'By regex', optionLabel: 'Regex', placeholder: '/cpu.*/' },
+  byType: { label: 'By type', optionLabel: 'Type', placeholder: 'number' },
+  byFrameRefID: { label: 'By query', optionLabel: 'Query refId', placeholder: 'A' },
+};
 
-// Overridable field-config properties (field-config fieldOverridePropertySchema). Drives the
-// "Add property" Select; each picked id builds the right-typed property via makeFieldOverrideProperty.
-const PROPERTY_ID_OPTIONS = [
-  { value: 'unit', label: 'Unit' },
-  { value: 'decimals', label: 'Decimals' },
-  { value: 'min', label: 'Min' },
-  { value: 'max', label: 'Max' },
-  { value: 'mappings', label: 'Value mappings' },
-] as const;
+const MATCHER_TYPE_OPTIONS = FIELD_OVERRIDE_MATCHER_IDS.map(id => ({ value: id, ...MATCHER_META[id] }));
 
-const isMatcherId = (v: string | null): v is FieldMatcherId => v === 'byName' || v === 'byRegexp' || v === 'byType' || v === 'byFrameRefID';
-const isPropertyId = (v: string | null): v is FieldOverridePropertyId => v === 'unit' || v === 'decimals' || v === 'min' || v === 'max' || v === 'mappings';
+// Overridable field-config properties (field-config fieldOverridePropertySchema). The id SET is
+// single-sourced from FIELD_OVERRIDE_PROPERTY_IDS; only the human labels live here (keyed by id,
+// so a new property forces a label). Drives the "Add property" Select; each picked id builds the
+// right-typed property via makeFieldOverrideProperty.
+const PROPERTY_LABELS: Record<FieldOverridePropertyId, string> = {
+  unit: 'Unit',
+  decimals: 'Decimals',
+  min: 'Min',
+  max: 'Max',
+  mappings: 'Value mappings',
+};
+
+const PROPERTY_ID_OPTIONS = FIELD_OVERRIDE_PROPERTY_IDS.map(id => ({ value: id, label: PROPERTY_LABELS[id] }));
+
+const isMatcherId = (v: string | null): v is FieldMatcherId => FIELD_OVERRIDE_MATCHER_IDS.some(id => id === v);
+const isPropertyId = (v: string | null): v is FieldOverridePropertyId => FIELD_OVERRIDE_PROPERTY_IDS.some(id => id === v);
 
 interface PanelEditorProps {
   panel: Panel;
@@ -288,32 +296,13 @@ export const PanelEditor = ({ panel, open, onClose, onSave }: PanelEditorProps) 
   );
 
   // Field overrides live under fieldConfig.overrides, parallel to defaults. Replace the whole
-  // array immutably through the existing setter (same pattern as setDefaults) — no extra state.
+  // array immutably through the existing setter (same pattern as setDefaults / setMappings) — the
+  // FieldOverridesEditor owns its own add/update/remove on top of this, like MappingsEditor does.
   const setOverrides = useCallback(
     (overrides: FieldOverride[]) => {
       updateField('fieldConfig', { ...draft.fieldConfig, overrides });
     },
     [draft.fieldConfig, updateField],
-  );
-
-  const addOverride = useCallback(() => {
-    // byName is the default matcher with an empty options string (Grafana's defaultOptions),
-    // and no properties yet — the user adds them per-row.
-    setOverrides([...draft.fieldConfig.overrides, { matcher: { id: 'byName', options: '' }, properties: [] }]);
-  }, [draft.fieldConfig.overrides, setOverrides]);
-
-  const updateOverride = useCallback(
-    (index: number, next: FieldOverride) => {
-      setOverrides(draft.fieldConfig.overrides.map((o, i) => (i === index ? next : o)));
-    },
-    [draft.fieldConfig.overrides, setOverrides],
-  );
-
-  const removeOverride = useCallback(
-    (index: number) => {
-      setOverrides(draft.fieldConfig.overrides.filter((_, i) => i !== index));
-    },
-    [draft.fieldConfig.overrides, setOverrides],
   );
 
   return (
@@ -458,7 +447,7 @@ export const PanelEditor = ({ panel, open, onClose, onSave }: PanelEditorProps) 
             <MappingsEditor mappings={draft.fieldConfig.defaults.mappings} onChange={setMappings} labelPrefix='Mapping' addLabel='Add value mapping' />
           </div>
 
-          <FieldOverridesEditor overrides={draft.fieldConfig.overrides} onAdd={addOverride} onUpdate={updateOverride} onRemove={removeOverride} />
+          <FieldOverridesEditor overrides={draft.fieldConfig.overrides} onChange={setOverrides} />
 
           <div className='flex justify-end gap-2'>
             <Button variant='outline' onClick={onClose}>
@@ -924,23 +913,15 @@ const OverridePropertyRow = ({
     [index, property, onChange],
   );
 
-  const handleDecimalsChange = useCallback(
+  // decimals/min/max share one handler: the guard narrows `property` to those three branches,
+  // whose `value` is `number` in every case, so the `{ ...property, value }` spread stays a valid
+  // member with no cast (verified type-safe). `kind` (decimals vs minmax) still differs inline at
+  // each NumericOption render — only the change-handling is shared.
+  const handleNumericChange = useCallback(
     (raw: string) => {
-      if (property.id === 'decimals') onChange(index, { ...property, value: parseRequiredNumber(raw) });
-    },
-    [index, property, onChange],
-  );
-
-  const handleMinChange = useCallback(
-    (raw: string) => {
-      if (property.id === 'min') onChange(index, { ...property, value: parseRequiredNumber(raw) });
-    },
-    [index, property, onChange],
-  );
-
-  const handleMaxChange = useCallback(
-    (raw: string) => {
-      if (property.id === 'max') onChange(index, { ...property, value: parseRequiredNumber(raw) });
+      if (property.id === 'decimals' || property.id === 'min' || property.id === 'max') {
+        onChange(index, { ...property, value: parseRequiredNumber(raw) });
+      }
     },
     [index, property, onChange],
   );
@@ -956,7 +937,9 @@ const OverridePropertyRow = ({
     onRemove(index);
   }, [index, onRemove]);
 
-  const propLabel = PROPERTY_ID_OPTIONS.find(o => o.value === property.id)?.label ?? property.id;
+  // The human label for this property id — single-sourced label table (PROPERTY_LABELS is keyed
+  // by FieldOverridePropertyId, so it's always present for a valid property).
+  const propLabel = PROPERTY_LABELS[property.id];
   const rowLabel = `${overrideLabel} ${propLabel}`;
 
   return (
@@ -973,10 +956,10 @@ const OverridePropertyRow = ({
 
       {property.id === 'unit' && <UnitSelect id={`${idPrefix}-unit`} value={property.value} onValueChange={handleUnitChange} />}
       {property.id === 'decimals' && (
-        <NumericOption id={`${idPrefix}-decimals`} label='Decimals' kind='decimals' value={property.value} onValueChange={handleDecimalsChange} />
+        <NumericOption id={`${idPrefix}-decimals`} label='Decimals' kind='decimals' value={property.value} onValueChange={handleNumericChange} />
       )}
-      {property.id === 'min' && <NumericOption id={`${idPrefix}-min`} label='Min' kind='minmax' value={property.value} onValueChange={handleMinChange} />}
-      {property.id === 'max' && <NumericOption id={`${idPrefix}-max`} label='Max' kind='minmax' value={property.value} onValueChange={handleMaxChange} />}
+      {property.id === 'min' && <NumericOption id={`${idPrefix}-min`} label='Min' kind='minmax' value={property.value} onValueChange={handleNumericChange} />}
+      {property.id === 'max' && <NumericOption id={`${idPrefix}-max`} label='Max' kind='minmax' value={property.value} onValueChange={handleNumericChange} />}
       {property.id === 'mappings' && (
         <MappingsEditor mappings={property.value} onChange={handleMappingsChange} labelPrefix={`${rowLabel} mapping`} addLabel={`Add ${rowLabel} mapping`} />
       )}
@@ -1004,7 +987,9 @@ const OverrideRow = ({
 }) => {
   const overrideLabel = `Override ${String(index + 1)}`;
   const idPrefix = `override-${String(index)}`;
-  const matcherKind = MATCHER_TYPE_OPTIONS.find(o => o.value === override.matcher.id) ?? MATCHER_TYPE_OPTIONS[0];
+  // The matcher's option-input copy, indexed straight off the keyed meta table — always present
+  // for a valid matcher id, so no find/fallback (and no possibly-undefined access).
+  const matcherKind = MATCHER_META[override.matcher.id];
 
   const handleMatcherIdChange = useCallback(
     (val: string | null) => {
@@ -1134,33 +1119,47 @@ const OverrideRow = ({
 };
 
 // The "Field overrides" section: a header with an Add button, then one OverrideRow per entry (or
-// an empty-state hint). Each override's matcher selects fields by name/regex/type/refId and layers
-// its properties over fieldConfig.defaults at render time (see resolveFieldConfig); array order is
+// an empty-state hint). Owns the immutable add/update/remove of the override array and reports the
+// next array through `onChange` (same shape as MappingsEditor) — the caller passes only the array
+// and the setter. Each override's matcher selects fields by name/regex/type/refId and layers its
+// properties over fieldConfig.defaults at render time (see resolveFieldConfig); array order is
 // precedence (later wins), matching the data layer.
-const FieldOverridesEditor = ({
-  overrides,
-  onAdd,
-  onUpdate,
-  onRemove,
-}: {
-  overrides: FieldOverride[];
-  onAdd: () => void;
-  onUpdate: (index: number, next: FieldOverride) => void;
-  onRemove: (index: number) => void;
-}) => (
-  <div className='space-y-3'>
-    <div className='flex items-center justify-between'>
-      <Label>Field overrides</Label>
-      <Button variant='ghost' size='xs' onClick={onAdd} aria-label='Add field override'>
-        <Plus className='mr-1 h-3 w-3' />
-        Add
-      </Button>
-    </div>
+const FieldOverridesEditor = ({ overrides, onChange }: { overrides: FieldOverride[]; onChange: (next: FieldOverride[]) => void }) => {
+  const handleAdd = useCallback(() => {
+    // byName is the default matcher with an empty options string (Grafana's defaultOptions), and
+    // no properties yet — the user adds them per-row.
+    onChange([...overrides, { matcher: { id: 'byName', options: '' }, properties: [] }]);
+  }, [overrides, onChange]);
 
-    {overrides.length === 0 ? (
-      <p className='text-muted-foreground text-xs'>No field overrides. Add one to style specific fields differently from the panel defaults.</p>
-    ) : (
-      overrides.map((o, i) => <OverrideRow key={String(i)} override={o} index={i} onUpdate={onUpdate} onRemove={onRemove} />)
-    )}
-  </div>
-);
+  const handleUpdate = useCallback(
+    (index: number, next: FieldOverride) => {
+      onChange(overrides.map((o, i) => (i === index ? next : o)));
+    },
+    [overrides, onChange],
+  );
+
+  const handleRemove = useCallback(
+    (index: number) => {
+      onChange(overrides.filter((_, i) => i !== index));
+    },
+    [overrides, onChange],
+  );
+
+  return (
+    <div className='space-y-3'>
+      <div className='flex items-center justify-between'>
+        <Label>Field overrides</Label>
+        <Button variant='ghost' size='xs' onClick={handleAdd} aria-label='Add field override'>
+          <Plus className='mr-1 h-3 w-3' />
+          Add
+        </Button>
+      </div>
+
+      {overrides.length === 0 ? (
+        <p className='text-muted-foreground text-xs'>No field overrides. Add one to style specific fields differently from the panel defaults.</p>
+      ) : (
+        overrides.map((o, i) => <OverrideRow key={String(i)} override={o} index={i} onUpdate={handleUpdate} onRemove={handleRemove} />)
+      )}
+    </div>
+  );
+};

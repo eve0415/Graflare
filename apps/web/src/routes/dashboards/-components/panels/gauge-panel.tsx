@@ -5,7 +5,7 @@ import { formatValue } from '@graflare/shared/format/value-format';
 import { applyValueMappings } from '@graflare/shared/format/value-mappings';
 import { useMemo } from 'react';
 
-import { extractResultSeries, firstScalar, getThresholdColor } from './panel-data-extract';
+import { extractResultSeriesWithQuery, firstScalar, getThresholdColor, seriesDescriptor } from './panel-data-extract';
 import { PanelFrame } from './panel-frame';
 import { usePanelQuery } from './use-panel-query';
 
@@ -39,14 +39,17 @@ export const GaugePanel = ({ panel, timeRange, refetchInterval }: GaugePanelProp
   }, [data]);
 
   // Gauge shows a single value field (the first series); resolve its effective config
-  // against the panel overrides — the single home for the gauge range (min/max), unit and
-  // mappings. With no matching override this returns the defaults reference, so the memo
-  // deps below stay reference-stable (byte-identical to before overrides).
-  const { fieldConfig } = panel;
+  // against the panel overrides through the shared `seriesDescriptor` — the single home for
+  // the gauge range (min/max), unit and mappings, matched by the SAME derived label (and
+  // query refId) every per-series panel keys on. With no series the descriptor name is ''
+  // (the no-data path is unchanged); with no matching override this returns the defaults
+  // reference, so the memo deps stay reference-stable.
+  const { fieldConfig, queries } = panel;
   const config = useMemo(() => {
-    const [first] = extractResultSeries(data);
-    return resolveFieldConfig({ name: first?.metric.__name__ ?? '' }, fieldConfig);
-  }, [data, fieldConfig]);
+    const [first] = extractResultSeriesWithQuery(data, queries);
+    const descriptor = first === undefined ? { name: '' } : seriesDescriptor(first.series, 0, first.refId);
+    return resolveFieldConfig(descriptor, fieldConfig);
+  }, [data, queries, fieldConfig]);
 
   const min = config.min ?? 0;
   const max = config.max ?? 100;

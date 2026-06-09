@@ -1,10 +1,11 @@
 import type { PanelDataResult } from './use-panel-data';
 import type { FieldConfig, FieldConfigDefaults } from '@graflare/shared/schemas/field-config';
+import type { PanelQuery } from '@graflare/shared/schemas/panel';
 
 import { resolveFieldConfig } from '@graflare/shared/format/resolve-field-config';
 import { formatValue } from '@graflare/shared/format/value-format';
 
-import { extractResultSeries } from './panel-data-extract';
+import { extractResultSeriesWithQuery, seriesDescriptor } from './panel-data-extract';
 
 // One discrete status sample: its timestamp (unix seconds), the numeric state `value`,
 // and its formatted `displayValue`. Unlike a state-timeline segment, a cell is a single
@@ -26,18 +27,6 @@ export interface StatusHistoryLane {
   config: FieldConfigDefaults;
 }
 
-// Derive a human label for a series: the metric name wins, else the first other label
-// value (e.g. instance), else a 1-based positional fallback. Mirrors the pie/bar-gauge
-// and state-timeline labelling so every panel reads series the same way.
-const seriesLabel = (metric: Record<string, string>, index: number): string => {
-  const name = metric.__name__;
-  if (name !== undefined && name !== '') return name;
-  for (const [key, value] of Object.entries(metric)) {
-    if (key !== '__name__' && value !== '') return value;
-  }
-  return `Series ${String(index + 1)}`;
-};
-
 /**
  * Map panel query results to one lane per series, emitting one cell per sample with no
  * merging. Pure: no DOM, no color — the renderer maps value → color and time → x.
@@ -45,17 +34,22 @@ const seriesLabel = (metric: Record<string, string>, index: number): string => {
  * Each series' `values` (`[time, val][]`) are walked in order; non-finite values are
  * dropped, and every remaining sample becomes its own cell (so a run of equal values
  * stays a row of distinct boxes, the defining difference from the state-timeline). Each
- * series resolves its own effective config against the panel overrides (keyed on the lane
- * label), so the numeric value is formatted to `displayValue` through THAT config and the
+ * series resolves its own effective config against the panel overrides via the shared
+ * `seriesDescriptor` (matched by the lane label, and by query refId when `queries` is
+ * passed), so the numeric value is formatted to `displayValue` through THAT config and the
  * lane carries it for the renderer's value→colour mapping. With no matching override the
  * lane resolves to the defaults reference (byte-identical to before overrides).
  */
-export const statusHistoryCells = (data: PanelDataResult[] | null | undefined, fieldConfig: FieldConfig): StatusHistoryLane[] => {
+export const statusHistoryCells = (
+  data: PanelDataResult[] | null | undefined,
+  fieldConfig: FieldConfig,
+  queries?: readonly PanelQuery[],
+): StatusHistoryLane[] => {
   const lanes: StatusHistoryLane[] = [];
 
-  for (const [index, series] of extractResultSeries(data).entries()) {
-    const label = seriesLabel(series.metric, index);
-    const config = resolveFieldConfig({ name: label }, fieldConfig);
+  for (const [index, { series, refId }] of extractResultSeriesWithQuery(data, queries).entries()) {
+    const descriptor = seriesDescriptor(series, index, refId);
+    const config = resolveFieldConfig(descriptor, fieldConfig);
     const cells: StatusCell[] = [];
 
     for (const [time, token] of series.values ?? []) {
@@ -64,7 +58,7 @@ export const statusHistoryCells = (data: PanelDataResult[] | null | undefined, f
       cells.push({ time, value, displayValue: formatValue(value, config) });
     }
 
-    lanes.push({ label, cells, config });
+    lanes.push({ label: descriptor.name, cells, config });
   }
 
   return lanes;

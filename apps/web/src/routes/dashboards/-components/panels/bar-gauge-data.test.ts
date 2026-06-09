@@ -1,5 +1,6 @@
 import type { PanelDataResult } from './use-panel-data';
 import type { FieldConfig } from '@graflare/shared/schemas/field-config';
+import type { PanelQuery } from '@graflare/shared/schemas/panel';
 
 import { describe, expect, it } from 'vitest';
 
@@ -152,5 +153,35 @@ describe('barGaugeSegments', () => {
     };
     const segments = barGaugeSegments(vector([{ metric: { instance: 'web-1' }, value: 1536 }]), config);
     expect(segments[0]?.config.unit).toBe('bytes');
+  });
+
+  it('matches a byFrameRefID override on the source query refId when queries are threaded', () => {
+    // Two queries (A, B), one response each — `data[i]` aligns with `queries[i]`. A
+    // byFrameRefID:'B' override sets bytes on every series of query B only; query A keeps the
+    // defaults. This proves the refId is threaded end-to-end (byFrameRefID was dead before).
+    const queries: PanelQuery[] = [
+      { refId: 'A', expr: 'a', legendFormat: '', format: 'time_series' },
+      { refId: 'B', expr: 'b', legendFormat: '', format: 'time_series' },
+    ];
+    const data: PanelDataResult[] = [...vector([{ metric: { __name__: 'a' }, value: 50 }]), ...vector([{ metric: { __name__: 'b' }, value: 50 }])];
+    const config: FieldConfig = {
+      defaults: { unit: '', mappings: [], min: 0, max: 100 },
+      overrides: [{ matcher: { id: 'byFrameRefID', options: 'B' }, properties: [{ id: 'unit', value: 'bytes' }] }],
+    };
+
+    const segments = barGaugeSegments(data, config, queries);
+    expect(segments[0]?.config).toBe(config.defaults); // query A — untouched
+    expect(segments[1]?.config.unit).toBe('bytes'); // query B — matched by refId
+  });
+
+  it('cannot match byFrameRefID when queries are omitted (pre-refId behavior preserved)', () => {
+    // Without `queries` the series carry no refId, so a byFrameRefID override degrades to a
+    // no-match and every series resolves to the defaults reference — byte-identical to before.
+    const config: FieldConfig = {
+      defaults: { unit: '', mappings: [], min: 0, max: 100 },
+      overrides: [{ matcher: { id: 'byFrameRefID', options: 'A' }, properties: [{ id: 'unit', value: 'bytes' }] }],
+    };
+    const segments = barGaugeSegments(vector([{ metric: { __name__: 'a' }, value: 50 }]), config);
+    expect(segments[0]?.config).toBe(config.defaults);
   });
 });
