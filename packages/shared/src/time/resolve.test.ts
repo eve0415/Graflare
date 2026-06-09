@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { computeStep, parseTimeExpr, resolveTime } from './resolve';
+import { computeStep, parseTimeExpr, resolveRange, resolveTime } from './resolve';
 
 // A fixed wall clock so `now`-relative assertions are exact, not delta-based.
 // 2023-11-14T22:13:20Z = 1700000000s. Chosen with a whole-second epoch so
@@ -64,10 +64,11 @@ describe('parseTimeExpr', () => {
   });
 
   it('returns null for unrecognised non-numeric input', () => {
-    expect(parseTimeExpr('now/d')).toBeNull();
     expect(parseTimeExpr('now-2x')).toBeNull();
     expect(parseTimeExpr('tomorrow')).toBeNull();
     expect(parseTimeExpr('garbage')).toBeNull();
+    expect(parseTimeExpr('now-30')).toBeNull(); // offset with no unit
+    expect(parseTimeExpr('now-1d/d/')).toBeNull(); // trailing operator, no unit
   });
 
   // The empty string is numeric (Number('') === 0), so it parses to 0 — not null.
@@ -87,6 +88,66 @@ describe('parseTimeExpr', () => {
   it('keeps "now-<N><unit>" symmetric across both signs', () => {
     expect(parseTimeExpr('now-1h')).toBe(NOW - 3600);
     expect(parseTimeExpr('now+1h')).toBe(NOW + 3600);
+  });
+});
+
+// `/unit` snapping (Grafana datemath). The fixed clock is 2023-11-14T22:13:20Z, a Tuesday.
+// Snapping is done in UTC (the resolver is a pure fn of (expr, now) shared server+client, so it
+// must not depend on ambient timezone). Expected boundaries are spelled out with Date.UTC.
+const sec = (ms: number): number => Math.floor(ms / 1000);
+
+describe('parseTimeExpr /unit snapping (round down, default)', () => {
+  it('snaps to the start of each unit in UTC', () => {
+    expect(parseTimeExpr('now/s')).toBe(sec(Date.UTC(2023, 10, 14, 22, 13, 20)));
+    expect(parseTimeExpr('now/m')).toBe(sec(Date.UTC(2023, 10, 14, 22, 13)));
+    expect(parseTimeExpr('now/h')).toBe(sec(Date.UTC(2023, 10, 14, 22)));
+    expect(parseTimeExpr('now/d')).toBe(sec(Date.UTC(2023, 10, 14)));
+    expect(parseTimeExpr('now/M')).toBe(sec(Date.UTC(2023, 10, 1)));
+    expect(parseTimeExpr('now/y')).toBe(sec(Date.UTC(2023, 0, 1)));
+  });
+
+  it('snaps the week to the preceding Monday (ISO week start)', () => {
+    // Tue 2023-11-14 → Mon 2023-11-13.
+    expect(parseTimeExpr('now/w')).toBe(sec(Date.UTC(2023, 10, 13)));
+  });
+
+  it('applies offsets before the round, left to right', () => {
+    expect(parseTimeExpr('now-1d/d')).toBe(sec(Date.UTC(2023, 10, 13))); // start of yesterday
+    expect(parseTimeExpr('now/d+6h')).toBe(sec(Date.UTC(2023, 10, 14, 6))); // 06:00 today
+    expect(parseTimeExpr('now-1M/M')).toBe(sec(Date.UTC(2023, 9, 1))); // start of October
+  });
+
+  it('rejects rounding by anything but a single whole unit', () => {
+    expect(parseTimeExpr('now/2d')).toBeNull();
+    expect(parseTimeExpr('now/0d')).toBeNull();
+  });
+});
+
+describe('parseTimeExpr /unit snapping (round up, roundUp=true)', () => {
+  it('snaps to the END of each unit (last whole second)', () => {
+    expect(parseTimeExpr('now/d', true)).toBe(sec(Date.UTC(2023, 10, 15)) - 1); // 23:59:59 today
+    expect(parseTimeExpr('now/h', true)).toBe(sec(Date.UTC(2023, 10, 14, 23)) - 1);
+    expect(parseTimeExpr('now/M', true)).toBe(sec(Date.UTC(2023, 11, 1)) - 1); // 2023-11-30 23:59:59
+    expect(parseTimeExpr('now/y', true)).toBe(sec(Date.UTC(2024, 0, 1)) - 1);
+    expect(parseTimeExpr('now/w', true)).toBe(sec(Date.UTC(2023, 10, 20)) - 1); // Sun 2023-11-19 23:59:59
+  });
+
+  it('leaves non-rounding expressions unaffected by roundUp', () => {
+    expect(parseTimeExpr('now', true)).toBe(NOW);
+    expect(parseTimeExpr('now-1h', true)).toBe(NOW - 3600);
+  });
+});
+
+describe('resolveRange', () => {
+  it('rounds from down and to up — the Grafana "Today" quick range', () => {
+    expect(resolveRange('now/d', 'now/d')).toEqual({
+      from: sec(Date.UTC(2023, 10, 14)),
+      to: sec(Date.UTC(2023, 10, 15)) - 1,
+    });
+  });
+
+  it('passes relative ranges through unchanged (no rounding tokens)', () => {
+    expect(resolveRange('now-1h', 'now')).toEqual({ from: NOW - 3600, to: NOW });
   });
 });
 
