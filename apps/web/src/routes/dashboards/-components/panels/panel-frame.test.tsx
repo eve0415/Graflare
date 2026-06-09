@@ -55,6 +55,17 @@ describe('panel-frame', () => {
     expect(region.tagName).toBe('SECTION');
   });
 
+  it('renders the panel title as an h2 so it nests under the dashboard h1 without skipping a level', () => {
+    // The dashboard title is the page h1 (toolbar); panels sit directly beneath it. Rendering the
+    // panel title as h2 (not h3) keeps the heading order contiguous — axe heading-order regression.
+    render(
+      <PanelFrame title='CPU'>
+        <div>body</div>
+      </PanelFrame>,
+    );
+    expect(screen.getByRole('heading', { level: 2, name: 'CPU' })).toBeDefined();
+  });
+
   it('reflects the data-table toggle state via aria-pressed', () => {
     render(
       <PanelFrame title='CPU' dataTableContent={<div>table</div>}>

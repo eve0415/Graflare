@@ -38,9 +38,9 @@ export const PanelFrame = ({ title, loading, error, onRetry, children, dataTable
   return (
     <section className='border-border bg-card flex h-full flex-col overflow-hidden rounded-lg border' aria-labelledby={titleId}>
       <div className='flex items-center justify-between border-b px-3 py-1.5'>
-        <h3 id={titleId} className='text-sm font-medium'>
+        <h2 id={titleId} className='text-sm font-medium'>
           {title}
-        </h3>
+        </h2>
         <div className='flex items-center gap-1'>
           {dataTableContent !== undefined && (
             <Toggle className='size-6 min-w-0 p-0' pressed={showDataTable} onPressedChange={setShowDataTable} aria-label='Show data table'>

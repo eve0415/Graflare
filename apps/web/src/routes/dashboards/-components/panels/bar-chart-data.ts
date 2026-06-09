@@ -29,6 +29,13 @@ interface BuildBarChartOptionsArgs {
   vertical: boolean;
   /** Theme-aware axis/grid/tick colors so the chart chrome is readable in dark mode. */
   colors: ChartThemeColors;
+  /**
+   * Resolved query window `[fromSec, toSec]` (epoch seconds). The bucket axis carries epoch
+   * timestamps, so we pin `scales.x.range` to this window — otherwise uPlot auto-ranges the x
+   * domain to fit every sample, and a stray out-of-window bucket balloons the axis across years
+   * (the audit saw 2027–2028). Same pin the time-series panel uses.
+   */
+  range: readonly [from: number, to: number];
 }
 
 // Bar geometry: 60% of the available slot, capped at 60px, centred. A named
@@ -68,7 +75,7 @@ export const formatBarChartTicks = (splits: number[], defaults: FieldConfigDefau
  * series and a formatted y-axis. `vertical` is accepted for forward-compat; uPlot
  * 1.6 renders value bars vertically, so it currently has no visual branch.
  */
-export const buildBarChartOptions = ({ series, labels, defaults, width, height, colors }: BuildBarChartOptionsArgs): uPlotNs.Options => {
+export const buildBarChartOptions = ({ series, labels, defaults, width, height, colors, range }: BuildBarChartOptionsArgs): uPlotNs.Options => {
   // `paths` is optional on Series and uPlot.paths.bars is itself optional in the
   // types; build it once and include the key only when present (no undefined writes).
   const barsPaths = uPlot.paths.bars?.({ size: BAR_SIZE, align: 0 });
@@ -76,9 +83,16 @@ export const buildBarChartOptions = ({ series, labels, defaults, width, height, 
   // Index 0 = x/bucket axis (default formatting). Index 1 = y, formatted via unit.
   const formatYTicks: uPlotNs.Axis.DynamicValues = (_u, splits) => formatBarChartTicks(splits, defaults);
 
+  // Pin the x domain to the resolved query window (epoch seconds) as a static [min, max] range.
+  // `time: true` is uPlot's default for x, so it changes nothing about bar geometry — it just
+  // states intent; the explicit `range` is what stops uPlot's auto-range from ballooning the axis
+  // when a stray sample sits outside the window (the audit saw a multi-year x-axis).
+  const [fromSec, toSec] = range;
+
   return {
     width: Math.max(100, width - 16),
     height: Math.max(80, height - 60),
+    scales: { x: { time: true, range: [fromSec, toSec] } },
     axes: [{ ...themedAxis(colors) }, { ...themedAxis(colors), values: formatYTicks }],
     series: [
       {},

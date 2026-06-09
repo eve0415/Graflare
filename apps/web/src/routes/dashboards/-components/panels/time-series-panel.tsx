@@ -118,7 +118,7 @@ export const TimeSeriesPanel = ({ panel, timeRange, refetchInterval, width, heig
   }, [width, height, chartResult, seriesLabels, panel, resolved, timeRange.from, timeRange.to]);
 
   const tableData = useMemo(() => formatPrometheusToTable(chartResult), [chartResult]);
-  const dataTable = useMemo(() => <QueryResultTable data={tableData} />, [tableData]);
+  const dataTable = useMemo(() => <QueryResultTable data={tableData} scrollRegionLabel={`${panel.title} data table`} />, [tableData, panel.title]);
 
   return (
     <UPlotPanel

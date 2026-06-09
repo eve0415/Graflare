@@ -323,7 +323,10 @@ export default defineConfig({
         'jsx-a11y/no-aria-hidden-on-focusable': 'error',
         'jsx-a11y/no-autofocus': 'error',
         'jsx-a11y/no-distracting-elements': 'error',
-        'jsx-a11y/no-noninteractive-tabindex': 'error',
+        // Allow a focusable `role="region"` in addition to the default `tabpanel`: a labelled,
+        // keyboard-scrollable region is the WAI-ARIA APG pattern for an overflowing scroll
+        // container (e.g. a wide data table), so `tabIndex={0}` on it is correct, not a smell.
+        'jsx-a11y/no-noninteractive-tabindex': ['error', { roles: ['tabpanel', 'region'] }],
         'jsx-a11y/no-redundant-roles': 'error',
         'jsx-a11y/no-static-element-interactions': 'error',
         'jsx-a11y/prefer-tag-over-role': 'error',

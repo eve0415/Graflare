@@ -307,7 +307,7 @@ export const PanelEditor = ({ panel, open, onClose, onSave }: PanelEditorProps) 
 
   return (
     <Sheet open={open} onOpenChange={handleOpenChange}>
-      <SheetContent className='w-[600px] overflow-y-auto sm:max-w-[600px]'>
+      <SheetContent className='overflow-y-auto sm:max-w-[600px]'>
         <SheetHeader>
           <SheetTitle>Edit Panel</SheetTitle>
         </SheetHeader>

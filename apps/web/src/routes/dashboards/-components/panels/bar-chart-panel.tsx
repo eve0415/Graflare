@@ -42,19 +42,29 @@ export const BarChartPanel = ({ panel, timeRange, refetchInterval, width, height
     [data, panel.queries],
   );
 
-  const markers = useMemo(() => {
-    const { from, to } = resolveRange(timeRange.from, timeRange.to);
-    return annotationMarkers(annotations, from, to);
-  }, [annotations, timeRange.from, timeRange.to]);
+  // Resolve the visible window once (epoch seconds) — shared by the annotation markers and the
+  // chart's x-axis range pin so both track the same `[from, to]`.
+  const queryWindow = useMemo(() => resolveRange(timeRange.from, timeRange.to), [timeRange.from, timeRange.to]);
+
+  const markers = useMemo(() => annotationMarkers(annotations, queryWindow.from, queryWindow.to), [annotations, queryWindow.from, queryWindow.to]);
 
   const chartOptions = useMemo(() => {
     const vertical = panel.displayOptions.barchart?.orientation !== 'horizontal';
     const colors = chartThemeColors(resolved);
-    return buildBarChartOptions({ series, labels, defaults: panel.fieldConfig.defaults, width, height, vertical, colors });
-  }, [series, labels, panel.fieldConfig.defaults, panel.displayOptions.barchart?.orientation, width, height, resolved]);
+    return buildBarChartOptions({
+      series,
+      labels,
+      defaults: panel.fieldConfig.defaults,
+      width,
+      height,
+      vertical,
+      colors,
+      range: [queryWindow.from, queryWindow.to],
+    });
+  }, [series, labels, panel.fieldConfig.defaults, panel.displayOptions.barchart?.orientation, width, height, resolved, queryWindow.from, queryWindow.to]);
 
   const tableData = useMemo(() => formatPrometheusToTable(series), [series]);
-  const dataTable = useMemo(() => <QueryResultTable data={tableData} />, [tableData]);
+  const dataTable = useMemo(() => <QueryResultTable data={tableData} scrollRegionLabel={`${panel.title} data table`} />, [tableData, panel.title]);
 
   return (
     <UPlotPanel

@@ -83,9 +83,19 @@ describe('formatBarChartTicks', () => {
 describe('buildBarChartOptions', () => {
   const sampleSeries = barChartSeries(matrix([{ metric: { __name__: 'cpu' }, values: [[1, 5]] }]));
   const colors = chartThemeColors('dark');
+  const range: readonly [number, number] = [1000, 2000];
 
   it('sets a bars path builder on each data series', () => {
-    const options = buildBarChartOptions({ series: sampleSeries, labels: [], defaults: defaults('short'), width: 400, height: 300, vertical: true, colors });
+    const options = buildBarChartOptions({
+      series: sampleSeries,
+      labels: [],
+      defaults: defaults('short'),
+      width: 400,
+      height: 300,
+      vertical: true,
+      colors,
+      range,
+    });
     // Index 0 is the x series; data series start at 1 and carry a bars path builder.
     expect(options.series).toHaveLength(2);
     expect(typeof options.series[1]?.paths).toBe('function');
@@ -100,22 +110,50 @@ describe('buildBarChartOptions', () => {
       height: 300,
       vertical: true,
       colors,
+      range,
     });
     expect(options.series[1]?.label).toBe('cpu');
   });
 
   it('falls back to a positional label when none is supplied for a series', () => {
-    const options = buildBarChartOptions({ series: sampleSeries, labels: [], defaults: defaults('short'), width: 400, height: 300, vertical: true, colors });
+    const options = buildBarChartOptions({
+      series: sampleSeries,
+      labels: [],
+      defaults: defaults('short'),
+      width: 400,
+      height: 300,
+      vertical: true,
+      colors,
+      range,
+    });
     expect(options.series[1]?.label).toBe('Series 1');
   });
 
   it('wires the formatted tick function onto the y-axis', () => {
-    const options = buildBarChartOptions({ series: sampleSeries, labels: [], defaults: defaults('bytes'), width: 400, height: 300, vertical: true, colors });
+    const options = buildBarChartOptions({
+      series: sampleSeries,
+      labels: [],
+      defaults: defaults('bytes'),
+      width: 400,
+      height: 300,
+      vertical: true,
+      colors,
+      range,
+    });
     expect(typeof options.axes?.[1]?.values).toBe('function');
   });
 
   it('applies the theme palette to both axes (stroke + grid) so chrome is readable in dark mode', () => {
-    const options = buildBarChartOptions({ series: sampleSeries, labels: [], defaults: defaults('short'), width: 400, height: 300, vertical: true, colors });
+    const options = buildBarChartOptions({
+      series: sampleSeries,
+      labels: [],
+      defaults: defaults('short'),
+      width: 400,
+      height: 300,
+      vertical: true,
+      colors,
+      range,
+    });
     // x axis (index 0) and y axis (index 1) both carry the themed chrome colors.
     expect(options.axes?.[0]?.stroke).toBe(colors.axis);
     expect(options.axes?.[0]?.grid?.stroke).toBe(colors.grid);
@@ -126,9 +164,36 @@ describe('buildBarChartOptions', () => {
   });
 
   it('honours explicit width/height (clamped to a floor)', () => {
-    const options = buildBarChartOptions({ series: sampleSeries, labels: [], defaults: defaults('short'), width: 500, height: 400, vertical: true, colors });
+    const options = buildBarChartOptions({
+      series: sampleSeries,
+      labels: [],
+      defaults: defaults('short'),
+      width: 500,
+      height: 400,
+      vertical: true,
+      colors,
+      range,
+    });
     expect(options.width).toBeGreaterThan(0);
     expect(options.height).toBeGreaterThan(0);
     expect(options.width).toBeLessThanOrEqual(500);
+  });
+
+  it('pins scales.x.range to the resolved query window so a stray sample cannot balloon the axis', () => {
+    // Regression for the P1 follow-up: the bar chart x-axis spanned years (2027–2028) because it
+    // auto-ranged to fit data instead of the selected window. The x scale must be time-based and
+    // its range pinned to the resolved [from, to] window (a static min/max, not data-driven).
+    const options = buildBarChartOptions({
+      series: sampleSeries,
+      labels: [],
+      defaults: defaults('short'),
+      width: 400,
+      height: 300,
+      vertical: true,
+      colors,
+      range,
+    });
+    expect(options.scales?.x?.time).toBe(true);
+    expect(options.scales?.x?.range).toEqual([1000, 2000]);
   });
 });

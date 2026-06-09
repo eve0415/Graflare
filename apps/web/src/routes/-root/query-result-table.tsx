@@ -13,6 +13,13 @@ interface QueryResultTableProps {
     rows: string[][];
   };
   renderCell?: CellRenderer;
+  /**
+   * Accessible name for the table's horizontal-scroll region (WAI-ARIA scrollable-region pattern,
+   * so keyboard users can scroll a wide table). Pass a value UNIQUE per on-screen table — e.g. the
+   * panel title — since the region is a landmark and duplicate names trip axe `landmark-unique`.
+   * Omitted in inline/non-scrolling contexts where a focusable landmark would just be noise.
+   */
+  scrollRegionLabel?: string;
 }
 
 // Leaf cell: the style object is built here from primitive props so the parent's
@@ -26,7 +33,7 @@ const DataCell = ({ text, color }: { text: string; color: string | undefined }) 
   );
 };
 
-export const QueryResultTable = ({ data, renderCell }: QueryResultTableProps) => {
+export const QueryResultTable = ({ data, renderCell, scrollRegionLabel }: QueryResultTableProps) => {
   const { columns, rows } = data;
 
   if (columns.length === 0) {
@@ -35,7 +42,7 @@ export const QueryResultTable = ({ data, renderCell }: QueryResultTableProps) =>
 
   return (
     <div className='max-h-96 overflow-auto rounded-md border'>
-      <Table>
+      <Table scrollRegionLabel={scrollRegionLabel}>
         <TableHeader>
           <TableRow>
             {columns.map(col => (

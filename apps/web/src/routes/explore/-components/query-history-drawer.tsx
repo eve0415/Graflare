@@ -91,7 +91,7 @@ export const QueryHistoryDrawer = ({ open, onOpenChange, entries, datasources, n
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetContent className='w-[480px] sm:max-w-[480px]'>
+      <SheetContent className='sm:max-w-[480px]'>
         <SheetHeader>
           <SheetTitle>Query history</SheetTitle>
           <SheetDescription>Re-run, star, and annotate queries you ran in Explore.</SheetDescription>

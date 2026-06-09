@@ -64,10 +64,13 @@ export const DashboardToolbar = ({
   );
 
   return (
-    <div className='flex items-center justify-between border-b px-4 py-2'>
+    // Wrap on narrow viewports so the dense control cluster drops below the title instead of
+    // forcing horizontal PAGE scroll at ~390px; the controls group keeps an overflow-x-auto
+    // safety valve for the rare case it still can't fit on one line on a very narrow device.
+    <div className='flex flex-wrap items-center justify-between gap-x-4 gap-y-2 border-b px-4 py-2'>
       <h1 className='text-lg font-semibold'>{title}</h1>
 
-      <div className='flex items-center gap-2'>
+      <div className='flex max-w-full min-w-0 items-center gap-2 overflow-x-auto pb-1 sm:pb-0'>
         <TimeRangePicker value={timeRange} onChange={onTimeRangeChange} />
 
         <Select value={refreshInterval} onValueChange={handleRefreshChange} items={refreshOptions}>

@@ -96,7 +96,7 @@ const StackedSqlTable = ({ refId, result, showLabel }: { refId: string; result: 
   return (
     <div className='space-y-1'>
       {showLabel && <span className='text-muted-foreground text-xs font-medium'>Query {refId}</span>}
-      <QueryResultTable data={data} />
+      <QueryResultTable data={data} scrollRegionLabel={`Query ${refId} results`} />
     </div>
   );
 };
@@ -514,7 +514,7 @@ export const ExplorePane = ({ timeRange, label }: ExplorePaneProps) => {
             <p className='text-muted-foreground text-sm'>Table format has no graph view. Switch the result view to see the rows.</p>
           )}
 
-          {resultView === 'table' && tableResults === null && <QueryResultTable data={seriesTableData} />}
+          {resultView === 'table' && tableResults === null && <QueryResultTable data={seriesTableData} scrollRegionLabel='Query results' />}
 
           {resultView === 'table' &&
             tableResults !== null &&

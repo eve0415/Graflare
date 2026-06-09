@@ -69,7 +69,7 @@ const DashboardCard = ({ dashboard: d }: { dashboard: { id: string; title: strin
       className='border-border hover:bg-accent/50 flex items-center justify-between rounded-lg border p-4 transition-colors'
     >
       <div className='space-y-1'>
-        <h3 className='font-medium'>{d.title}</h3>
+        <h2 className='font-medium'>{d.title}</h2>
         {d.description && <p className='text-muted-foreground text-sm'>{d.description}</p>}
         {d.tags.length > 0 && (
           <div className='flex gap-1'>

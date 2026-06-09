@@ -53,6 +53,16 @@ describe('routes', () => {
     });
   });
 
+  it('gives the add-data-source page exactly one h1 (page-has-heading-one regression)', async () => {
+    // The form title was a CardTitle <div>, leaving the standalone create/edit page with no h1.
+    // It is now a real heading; assert exactly one level-1 heading carrying the page title.
+    await renderWithRouter('/datasources/new');
+    await waitFor(() => {
+      expect(screen.getByRole('heading', { level: 1, name: 'Add Data Source' })).toBeDefined();
+    });
+    expect(screen.getAllByRole('heading', { level: 1 })).toHaveLength(1);
+  });
+
   it('renders edit page at /datasources/:id', async () => {
     await renderWithRouter('/datasources/test-id-123');
     await waitFor(() => {

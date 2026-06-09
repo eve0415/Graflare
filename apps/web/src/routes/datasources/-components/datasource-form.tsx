@@ -1,6 +1,6 @@
 import { Alert, AlertDescription } from '@graflare/ui/components/alert';
 import { Button } from '@graflare/ui/components/button';
-import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '@graflare/ui/components/card';
+import { Card, CardContent, CardFooter, CardHeader } from '@graflare/ui/components/card';
 import { Input } from '@graflare/ui/components/input';
 import { Label } from '@graflare/ui/components/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@graflare/ui/components/select';
@@ -228,7 +228,9 @@ export const DatasourceForm = ({ mode, initialData }: Props) => {
     <form onSubmit={handleSubmitEvent}>
       <Card>
         <CardHeader>
-          <CardTitle>{mode === 'create' ? 'Add Data Source' : 'Edit Data Source'}</CardTitle>
+          {/* Real <h1> (not the CardTitle <div>) so the standalone create/edit page has exactly
+              one page heading — keeps the card-title styling, fixes axe page-has-heading-one. */}
+          <h1 className='text-base font-medium'>{mode === 'create' ? 'Add Data Source' : 'Edit Data Source'}</h1>
         </CardHeader>
         <CardContent className='space-y-4'>
           {error !== null && (

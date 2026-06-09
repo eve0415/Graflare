@@ -3,9 +3,22 @@
 import { cn } from '@graflare/ui/lib/utils';
 import * as React from 'react';
 
-function Table({ className, ...props }: React.ComponentProps<'table'>) {
+// `scrollRegionLabel` opts the horizontal-scroll container into the WAI-ARIA scrollable-region
+// pattern: a labelled `role="region"` with `tabIndex={0}` so keyboard-only users can scroll an
+// overflowing table (axe `scrollable-region-focusable`). It is opt-in because Table is also used
+// in non-scrolling / inline contexts where a focusable landmark would be noise; only pass a label
+// where the table can actually scroll, and make it UNIQUE per instance (region is a landmark, so a
+// shared static name trips `landmark-unique`).
+function Table({ className, scrollRegionLabel, ...props }: React.ComponentProps<'table'> & { scrollRegionLabel?: string | undefined }) {
+  const scrollable = scrollRegionLabel !== undefined;
   return (
-    <div data-slot='table-container' className='relative w-full overflow-x-auto'>
+    <div
+      data-slot='table-container'
+      className='relative w-full overflow-x-auto'
+      role={scrollable ? 'region' : undefined}
+      aria-label={scrollRegionLabel}
+      tabIndex={scrollable ? 0 : undefined}
+    >
       <table data-slot='table' className={cn('w-full caption-bottom text-sm', className)} {...props} />
     </div>
   );

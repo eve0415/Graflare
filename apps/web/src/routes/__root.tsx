@@ -46,9 +46,16 @@ const RootComponent = () => {
                 </div>
               </header>
               <div className='flex-1 p-6'>
-                <QueryBoundary pendingFallback={rootFallback}>
-                  <Outlet />
-                </QueryBoundary>
+                {/* Cap + center content on ultra-wide (4K/8K) displays so forms, cards and search
+                    don't stretch to unreadable line lengths. 2000px is strictly greater than a
+                    1920px viewport, so the ≤1920 layout is unchanged; below the cap this is a no-op.
+                    The dashboard view escapes the page padding with `-m-6` but stays within this cap
+                    (its panel grid reflows to the available columns either way). */}
+                <div className='mx-auto w-full max-w-[2000px]'>
+                  <QueryBoundary pendingFallback={rootFallback}>
+                    <Outlet />
+                  </QueryBoundary>
+                </div>
               </div>
             </SidebarInset>
           </SidebarProvider>
