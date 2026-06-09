@@ -1,6 +1,5 @@
 import type { AppEnv } from '../index';
-import type { ServiceTokenClient } from './access-service-tokens';
-import type { CreateServiceToken, ServiceToken, ServiceTokenWithSecret } from '@graflare/shared/schemas/service-token';
+import type { ServiceTokenWithSecret } from '@graflare/shared/schemas/service-token';
 
 import { createExecutionContext } from 'cloudflare:test';
 import { env } from 'cloudflare:workers';
@@ -10,6 +9,12 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { createDb } from '../db';
 import { accessServiceTokens, organizations } from '../db/schema';
 import { GraflareAPI } from '../index';
+
+// The privileged CF client is built behind a JS-private method on GraflareAPI
+// (so it is never RPC-exposed), so we can't spy on the method. Instead we mock
+// the network boundary (`globalThis.fetch`) and let the real client →
+// cfRequest → zod-parse path run, exactly as in production. createServiceToken
+// hits POST and revokeServiceToken hits DELETE; listServiceTokens reads D1 only.
 
 const TEST_ENCRYPTION_KEY = btoa(String.fromCodePoint(...crypto.getRandomValues(new Uint8Array(32))));
 const DEV_EMAIL = 'service-token-rpc@example.com';
@@ -43,23 +48,33 @@ const createResult: ServiceTokenWithSecret = {
   duration: '8760h',
 };
 
-type CreateFn = (input: CreateServiceToken) => Promise<ServiceTokenWithSecret>;
-type ListFn = () => Promise<ServiceToken[]>;
-type DeleteFn = (cfTokenId: string) => Promise<void>;
-
-/** A spy-able client whose three mocks are standalone (so assertions never reference unbound members). */
-interface SpyClient {
-  client: ServiceTokenClient;
-  create: ReturnType<typeof vi.fn<CreateFn>>;
-  list: ReturnType<typeof vi.fn<ListFn>>;
-  delete: ReturnType<typeof vi.fn<DeleteFn>>;
+interface CapturedRequest {
+  url: string;
+  method: string;
+  body: string | null;
 }
 
-const spyClient = (createResolves: ServiceTokenWithSecret = createResult): SpyClient => {
-  const create = vi.fn<CreateFn>(() => Promise.resolve(createResolves));
-  const list = vi.fn<ListFn>(() => Promise.resolve([]));
-  const del = vi.fn<DeleteFn>(() => Promise.resolve());
-  return { client: { create, list, delete: del }, create, list, delete: del };
+const captured: CapturedRequest[] = [];
+// FIFO of CF create (POST) results; each create dequeues one, falling back to
+// the default. Lets a test stage distinct tokens for two orgs in call order.
+const createQueue: ServiceTokenWithSecret[] = [];
+
+const envelope = (result: unknown): Response =>
+  new Response(JSON.stringify({ success: true, errors: [], messages: [], result }), {
+    status: 200,
+    headers: { 'Content-Type': 'application/json' },
+  });
+
+const installFetch = (): void => {
+  vi.spyOn(globalThis, 'fetch').mockImplementation((input, init) => {
+    const req = new Request(input, init);
+    captured.push({ url: req.url, method: req.method, body: typeof init?.body === 'string' ? init.body : null });
+    if (req.method === 'POST') {
+      return Promise.resolve(envelope(createQueue.shift() ?? createResult));
+    }
+    // DELETE (revoke) and any GET (list) — RPC list reads D1, so GET is unused.
+    return Promise.resolve(envelope({ id: 'ok' }));
+  });
 };
 
 const must = <T>(v: T | undefined): T => {
@@ -67,9 +82,10 @@ const must = <T>(v: T | undefined): T => {
   return v;
 };
 
-afterEach(() => {
-  vi.restoreAllMocks();
-});
+const mustBody = (v: string | null): string => {
+  if (v === null) throw new Error('expected a request body');
+  return v;
+};
 
 const resetDb = async (): Promise<void> => {
   const db = createDb(env.DB);
@@ -77,25 +93,33 @@ const resetDb = async (): Promise<void> => {
   await db.delete(organizations);
 };
 
-describe('createServiceToken RPC', () => {
-  beforeEach(resetDb);
+beforeEach(async () => {
+  captured.length = 0;
+  createQueue.length = 0;
+  installFetch();
+  await resetDb();
+});
 
+afterEach(() => {
+  vi.restoreAllMocks();
+});
+
+describe('createServiceToken RPC', () => {
   it('returns the secret once and forwards name+duration to Cloudflare', async () => {
     const api = makeApi();
-    const spy = spyClient();
-    vi.spyOn(api, 'serviceTokens').mockReturnValue(spy.client);
 
     const result = await api.createServiceToken('jwt', { name: 'ci', duration: '8760h' });
 
     expect(result.clientSecret).toBe('the-secret');
     expect(result.clientId).toBe('client-1');
     expect(result.name).toBe('ci');
-    expect(spy.create).toHaveBeenCalledWith({ name: 'ci', duration: '8760h' });
+
+    const post = must(captured.find(r => r.method === 'POST'));
+    expect(JSON.parse(mustBody(post.body))).toEqual({ name: 'ci', duration: '8760h' });
   });
 
   it('stores a link row that contains no secret', async () => {
     const api = makeApi();
-    vi.spyOn(api, 'serviceTokens').mockReturnValue(spyClient().client);
 
     await api.createServiceToken('jwt', { name: 'ci' });
 
@@ -112,7 +136,7 @@ describe('createServiceToken RPC', () => {
   it('persists expiresAt as null when CF omits expires_at', async () => {
     const api = makeApi();
     const { expires_at: _e, ...noExpiry } = createResult;
-    vi.spyOn(api, 'serviceTokens').mockReturnValue(spyClient(noExpiry).client);
+    createQueue.push(noExpiry);
 
     const result = await api.createServiceToken('jwt', { name: 'ci' });
     expect(result.expiresAt).toBeNull();
@@ -120,14 +144,30 @@ describe('createServiceToken RPC', () => {
     const rows = await createDb(env.DB).select().from(accessServiceTokens);
     expect(must(rows[0]).expiresAt).toBeNull();
   });
+
+  it('rolls back the CF token (best-effort delete) when the link insert fails', async () => {
+    const api = makeApi();
+    // Force the link insert to fail: clientId has a unique index, so a second
+    // create whose CF result reuses client_id 'client-1' (only the cf token id
+    // differs) collides and throws — exercising the orphan-rollback path.
+    createQueue.push(createResult, { ...createResult, id: 'cf-tok-dup' });
+    await api.createServiceToken('jwt', { name: 'first' });
+
+    await expect(api.createServiceToken('jwt', { name: 'dup' })).rejects.toThrow('Failed to create service token');
+
+    // The orphan-avoidance path revoked the just-created CF token at Cloudflare.
+    const del = must(captured.find(r => r.method === 'DELETE'));
+    expect(del.url).toContain('/service_tokens/cf-tok-dup');
+    // Only the first token's link row survives.
+    const rows = await createDb(env.DB).select().from(accessServiceTokens);
+    expect(rows).toHaveLength(1);
+    expect(must(rows[0]).cfTokenId).toBe('cf-tok-1');
+  });
 });
 
 describe('listServiceTokens RPC', () => {
-  beforeEach(resetDb);
-
   it('returns metadata only — never a secret or cf token id', async () => {
     const api = makeApi();
-    vi.spyOn(api, 'serviceTokens').mockReturnValue(spyClient().client);
     await api.createServiceToken('jwt', { name: 'ci' });
 
     const list = await api.listServiceTokens('jwt');
@@ -141,12 +181,12 @@ describe('listServiceTokens RPC', () => {
   });
 
   it('only returns the caller org rows', async () => {
+    createQueue.push(createResult, { ...createResult, id: 'cf-tok-2', client_id: 'client-2' });
+
     const mine = makeApi();
-    vi.spyOn(mine, 'serviceTokens').mockReturnValue(spyClient().client);
     await mine.createServiceToken('jwt', { name: 'mine' });
 
     const theirs = makeApi({ DEV_AUTH_EMAIL: OTHER_EMAIL });
-    vi.spyOn(theirs, 'serviceTokens').mockReturnValue(spyClient({ ...createResult, id: 'cf-tok-2', client_id: 'client-2' }).client);
     await theirs.createServiceToken('jwt', { name: 'theirs' });
 
     const mineList = await mine.listServiceTokens('jwt');
@@ -156,32 +196,27 @@ describe('listServiceTokens RPC', () => {
 });
 
 describe('revokeServiceToken RPC', () => {
-  beforeEach(resetDb);
-
   it('calls Cloudflare delete with the cf token id and removes the link', async () => {
     const api = makeApi();
-    const spy = spyClient();
-    vi.spyOn(api, 'serviceTokens').mockReturnValue(spy.client);
     const created = await api.createServiceToken('jwt', { name: 'ci' });
 
     await api.revokeServiceToken('jwt', created.id);
 
-    expect(spy.delete).toHaveBeenCalledWith('cf-tok-1');
+    const del = must(captured.find(r => r.method === 'DELETE'));
+    expect(del.url).toContain('/service_tokens/cf-tok-1');
     expect(await createDb(env.DB).select().from(accessServiceTokens)).toHaveLength(0);
   });
 
   it('is org-scoped: another org cannot revoke (no CF delete, row preserved)', async () => {
     const mine = makeApi();
-    vi.spyOn(mine, 'serviceTokens').mockReturnValue(spyClient().client);
     const created = await mine.createServiceToken('jwt', { name: 'mine' });
 
     const theirs = makeApi({ DEV_AUTH_EMAIL: OTHER_EMAIL });
-    const theirsSpy = spyClient();
-    vi.spyOn(theirs, 'serviceTokens').mockReturnValue(theirsSpy.client);
-
     await theirs.revokeServiceToken('jwt', created.id);
 
-    expect(theirsSpy.delete).not.toHaveBeenCalled();
+    // theirs' revoke found no row for its org → returned before any CF call.
+    expect(captured.some(r => r.method === 'DELETE')).toBe(false);
+
     const orgAId = await orgIdOf(DEV_EMAIL);
     const rows = await createDb(env.DB)
       .select()

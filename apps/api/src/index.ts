@@ -163,11 +163,13 @@ export class GraflareAPI extends WorkerEntrypoint<Bindings> {
 
   /**
    * The Cloudflare Access service-token client, bound to this worker's
-   * maintainer-provisioned credentials. Exposed as a method so tests can
-   * substitute a fake (the real one calls api.cloudflare.com, which the test
-   * isolate can't reach).
+   * maintainer-provisioned credentials. JS-private (`#`) so it is NOT exposed
+   * over the RPC service binding — a public method here would hand any binding
+   * caller an account-wide, un-org-scoped CF client (list/create/delete every
+   * token on the account). Tests mock the `createServiceTokenClient` module
+   * export instead of this method.
    */
-  serviceTokens(): ServiceTokenClient {
+  #serviceTokens(): ServiceTokenClient {
     return createServiceTokenClient({ apiToken: this.env.CF_API_TOKEN, accountId: this.env.CF_ACCOUNT_ID });
   }
 
@@ -1886,7 +1888,7 @@ export class GraflareAPI extends WorkerEntrypoint<Bindings> {
     const { orgId } = await this.resolveAuth(jwt);
     const parsed = createServiceTokenSchema.parse(input);
 
-    const created = await this.serviceTokens().create(parsed);
+    const created = await this.#serviceTokens().create(parsed);
 
     const id = crypto.randomUUID();
     const createdAt = new Date();
@@ -1903,7 +1905,16 @@ export class GraflareAPI extends WorkerEntrypoint<Bindings> {
         expiresAt,
       });
     } catch (error) {
-      console.error('createServiceToken failed:', error);
+      // The CF token exists but its link row didn't persist — it would be
+      // orphaned (unlistable, unrevokable from the UI) yet still a live
+      // credential. Best-effort revoke it at Cloudflare; if that also fails,
+      // log the cf token id (NOT a secret) for manual cleanup.
+      console.error('createServiceToken: link insert failed; rolling back CF token', created.id, error);
+      try {
+        await this.#serviceTokens().delete(created.id);
+      } catch (rollbackError) {
+        console.error('createServiceToken: rollback of orphaned CF token failed; manual cleanup needed for', created.id, rollbackError);
+      }
       throw new Error('Failed to create service token', { cause: error });
     }
 
@@ -1935,7 +1946,7 @@ export class GraflareAPI extends WorkerEntrypoint<Bindings> {
     }
 
     try {
-      await this.serviceTokens().delete(row.cfTokenId);
+      await this.#serviceTokens().delete(row.cfTokenId);
       await this.db.delete(accessServiceTokens).where(and(eq(accessServiceTokens.id, id), eq(accessServiceTokens.orgId, orgId)));
     } catch (error) {
       console.error('revokeServiceToken failed:', error);
