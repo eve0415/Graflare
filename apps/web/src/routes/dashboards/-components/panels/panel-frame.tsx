@@ -1,5 +1,6 @@
 import { Button } from '@graflare/ui/components/button';
 import { Skeleton } from '@graflare/ui/components/skeleton';
+import { Toggle } from '@graflare/ui/components/toggle';
 import { AlertCircle, Pencil, Table2, Trash2 } from 'lucide-react';
 import { Suspense, useCallback, useId, useMemo, useState } from 'react';
 
@@ -24,10 +25,6 @@ export const PanelFrame = ({ title, loading, error, onRetry, children, dataTable
   // in the tab order without making the non-interactive region itself a tab stop.
   const titleId = useId();
 
-  const toggleDataTable = useCallback(() => {
-    setShowDataTable(v => !v);
-  }, []);
-
   const handleEdit = useCallback(() => {
     if (panelId !== undefined) actions?.onEdit(panelId);
   }, [actions, panelId]);
@@ -46,9 +43,9 @@ export const PanelFrame = ({ title, loading, error, onRetry, children, dataTable
         </h3>
         <div className='flex items-center gap-1'>
           {dataTableContent !== undefined && (
-            <Button variant='ghost' size='icon' className='h-6 w-6' onClick={toggleDataTable} aria-pressed={showDataTable} aria-label='Show data table'>
+            <Toggle className='size-6 min-w-0 p-0' pressed={showDataTable} onPressedChange={setShowDataTable} aria-label='Show data table'>
               <Table2 className='h-3.5 w-3.5' />
-            </Button>
+            </Toggle>
           )}
           {actions !== null && panelId !== undefined && (
             <>
