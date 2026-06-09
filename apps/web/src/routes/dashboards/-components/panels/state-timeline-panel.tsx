@@ -95,7 +95,9 @@ const StateTimelineSvg = ({ lanes, domain, thresholds, rowHeight, showValue, lab
         const y = MARGIN.top + laneIndex * laneH + bandPad;
         const showLabel = showValue === 'always' || (showValue === 'auto' && bandH >= AUTO_LABEL_MIN_LANE_H);
         return (
-          <g key={lane.label}>
+          // Suffix the key with the lane index: two series sharing a `__name__` resolve to the
+          // same label, so the label alone is not a unique key (React "same key" warning).
+          <g key={`${lane.label}-${String(laneIndex)}`}>
             {lane.segments.map(seg => {
               const x = xPos(seg.startTime);
               const w = Math.max(MIN_SEG_W, xPos(seg.endTime) - x);

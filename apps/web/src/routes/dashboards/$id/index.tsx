@@ -18,6 +18,7 @@ import { DashboardGrid } from '../-components/dashboard-grid';
 import { DashboardSettings } from '../-components/dashboard-settings';
 import { DashboardToolbar } from '../-components/dashboard-toolbar';
 import { DashboardViewSkeleton } from '../-components/dashboard-view-skeleton';
+import { initialRefresh, initialTimeRange, intervalToMs } from '../-components/dashboard-view-state';
 import { PanelEditor } from '../-components/panel-editor';
 import { PanelActionsProvider } from '../-components/panels/panel-actions-context';
 import { VariableBar } from '../-components/variable-bar';
@@ -35,20 +36,6 @@ const EMPTY_ANNOTATIONS: readonly Annotation[] = [];
 // Stable empty fallback for the datasource list passed to the settings dialog, so the prop keeps
 // a constant identity while the datasource query is still loading.
 const EMPTY_DATASOURCES: readonly DatasourceRow[] = [];
-
-type RefreshInterval = '5s' | '10s' | '30s' | '1m' | '5m' | '15m' | '30m' | '1h' | 'off';
-
-const intervalToMs: Record<RefreshInterval, number | false> = {
-  off: false,
-  '5s': 5000,
-  '10s': 10000,
-  '30s': 30000,
-  '1m': 60000,
-  '5m': 300000,
-  '15m': 900000,
-  '30m': 1800000,
-  '1h': 3600000,
-};
 
 const parsePanels = (raw: unknown): Panel[] => {
   if (!Array.isArray(raw)) return [];
@@ -76,8 +63,12 @@ const DashboardViewPage = () => {
   const { data: dashboard } = useSuspenseQuery(dashboardQueryOptions(id));
   const { record: recordRecent } = useRecentDashboards();
 
-  const [timeRange, setTimeRange] = useState({ from: 'now-1h', to: 'now' });
-  const [refreshInterval, setRefreshInterval] = useState<RefreshInterval>('off');
+  // Seed the view from the dashboard's SAVED time range / refresh (falling back to
+  // now-1h / off when absent), so opening a dashboard restores the window it was saved
+  // with instead of always snapping to the last hour. Lazy initializers: `dashboard` is
+  // present here (useSuspenseQuery), and a later user change must not be reset on rerender.
+  const [timeRange, setTimeRange] = useState(() => initialTimeRange(dashboard?.timeRange));
+  const [refreshInterval, setRefreshInterval] = useState(() => initialRefresh(dashboard?.timeRange));
   const [editMode, setEditMode] = useState(false);
   const [saving, setSaving] = useState(false);
   const [panels, setPanels] = useState<Panel[]>([]);

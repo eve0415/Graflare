@@ -350,13 +350,19 @@ export const ExplorePane = ({ timeRange, label }: ExplorePaneProps) => {
 
   const chartOptions = useMemo((): UPlotOptions => {
     const colors = chartThemeColors(resolved);
+    // Pin the x domain to the selected query window so the axis tracks the chosen range
+    // rather than uPlot's data-driven auto-range (which balloons on a stray out-of-window
+    // sample). `from`/`to` already snap with Grafana's start/end rounding convention.
+    const { from: fromSec, to: toSec } = resolveRange(timeRange.from, timeRange.to);
+    const xRange = (): [number, number] => [fromSec, toSec];
     return {
       width: 800,
       height: 300,
+      scales: { x: { time: true, range: xRange } },
       axes: [{ ...themedAxis(colors) }, { ...themedAxis(colors) }],
       series: [{}, ...merged.labels.map((labelText, i) => ({ label: labelText, stroke: `hsl(${String(i * 60)}, 70%, 50%)` }))],
     };
-  }, [merged, resolved]);
+  }, [merged, resolved, timeRange.from, timeRange.to]);
 
   // The table view. SQL-table results stack one table per ref id; otherwise the combined series
   // feed the existing prometheus formatter. The ref-id `Query` column appears only when more than

@@ -2,7 +2,6 @@ import type { ChartThemeColors } from '../../../-root/chart-theme';
 import type { ResultSeries } from './panel-data-extract';
 import type { PanelDataResult } from './use-panel-data';
 import type { FieldConfigDefaults } from '@graflare/shared/schemas/field-config';
-import type { PanelQuery } from '@graflare/shared/schemas/panel';
 import type uPlotNs from 'uplot';
 
 import { formatValue } from '@graflare/shared/format/value-format';
@@ -18,7 +17,12 @@ export type BarChartSeries = ResultSeries;
 
 interface BuildBarChartOptionsArgs {
   series: BarChartSeries[];
-  queries: PanelQuery[];
+  /**
+   * Display label per series, index-aligned with `series`. Resolved by the caller (which has the
+   * panel queries) so a `legendFormat` template applies even when one query yields many series.
+   * A missing entry falls back to a positional `Series N`.
+   */
+  labels: readonly string[];
   defaults: FieldConfigDefaults;
   width: number;
   height: number;
@@ -64,7 +68,7 @@ export const formatBarChartTicks = (splits: number[], defaults: FieldConfigDefau
  * series and a formatted y-axis. `vertical` is accepted for forward-compat; uPlot
  * 1.6 renders value bars vertically, so it currently has no visual branch.
  */
-export const buildBarChartOptions = ({ series, queries, defaults, width, height, colors }: BuildBarChartOptionsArgs): uPlotNs.Options => {
+export const buildBarChartOptions = ({ series, labels, defaults, width, height, colors }: BuildBarChartOptionsArgs): uPlotNs.Options => {
   // `paths` is optional on Series and uPlot.paths.bars is itself optional in the
   // types; build it once and include the key only when present (no undefined writes).
   const barsPaths = uPlot.paths.bars?.({ size: BAR_SIZE, align: 0 });
@@ -78,9 +82,9 @@ export const buildBarChartOptions = ({ series, queries, defaults, width, height,
     axes: [{ ...themedAxis(colors) }, { ...themedAxis(colors), values: formatYTicks }],
     series: [
       {},
-      ...series.map((s, i): uPlotNs.Series => {
+      ...series.map((_s, i): uPlotNs.Series => {
         const base: uPlotNs.Series = {
-          label: s.metric.__name__ ?? queries[i]?.legendFormat ?? `Series ${String(i + 1)}`,
+          label: labels[i] ?? `Series ${String(i + 1)}`,
           stroke: `hsl(${String(i * 60)}, 70%, 50%)`,
           fill: `hsla(${String(i * 60)}, 70%, 50%, 0.7)`,
         };

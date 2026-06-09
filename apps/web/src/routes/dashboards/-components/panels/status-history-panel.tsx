@@ -103,7 +103,9 @@ const StatusHistorySvg = ({ lanes, layout, thresholds, rowHeight, colWidth, labe
       {lanes.map((lane, laneIndex) => {
         const y = MARGIN.top + laneIndex * laneH + bandPad;
         return (
-          <g key={lane.label}>
+          // Suffix the key with the lane index: two series sharing a `__name__` resolve to the
+          // same label, so the label alone is not a unique key (React "same key" warning).
+          <g key={`${lane.label}-${String(laneIndex)}`}>
             {lane.cells.map(cell => {
               const cx = xPos(cell.time);
               // The lane's own resolved mappings drive the colour, so a per-field

@@ -85,24 +85,37 @@ describe('buildBarChartOptions', () => {
   const colors = chartThemeColors('dark');
 
   it('sets a bars path builder on each data series', () => {
-    const options = buildBarChartOptions({ series: sampleSeries, queries: [], defaults: defaults('short'), width: 400, height: 300, vertical: true, colors });
+    const options = buildBarChartOptions({ series: sampleSeries, labels: [], defaults: defaults('short'), width: 400, height: 300, vertical: true, colors });
     // Index 0 is the x series; data series start at 1 and carry a bars path builder.
     expect(options.series).toHaveLength(2);
     expect(typeof options.series[1]?.paths).toBe('function');
   });
 
-  it('labels each series from its metric name', () => {
-    const options = buildBarChartOptions({ series: sampleSeries, queries: [], defaults: defaults('short'), width: 400, height: 300, vertical: true, colors });
+  it('labels each data series from the supplied labels (index-aligned)', () => {
+    const options = buildBarChartOptions({
+      series: sampleSeries,
+      labels: ['cpu'],
+      defaults: defaults('short'),
+      width: 400,
+      height: 300,
+      vertical: true,
+      colors,
+    });
     expect(options.series[1]?.label).toBe('cpu');
   });
 
+  it('falls back to a positional label when none is supplied for a series', () => {
+    const options = buildBarChartOptions({ series: sampleSeries, labels: [], defaults: defaults('short'), width: 400, height: 300, vertical: true, colors });
+    expect(options.series[1]?.label).toBe('Series 1');
+  });
+
   it('wires the formatted tick function onto the y-axis', () => {
-    const options = buildBarChartOptions({ series: sampleSeries, queries: [], defaults: defaults('bytes'), width: 400, height: 300, vertical: true, colors });
+    const options = buildBarChartOptions({ series: sampleSeries, labels: [], defaults: defaults('bytes'), width: 400, height: 300, vertical: true, colors });
     expect(typeof options.axes?.[1]?.values).toBe('function');
   });
 
   it('applies the theme palette to both axes (stroke + grid) so chrome is readable in dark mode', () => {
-    const options = buildBarChartOptions({ series: sampleSeries, queries: [], defaults: defaults('short'), width: 400, height: 300, vertical: true, colors });
+    const options = buildBarChartOptions({ series: sampleSeries, labels: [], defaults: defaults('short'), width: 400, height: 300, vertical: true, colors });
     // x axis (index 0) and y axis (index 1) both carry the themed chrome colors.
     expect(options.axes?.[0]?.stroke).toBe(colors.axis);
     expect(options.axes?.[0]?.grid?.stroke).toBe(colors.grid);
@@ -113,7 +126,7 @@ describe('buildBarChartOptions', () => {
   });
 
   it('honours explicit width/height (clamped to a floor)', () => {
-    const options = buildBarChartOptions({ series: sampleSeries, queries: [], defaults: defaults('short'), width: 500, height: 400, vertical: true, colors });
+    const options = buildBarChartOptions({ series: sampleSeries, labels: [], defaults: defaults('short'), width: 500, height: 400, vertical: true, colors });
     expect(options.width).toBeGreaterThan(0);
     expect(options.height).toBeGreaterThan(0);
     expect(options.width).toBeLessThanOrEqual(500);
