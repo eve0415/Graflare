@@ -13,8 +13,7 @@
     }
   ],
   "vars": {
-    "CF_ZONE_IDS": "",
-    "BRIDGE_DEBUG": ""
+    "CF_ZONE_IDS": "eve0415.net"
   },
   "triggers": {
     "crons": ["*/5 * * * *"]
