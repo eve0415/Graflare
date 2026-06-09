@@ -15,8 +15,10 @@ import { useQuery, useSuspenseQuery } from '@tanstack/react-query';
 import { BarChart3, History, Play, Plus, Table2 } from 'lucide-react';
 import { Suspense, useCallback, useMemo, useState } from 'react';
 
+import { chartThemeColors, themedAxis } from '../../-root/chart-theme';
 import { databaseSchemaQueryOptions } from '../../-root/introspection-queries';
 import { QueryResultTable, formatPrometheusToTable } from '../../-root/query-result-table';
+import { useTheme } from '../../-root/theme-provider';
 import { UPlotChart } from '../../-root/uplot-chart';
 import { proxyQuery } from '../../../lib/proxy';
 import { sqlQuery } from '../../../lib/sql-proxy';
@@ -118,6 +120,7 @@ const parsePrometheusSeries = (data: PrometheusData | undefined): MergeSeries[] 
 
 export const ExplorePane = ({ timeRange, label }: ExplorePaneProps) => {
   const { data: datasources } = useSuspenseQuery(datasourcesQueryOptions());
+  const { resolved } = useTheme();
   const dsItems = useMemo(() => datasources.map(ds => ({ value: ds.id, label: ds.name })), [datasources]);
 
   const [datasourceId, setDatasourceId] = useState<string>(datasources[0]?.id ?? '');
@@ -345,14 +348,15 @@ export const ExplorePane = ({ timeRange, label }: ExplorePaneProps) => {
 
   const chartFallback = useMemo(() => <Skeleton className='h-72 w-full' />, []);
 
-  const chartOptions = useMemo(
-    (): UPlotOptions => ({
+  const chartOptions = useMemo((): UPlotOptions => {
+    const colors = chartThemeColors(resolved);
+    return {
       width: 800,
       height: 300,
+      axes: [{ ...themedAxis(colors) }, { ...themedAxis(colors) }],
       series: [{}, ...merged.labels.map((labelText, i) => ({ label: labelText, stroke: `hsl(${String(i * 60)}, 70%, 50%)` }))],
-    }),
-    [merged],
-  );
+    };
+  }, [merged, resolved]);
 
   // The table view. SQL-table results stack one table per ref id; otherwise the combined series
   // feed the existing prometheus formatter. The ref-id `Query` column appears only when more than

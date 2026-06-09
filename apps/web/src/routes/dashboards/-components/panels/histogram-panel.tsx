@@ -4,6 +4,9 @@ import type { Panel } from '@graflare/shared/schemas/panel';
 import { resolveRange } from '@graflare/shared/time/resolve';
 import { useMemo } from 'react';
 
+import { chartThemeColors } from '../../../-root/chart-theme';
+import { useTheme } from '../../../-root/theme-provider';
+
 import { annotationMarkers } from './annotations-plugin';
 import { buildHistogramOptions, histogramAlignedData, histogramBuckets, histogramValues } from './histogram-data';
 import { UPlotPanel } from './uplot-panel';
@@ -20,6 +23,7 @@ interface HistogramPanelProps {
 
 export const HistogramPanel = ({ panel, timeRange, refetchInterval, width, height, annotations }: HistogramPanelProps) => {
   const { data, isLoading, error, handleRetry } = usePanelQuery(panel, timeRange, refetchInterval);
+  const { resolved } = useTheme();
 
   const buckets = useMemo(() => {
     const values = histogramValues(data);
@@ -35,8 +39,8 @@ export const HistogramPanel = ({ panel, timeRange, refetchInterval, width, heigh
   const chartData = useMemo(() => histogramAlignedData(buckets), [buckets]);
 
   const chartOptions = useMemo(
-    () => buildHistogramOptions({ defaults: panel.fieldConfig.defaults, width, height }),
-    [panel.fieldConfig.defaults, width, height],
+    () => buildHistogramOptions({ defaults: panel.fieldConfig.defaults, width, height, colors: chartThemeColors(resolved) }),
+    [panel.fieldConfig.defaults, width, height, resolved],
   );
 
   // The histogram x-axis is bucket-value, not time, so epoch-second markers fall

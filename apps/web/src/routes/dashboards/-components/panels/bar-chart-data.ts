@@ -1,3 +1,4 @@
+import type { ChartThemeColors } from '../../../-root/chart-theme';
 import type { ResultSeries } from './panel-data-extract';
 import type { PanelDataResult } from './use-panel-data';
 import type { FieldConfigDefaults } from '@graflare/shared/schemas/field-config';
@@ -6,6 +7,8 @@ import type uPlotNs from 'uplot';
 
 import { formatValue } from '@graflare/shared/format/value-format';
 import uPlot from 'uplot';
+
+import { themedAxis } from '../../../-root/chart-theme';
 
 import { extractResultSeries } from './panel-data-extract';
 
@@ -20,6 +23,8 @@ interface BuildBarChartOptionsArgs {
   width: number;
   height: number;
   vertical: boolean;
+  /** Theme-aware axis/grid/tick colors so the chart chrome is readable in dark mode. */
+  colors: ChartThemeColors;
 }
 
 // Bar geometry: 60% of the available slot, capped at 60px, centred. A named
@@ -59,7 +64,7 @@ export const formatBarChartTicks = (splits: number[], defaults: FieldConfigDefau
  * series and a formatted y-axis. `vertical` is accepted for forward-compat; uPlot
  * 1.6 renders value bars vertically, so it currently has no visual branch.
  */
-export const buildBarChartOptions = ({ series, queries, defaults, width, height }: BuildBarChartOptionsArgs): uPlotNs.Options => {
+export const buildBarChartOptions = ({ series, queries, defaults, width, height, colors }: BuildBarChartOptionsArgs): uPlotNs.Options => {
   // `paths` is optional on Series and uPlot.paths.bars is itself optional in the
   // types; build it once and include the key only when present (no undefined writes).
   const barsPaths = uPlot.paths.bars?.({ size: BAR_SIZE, align: 0 });
@@ -70,7 +75,7 @@ export const buildBarChartOptions = ({ series, queries, defaults, width, height 
   return {
     width: Math.max(100, width - 16),
     height: Math.max(80, height - 60),
-    axes: [{}, { values: formatYTicks }],
+    axes: [{ ...themedAxis(colors) }, { ...themedAxis(colors), values: formatYTicks }],
     series: [
       {},
       ...series.map((s, i): uPlotNs.Series => {

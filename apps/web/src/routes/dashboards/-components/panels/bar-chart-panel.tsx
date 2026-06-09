@@ -4,7 +4,9 @@ import type { Panel } from '@graflare/shared/schemas/panel';
 import { resolveRange } from '@graflare/shared/time/resolve';
 import { useMemo } from 'react';
 
+import { chartThemeColors } from '../../../-root/chart-theme';
 import { QueryResultTable, formatPrometheusToTable } from '../../../-root/query-result-table';
+import { useTheme } from '../../../-root/theme-provider';
 
 import { annotationMarkers } from './annotations-plugin';
 import { barChartAlignedData, barChartSeries, buildBarChartOptions } from './bar-chart-data';
@@ -22,6 +24,7 @@ interface BarChartPanelProps {
 
 export const BarChartPanel = ({ panel, timeRange, refetchInterval, width, height, annotations }: BarChartPanelProps) => {
   const { data, isLoading, error, handleRetry } = usePanelQuery(panel, timeRange, refetchInterval);
+  const { resolved } = useTheme();
 
   const series = useMemo(() => barChartSeries(data), [data]);
   const chartData = useMemo(() => barChartAlignedData(series), [series]);
@@ -33,8 +36,9 @@ export const BarChartPanel = ({ panel, timeRange, refetchInterval, width, height
 
   const chartOptions = useMemo(() => {
     const vertical = panel.displayOptions.barchart?.orientation !== 'horizontal';
-    return buildBarChartOptions({ series, queries: panel.queries, defaults: panel.fieldConfig.defaults, width, height, vertical });
-  }, [series, panel.queries, panel.fieldConfig.defaults, panel.displayOptions.barchart?.orientation, width, height]);
+    const colors = chartThemeColors(resolved);
+    return buildBarChartOptions({ series, queries: panel.queries, defaults: panel.fieldConfig.defaults, width, height, vertical, colors });
+  }, [series, panel.queries, panel.fieldConfig.defaults, panel.displayOptions.barchart?.orientation, width, height, resolved]);
 
   const tableData = useMemo(() => formatPrometheusToTable(series), [series]);
   const dataTable = useMemo(() => <QueryResultTable data={tableData} />, [tableData]);

@@ -71,7 +71,7 @@ export const DashboardToolbar = ({
         <TimeRangePicker value={timeRange} onChange={onTimeRangeChange} />
 
         <Select value={refreshInterval} onValueChange={handleRefreshChange} items={refreshOptions}>
-          <SelectTrigger className='w-20' aria-label='Auto-refresh interval'>
+          <SelectTrigger className='min-w-24' aria-label='Auto-refresh interval'>
             <RefreshCw className='mr-1 h-3 w-3' />
             <SelectValue />
           </SelectTrigger>

@@ -6,7 +6,9 @@ import { formatValue } from '@graflare/shared/format/value-format';
 import { resolveRange } from '@graflare/shared/time/resolve';
 import { useMemo } from 'react';
 
+import { chartThemeColors, themedAxis } from '../../../-root/chart-theme';
 import { QueryResultTable, formatPrometheusToTable } from '../../../-root/query-result-table';
+import { useTheme } from '../../../-root/theme-provider';
 
 import { annotationMarkers } from './annotations-plugin';
 import { extractResultSeries } from './panel-data-extract';
@@ -24,6 +26,7 @@ interface TimeSeriesPanelProps {
 
 export const TimeSeriesPanel = ({ panel, timeRange, refetchInterval, width, height, annotations }: TimeSeriesPanelProps) => {
   const { data, isLoading, error, handleRetry } = usePanelQuery(panel, timeRange, refetchInterval);
+  const { resolved } = useTheme();
 
   const chartResult = useMemo(() => extractResultSeries(data), [data]);
 
@@ -48,6 +51,7 @@ export const TimeSeriesPanel = ({ panel, timeRange, refetchInterval, width, heig
     const thresholdBands: uPlot.Band[] = [];
     const sorted = [...panel.thresholds].sort((a, b) => a.value - b.value);
     const { defaults } = panel.fieldConfig;
+    const colors = chartThemeColors(resolved);
 
     // y-axis tick formatting only — uPlot's DynamicValues hook over the y splits.
     // Tooltip/legend and value-mappings (which don't apply to a continuous series)
@@ -57,7 +61,7 @@ export const TimeSeriesPanel = ({ panel, timeRange, refetchInterval, width, heig
     return {
       width: Math.max(100, width - 16),
       height: Math.max(80, height - 60),
-      axes: [{}, { values: formatYTicks }],
+      axes: [{ ...themedAxis(colors) }, { ...themedAxis(colors), values: formatYTicks }],
       series: [
         {},
         ...chartResult.map((r, i) => ({
@@ -93,7 +97,7 @@ export const TimeSeriesPanel = ({ panel, timeRange, refetchInterval, width, heig
             ]
           : [],
     };
-  }, [width, height, chartResult, panel]);
+  }, [width, height, chartResult, panel, resolved]);
 
   const tableData = useMemo(() => formatPrometheusToTable(chartResult), [chartResult]);
   const dataTable = useMemo(() => <QueryResultTable data={tableData} />, [tableData]);

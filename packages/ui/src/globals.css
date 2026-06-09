@@ -1,5 +1,15 @@
 @custom-variant dark (&:is(.dark *));
 
+/* Base UI sets `data-orientation="horizontal"|"vertical"` on tabs, toggle-group,
+   scroll-area and separator, but the base-rhea components style them with the
+   `data-horizontal:` / `data-vertical:` variants (both the element form and the
+   `group-data-horizontal/…` group form). Tailwind v4 has no built-in variant for
+   those names, so without these declarations the orientation classes never match
+   and horizontal tabs render as a vertical block. Defining them here fixes every
+   affected component at once. */
+@custom-variant data-horizontal (&[data-orientation="horizontal"]);
+@custom-variant data-vertical (&[data-orientation="vertical"]);
+
 :root {
   --background: oklch(1 0 0);
   --foreground: oklch(0.145 0.008 326);

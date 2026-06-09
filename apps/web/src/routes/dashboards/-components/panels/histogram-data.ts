@@ -1,9 +1,12 @@
+import type { ChartThemeColors } from '../../../-root/chart-theme';
 import type { PanelDataResult } from './use-panel-data';
 import type { FieldConfigDefaults } from '@graflare/shared/schemas/field-config';
 import type uPlotNs from 'uplot';
 
 import { formatValue } from '@graflare/shared/format/value-format';
 import uPlot from 'uplot';
+
+import { themedAxis } from '../../../-root/chart-theme';
 
 import { extractResultSeries } from './panel-data-extract';
 
@@ -95,6 +98,8 @@ interface BuildHistogramOptionsArgs {
   defaults: FieldConfigDefaults;
   width: number;
   height: number;
+  /** Theme-aware axis/grid/tick colors so the chart chrome is readable in dark mode. */
+  colors: ChartThemeColors;
 }
 
 // Bar geometry: full slot width (adjacent bins touch, the usual histogram look),
@@ -124,7 +129,7 @@ export const formatHistogramTicks = (splits: number[], defaults: FieldConfigDefa
  * a unit-formatted x-axis (the bucket bounds). The bars path is the same factory the
  * bar chart uses (verified against uplot@1.6.32: `uPlot.paths.bars?.(opts)`).
  */
-export const buildHistogramOptions = ({ defaults, width, height }: BuildHistogramOptionsArgs): uPlotNs.Options => {
+export const buildHistogramOptions = ({ defaults, width, height, colors }: BuildHistogramOptionsArgs): uPlotNs.Options => {
   // `paths` is optional on Series and uPlot.paths.bars is itself optional in the
   // types; build it once and include the key only when present (no undefined writes).
   const barsPaths = uPlot.paths.bars?.({ size: BAR_SIZE, align: 0 });
@@ -141,7 +146,7 @@ export const buildHistogramOptions = ({ defaults, width, height }: BuildHistogra
   return {
     width: Math.max(100, width - 16),
     height: Math.max(80, height - 60),
-    axes: [{ values: formatXTicks }, {}],
+    axes: [{ ...themedAxis(colors), values: formatXTicks }, { ...themedAxis(colors) }],
     series: [{}, barsPaths === undefined ? countSeries : { ...countSeries, paths: barsPaths }],
   };
 };
