@@ -143,4 +143,7 @@ function CalendarDayButton({ className, day, modifiers, locale, ...props }: Reac
   );
 }
 
+// Re-exported so consumers can type the range-mode `selected`/`onSelect` without depending on
+// react-day-picker directly (it's an internal dependency of this package).
+export type { DateRange } from 'react-day-picker';
 export { Calendar, CalendarDayButton };

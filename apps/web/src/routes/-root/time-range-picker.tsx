@@ -1,5 +1,8 @@
+import type { DateRange } from '@graflare/ui/components/calendar';
+
 import { parseTimeExpr } from '@graflare/shared/time/resolve';
 import { Button } from '@graflare/ui/components/button';
+import { Calendar } from '@graflare/ui/components/calendar';
 import { Input } from '@graflare/ui/components/input';
 import { Label } from '@graflare/ui/components/label';
 import { Popover, PopoverContent, PopoverTrigger } from '@graflare/ui/components/popover';
@@ -61,22 +64,24 @@ const dateTimeFormat = new Intl.DateTimeFormat(undefined, {
 // epoch seconds -> readable local date-time for the trigger label.
 const formatEpoch = (epoch: string): string => dateTimeFormat.format(new Date(Number(epoch) * 1000));
 
-// epoch seconds -> a `<input type="datetime-local">` value (local wall clock,
-// "YYYY-MM-DDTHH:mm"). Offsetting by the TZ then slicing the ISO string yields
-// the local time, matching the pattern used by the silence form.
-const epochToLocalInput = (epoch: string): string => {
+const pad2 = (n: number): string => String(n).padStart(2, '0');
+
+// epoch seconds -> local "HH:mm" for an `<input type="time">`.
+const epochToTimeInput = (epoch: string): string => {
   const d = new Date(Number(epoch) * 1000);
-  d.setMinutes(d.getMinutes() - d.getTimezoneOffset());
-  return d.toISOString().slice(0, 16);
+  return `${pad2(d.getHours())}:${pad2(d.getMinutes())}`;
 };
 
-// `<input type="datetime-local">` value -> epoch-second string, or null if the
-// value is empty or unparseable. Local-parsed and floored to seconds.
-const localInputToEpoch = (value: string): string | null => {
-  if (value === '') return null;
-  const ms = new Date(value).getTime();
-  if (Number.isNaN(ms)) return null;
-  return String(Math.floor(ms / 1000));
+// A calendar day (local midnight) + an "HH:mm" time string -> epoch-second string. Interpreted in
+// the browser's local timezone (matching how the picker has always handled absolute times); empty
+// or malformed time parts fall back to 0, so the bound still resolves.
+const combineDateTime = (date: Date, time: string): string => {
+  const [hStr, mStr] = time.split(':');
+  const hours = Number(hStr);
+  const minutes = Number(mStr);
+  const d = new Date(date);
+  d.setHours(Number.isNaN(hours) ? 0 : hours, Number.isNaN(minutes) ? 0 : minutes, 0, 0);
+  return String(Math.floor(d.getTime() / 1000));
 };
 
 const displayRange = (range: TimeRange): string => {
@@ -88,22 +93,27 @@ const displayRange = (range: TimeRange): string => {
 
 export const TimeRangePicker = ({ value, onChange }: TimeRangePickerProps) => {
   const [open, setOpen] = useState(false);
-  const [absFrom, setAbsFrom] = useState('');
-  const [absTo, setAbsTo] = useState('');
+  const [range, setRange] = useState<DateRange | undefined>();
+  const [fromTime, setFromTime] = useState('00:00');
+  const [toTime, setToTime] = useState('23:59');
   const [relFrom, setRelFrom] = useState('now-1h');
   const [relTo, setRelTo] = useState('now');
 
   // Prefill both sections from the current value at the moment the popover opens
   // (in the open handler, not an effect, to avoid cascading renders). Per-field
-  // by type: epochs seed the absolute inputs; relative expressions seed the
-  // relative text fields.
+  // by type: an epoch pair seeds the calendar range + time inputs; relative
+  // expressions seed the relative text fields.
   const handleOpenChange = useCallback(
     (next: boolean) => {
       if (next) {
-        if (isEpoch(value.from)) setAbsFrom(epochToLocalInput(value.from));
-        else setRelFrom(value.from);
-        if (isEpoch(value.to)) setAbsTo(epochToLocalInput(value.to));
-        else setRelTo(value.to);
+        if (isEpoch(value.from) && isEpoch(value.to)) {
+          setRange({ from: new Date(Number(value.from) * 1000), to: new Date(Number(value.to) * 1000) });
+          setFromTime(epochToTimeInput(value.from));
+          setToTime(epochToTimeInput(value.to));
+        } else {
+          setRelFrom(value.from);
+          setRelTo(value.to);
+        }
       }
       setOpen(next);
     },
@@ -118,12 +128,12 @@ export const TimeRangePicker = ({ value, onChange }: TimeRangePickerProps) => {
     [onChange],
   );
 
-  const handleAbsFromChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
-    setAbsFrom(e.target.value);
+  const handleFromTimeChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+    setFromTime(e.target.value);
   }, []);
 
-  const handleAbsToChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
-    setAbsTo(e.target.value);
+  const handleToTimeChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+    setToTime(e.target.value);
   }, []);
 
   const handleRelFromChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
@@ -134,15 +144,19 @@ export const TimeRangePicker = ({ value, onChange }: TimeRangePickerProps) => {
     setRelTo(e.target.value);
   }, []);
 
-  const absFromEpoch = useMemo(() => localInputToEpoch(absFrom), [absFrom]);
-  const absToEpoch = useMemo(() => localInputToEpoch(absTo), [absTo]);
-  const absValid = absFromEpoch !== null && absToEpoch !== null;
+  const absFrom = range?.from;
+  const absTo = range?.to;
+  const absValid = absFrom !== undefined && absTo !== undefined;
+
+  // Open the calendar on the prefilled range's month; omit the prop entirely (rather than passing
+  // `undefined`) when there's no range, to satisfy exactOptionalPropertyTypes.
+  const calendarMonthProps = useMemo(() => (absFrom === undefined ? {} : { defaultMonth: absFrom }), [absFrom]);
 
   const handleApplyAbsolute = useCallback(() => {
-    if (absFromEpoch === null || absToEpoch === null) return;
-    onChange({ from: absFromEpoch, to: absToEpoch });
+    if (absFrom === undefined || absTo === undefined) return;
+    onChange({ from: combineDateTime(absFrom, fromTime), to: combineDateTime(absTo, toTime) });
     setOpen(false);
-  }, [absFromEpoch, absToEpoch, onChange]);
+  }, [absFrom, absTo, fromTime, toTime, onChange]);
 
   const relFromValid = useMemo(() => parseTimeExpr(relFrom) !== null, [relFrom]);
   const relToValid = useMemo(() => parseTimeExpr(relTo) !== null, [relTo]);
@@ -163,7 +177,7 @@ export const TimeRangePicker = ({ value, onChange }: TimeRangePickerProps) => {
         <Clock className='mr-2 h-3.5 w-3.5' />
         {display}
       </PopoverTrigger>
-      <PopoverContent className='w-72 p-2' align='end'>
+      <PopoverContent className='w-80 p-2' align='end'>
         <div className='text-muted-foreground mb-2 px-2 text-xs font-medium'>Quick ranges</div>
         <div className='grid gap-0.5'>
           {presets.map(p => (
@@ -182,17 +196,20 @@ export const TimeRangePicker = ({ value, onChange }: TimeRangePickerProps) => {
 
         <div className='text-muted-foreground mb-2 px-2 text-xs font-medium'>Absolute range</div>
         <div className='grid gap-2 px-2'>
-          <div className='grid gap-1'>
-            <Label htmlFor='time-abs-from' className='text-xs'>
-              From
-            </Label>
-            <Input id='time-abs-from' type='datetime-local' aria-label='Absolute from' value={absFrom} onChange={handleAbsFromChange} />
-          </div>
-          <div className='grid gap-1'>
-            <Label htmlFor='time-abs-to' className='text-xs'>
-              To
-            </Label>
-            <Input id='time-abs-to' type='datetime-local' aria-label='Absolute to' value={absTo} onChange={handleAbsToChange} />
+          <Calendar mode='range' selected={range} onSelect={setRange} className='mx-auto' {...calendarMonthProps} />
+          <div className='grid grid-cols-2 gap-2'>
+            <div className='grid gap-1'>
+              <Label htmlFor='time-abs-from' className='text-xs'>
+                From time
+              </Label>
+              <Input id='time-abs-from' type='time' aria-label='Absolute from time' value={fromTime} onChange={handleFromTimeChange} />
+            </div>
+            <div className='grid gap-1'>
+              <Label htmlFor='time-abs-to' className='text-xs'>
+                To time
+              </Label>
+              <Input id='time-abs-to' type='time' aria-label='Absolute to time' value={toTime} onChange={handleToTimeChange} />
+            </div>
           </div>
           <Button variant='secondary' size='sm' aria-label='Apply absolute range' disabled={!absValid} onClick={handleApplyAbsolute}>
             Apply

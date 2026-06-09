@@ -1,4 +1,4 @@
-import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { TimeRangePicker } from './time-range-picker';
@@ -22,7 +22,7 @@ const openPicker = async (value: TimeRange, onChange: (r: TimeRange) => void): P
   render(<TimeRangePicker value={value} onChange={onChange} />);
   fireEvent.click(screen.getByRole('button', { name: 'Select time range' }));
   await waitFor(() => {
-    expect(screen.getByLabelText('Absolute from')).toBeDefined();
+    expect(screen.getByLabelText('Absolute from time')).toBeDefined();
   });
 };
 
@@ -43,6 +43,15 @@ const firstOnChangeArg = (onChange: ReturnType<typeof vi.fn<(r: TimeRange) => vo
 // The trigger's textContent, normalised to a string (it is `string | null`).
 const triggerText = (): string => screen.getByRole('button', { name: 'Select time range' }).textContent ?? '';
 
+// Find a calendar day-cell button by its day number (its trimmed text content). The conditional
+// lives in this helper, not a test body.
+const calendarDay = (day: string): HTMLElement => {
+  const buttons = screen.getAllByRole('gridcell').flatMap(cell => within(cell).queryAllByRole('button'));
+  const match = buttons.find(b => b.textContent?.trim() === day);
+  if (match === undefined) throw new Error(`calendar day ${day} not found among ${String(buttons.length)} cells`);
+  return match;
+};
+
 describe('time-range-picker', () => {
   it('renders both the absolute and relative sections', async () => {
     const onChange = vi.fn<(r: TimeRange) => void>();
@@ -50,8 +59,10 @@ describe('time-range-picker', () => {
 
     expect(screen.getByText('Absolute range')).toBeDefined();
     expect(screen.getByText('Relative range')).toBeDefined();
-    expect(screen.getByLabelText('Absolute from')).toBeDefined();
-    expect(screen.getByLabelText('Absolute to')).toBeDefined();
+    // The absolute range is a calendar (a grid) plus from/to time inputs.
+    expect(screen.getByRole('grid')).toBeDefined();
+    expect(screen.getByLabelText('Absolute from time')).toBeDefined();
+    expect(screen.getByLabelText('Absolute to time')).toBeDefined();
     expect(screen.getByLabelText('Relative from')).toBeDefined();
     expect(screen.getByLabelText('Relative to')).toBeDefined();
   });
@@ -64,33 +75,46 @@ describe('time-range-picker', () => {
     expect(screen.getByText('Last 30d')).toBeDefined();
   });
 
-  it('applies an absolute pick as numeric epoch-second strings one hour apart', async () => {
+  it('applies the prefilled calendar range with its time inputs as epoch-second strings', async () => {
     const onChange = vi.fn<(r: TimeRange) => void>();
-    await openPicker(PRESET_RANGE, onChange);
+    // EPOCH_RANGE is two epochs exactly one hour apart; opening prefills the calendar + time inputs.
+    await openPicker(EPOCH_RANGE, onChange);
 
-    fireEvent.change(screen.getByLabelText('Absolute from'), { target: { value: '2023-11-14T00:00' } });
-    fireEvent.change(screen.getByLabelText('Absolute to'), { target: { value: '2023-11-14T01:00' } });
     fireEvent.click(buttonByName('Apply absolute range'));
 
     expect(onChange).toHaveBeenCalledTimes(1);
     const arg = firstOnChangeArg(onChange);
     expect(/^\d+$/.test(arg.from)).toBe(true);
     expect(/^\d+$/.test(arg.to)).toBe(true);
-    // One hour apart regardless of the host timezone.
+    // Recombining each prefilled date with its time preserves the one-hour gap.
     expect(Number(arg.to) - Number(arg.from)).toBe(3600);
   });
 
-  it('keeps the absolute Apply disabled until both inputs are filled', async () => {
+  it('disables the absolute Apply when no range is selected (relative value)', async () => {
     const onChange = vi.fn<(r: TimeRange) => void>();
     await openPicker(PRESET_RANGE, onChange);
-
     expect(buttonByName('Apply absolute range').disabled).toBe(true);
+  });
 
-    fireEvent.change(screen.getByLabelText('Absolute from'), { target: { value: '2023-11-14T00:00' } });
-    expect(buttonByName('Apply absolute range').disabled).toBe(true);
-
-    fireEvent.change(screen.getByLabelText('Absolute to'), { target: { value: '2023-11-14T01:00' } });
+  it('enables the absolute Apply when the calendar range is prefilled from an epoch value', async () => {
+    const onChange = vi.fn<(r: TimeRange) => void>();
+    await openPicker(EPOCH_RANGE, onChange);
     expect(buttonByName('Apply absolute range').disabled).toBe(false);
+  });
+
+  it('selecting a day in the calendar updates the absolute range and applies it', async () => {
+    const onChange = vi.fn<(r: TimeRange) => void>();
+    // Prefill from an epoch so the visible month is deterministic (November 2023).
+    await openPicker(EPOCH_RANGE, onChange);
+
+    // Range mode: the first click starts a fresh range, the second closes it.
+    fireEvent.click(calendarDay('10'));
+    fireEvent.click(calendarDay('20'));
+    fireEvent.click(buttonByName('Apply absolute range'));
+
+    expect(onChange).toHaveBeenCalledTimes(1);
+    const arg = firstOnChangeArg(onChange);
+    expect(Number(arg.to)).toBeGreaterThan(Number(arg.from));
   });
 
   it('disables the relative Apply and shows an error for a bad expression', async () => {
