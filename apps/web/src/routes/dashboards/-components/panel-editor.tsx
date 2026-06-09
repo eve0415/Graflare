@@ -1,9 +1,17 @@
 import type { DatasourceDialect, DatasourceType } from '@graflare/shared/schemas/datasource';
-import type { MappingResult, ValueMapping, ValueMappingType } from '@graflare/shared/schemas/field-config';
+import type {
+  FieldMatcherId,
+  FieldOverride,
+  FieldOverrideProperty,
+  FieldOverridePropertyId,
+  MappingResult,
+  ValueMapping,
+  ValueMappingType,
+} from '@graflare/shared/schemas/field-config';
 import type { Panel, PanelQuery } from '@graflare/shared/schemas/panel';
 
 import { UNIT_CATALOG } from '@graflare/shared/format/value-format';
-import { makeValueMapping } from '@graflare/shared/schemas/field-config';
+import { makeFieldOverrideProperty, makeValueMapping } from '@graflare/shared/schemas/field-config';
 import { Button } from '@graflare/ui/components/button';
 import { Input } from '@graflare/ui/components/input';
 import { Label } from '@graflare/ui/components/label';
@@ -61,6 +69,29 @@ const SPECIAL_MATCH_OPTIONS = [
 
 const isMappingType = (v: string | null): v is ValueMappingType => v === 'value' || v === 'range' || v === 'regex' || v === 'special';
 const isSpecialMatch = (v: string | null): v is 'null' | 'nan' | 'empty' => v === 'null' || v === 'nan' || v === 'empty';
+
+// Field-override matcher kinds (field-config fieldMatcherSchema). `label` names the kind in the
+// type Select; `optionLabel`/`placeholder` adapt the single string-options input per matcher, so
+// the same `options: string` field reads naturally whether it holds a name, regex, type, or refId.
+const MATCHER_TYPE_OPTIONS = [
+  { value: 'byName', label: 'By name', optionLabel: 'Field name', placeholder: 'cpu_usage' },
+  { value: 'byRegexp', label: 'By regex', optionLabel: 'Regex', placeholder: '/cpu.*/' },
+  { value: 'byType', label: 'By type', optionLabel: 'Type', placeholder: 'number' },
+  { value: 'byFrameRefID', label: 'By query', optionLabel: 'Query refId', placeholder: 'A' },
+] as const;
+
+// Overridable field-config properties (field-config fieldOverridePropertySchema). Drives the
+// "Add property" Select; each picked id builds the right-typed property via makeFieldOverrideProperty.
+const PROPERTY_ID_OPTIONS = [
+  { value: 'unit', label: 'Unit' },
+  { value: 'decimals', label: 'Decimals' },
+  { value: 'min', label: 'Min' },
+  { value: 'max', label: 'Max' },
+  { value: 'mappings', label: 'Value mappings' },
+] as const;
+
+const isMatcherId = (v: string | null): v is FieldMatcherId => v === 'byName' || v === 'byRegexp' || v === 'byType' || v === 'byFrameRefID';
+const isPropertyId = (v: string | null): v is FieldOverridePropertyId => v === 'unit' || v === 'decimals' || v === 'min' || v === 'max' || v === 'mappings';
 
 interface PanelEditorProps {
   panel: Panel;
@@ -228,6 +259,27 @@ export const PanelEditor = ({ panel, open, onClose, onSave }: PanelEditorProps) 
     [draft.fieldConfig.defaults, setDefaults],
   );
 
+  // The generalized NumericOption reports just the raw string; these bind the field so each
+  // Standard-options input keeps a stable callback (the codebase wires callbacks explicitly).
+  const handleDecimalsChange = useCallback(
+    (raw: string) => {
+      handleNumericOptionChange('decimals', raw);
+    },
+    [handleNumericOptionChange],
+  );
+  const handleMinChange = useCallback(
+    (raw: string) => {
+      handleNumericOptionChange('min', raw);
+    },
+    [handleNumericOptionChange],
+  );
+  const handleMaxChange = useCallback(
+    (raw: string) => {
+      handleNumericOptionChange('max', raw);
+    },
+    [handleNumericOptionChange],
+  );
+
   const setMappings = useCallback(
     (mappings: ValueMapping[]) => {
       setDefaults({ ...draft.fieldConfig.defaults, mappings });
@@ -235,22 +287,33 @@ export const PanelEditor = ({ panel, open, onClose, onSave }: PanelEditorProps) 
     [draft.fieldConfig.defaults, setDefaults],
   );
 
-  const addMapping = useCallback(() => {
-    setMappings([...draft.fieldConfig.defaults.mappings, makeValueMapping('value', {})]);
-  }, [draft.fieldConfig.defaults.mappings, setMappings]);
-
-  const removeMapping = useCallback(
-    (index: number) => {
-      setMappings(draft.fieldConfig.defaults.mappings.filter((_, i) => i !== index));
+  // Field overrides live under fieldConfig.overrides, parallel to defaults. Replace the whole
+  // array immutably through the existing setter (same pattern as setDefaults) — no extra state.
+  const setOverrides = useCallback(
+    (overrides: FieldOverride[]) => {
+      updateField('fieldConfig', { ...draft.fieldConfig, overrides });
     },
-    [draft.fieldConfig.defaults.mappings, setMappings],
+    [draft.fieldConfig, updateField],
   );
 
-  const updateMapping = useCallback(
-    (index: number, next: ValueMapping) => {
-      setMappings(draft.fieldConfig.defaults.mappings.map((m, i) => (i === index ? next : m)));
+  const addOverride = useCallback(() => {
+    // byName is the default matcher with an empty options string (Grafana's defaultOptions),
+    // and no properties yet — the user adds them per-row.
+    setOverrides([...draft.fieldConfig.overrides, { matcher: { id: 'byName', options: '' }, properties: [] }]);
+  }, [draft.fieldConfig.overrides, setOverrides]);
+
+  const updateOverride = useCallback(
+    (index: number, next: FieldOverride) => {
+      setOverrides(draft.fieldConfig.overrides.map((o, i) => (i === index ? next : o)));
     },
-    [draft.fieldConfig.defaults.mappings, setMappings],
+    [draft.fieldConfig.overrides, setOverrides],
+  );
+
+  const removeOverride = useCallback(
+    (index: number) => {
+      setOverrides(draft.fieldConfig.overrides.filter((_, i) => i !== index));
+    },
+    [draft.fieldConfig.overrides, setOverrides],
   );
 
   return (
@@ -360,45 +423,42 @@ export const PanelEditor = ({ panel, open, onClose, onSave }: PanelEditorProps) 
               <Label htmlFor='panel-unit' className='text-muted-foreground text-xs font-normal'>
                 Unit
               </Label>
-              <Select value={draft.fieldConfig.defaults.unit} onValueChange={handleUnitChange} items={UNIT_ITEMS}>
-                <SelectTrigger id='panel-unit'>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {UNIT_CATALOG.map(group => (
-                    <SelectGroup key={group.group}>
-                      <SelectLabel>{group.group}</SelectLabel>
-                      {group.options.map(o => (
-                        <SelectItem key={o.id} value={o.id}>
-                          {o.label}
-                        </SelectItem>
-                      ))}
-                    </SelectGroup>
-                  ))}
-                </SelectContent>
-              </Select>
+              <UnitSelect id='panel-unit' value={draft.fieldConfig.defaults.unit} onValueChange={handleUnitChange} />
             </div>
 
             <div className='grid grid-cols-3 gap-2'>
-              <NumericOption field='decimals' label='Decimals' value={draft.fieldConfig.defaults.decimals} onChange={handleNumericOptionChange} />
-              <NumericOption field='min' label='Min' value={draft.fieldConfig.defaults.min} onChange={handleNumericOptionChange} />
-              <NumericOption field='max' label='Max' value={draft.fieldConfig.defaults.max} onChange={handleNumericOptionChange} />
+              <NumericOption
+                id='panel-decimals'
+                label='Decimals'
+                kind='decimals'
+                value={draft.fieldConfig.defaults.decimals}
+                placeholder='auto'
+                onValueChange={handleDecimalsChange}
+              />
+              <NumericOption
+                id='panel-min'
+                label='Min'
+                kind='minmax'
+                value={draft.fieldConfig.defaults.min}
+                placeholder='auto'
+                onValueChange={handleMinChange}
+              />
+              <NumericOption
+                id='panel-max'
+                label='Max'
+                kind='minmax'
+                value={draft.fieldConfig.defaults.max}
+                placeholder='auto'
+                onValueChange={handleMaxChange}
+              />
             </div>
           </div>
 
           <div className='space-y-3'>
-            <div className='flex items-center justify-between'>
-              <Label>Value mappings</Label>
-              <Button variant='ghost' size='xs' onClick={addMapping} aria-label='Add value mapping'>
-                <Plus className='mr-1 h-3 w-3' />
-                Add
-              </Button>
-            </div>
-
-            {draft.fieldConfig.defaults.mappings.map((m, i) => (
-              <MappingRow key={String(i)} mapping={m} index={i} onUpdate={updateMapping} onRemove={removeMapping} />
-            ))}
+            <MappingsEditor mappings={draft.fieldConfig.defaults.mappings} onChange={setMappings} labelPrefix='Mapping' addLabel='Add value mapping' />
           </div>
+
+          <FieldOverridesEditor overrides={draft.fieldConfig.overrides} onAdd={addOverride} onUpdate={updateOverride} onRemove={removeOverride} />
 
           <div className='flex justify-end gap-2'>
             <Button variant='outline' onClick={onClose}>
@@ -529,38 +589,46 @@ const ThresholdRow = ({
   );
 };
 
+// A single labelled numeric input, shared by Standard options and the override property rows.
+// Presentational only: it reports the raw input string and lets the caller decide how to parse
+// (Standard options treats empty as "auto"/omit; an override property treats empty as 0, since
+// its schema value is required). `kind` selects the keypad/step: 'decimals' is a non-negative
+// integer count (numeric keypad), 'minmax' may be negative (default keyboard keeps the minus key)
+// and fractional (wider step). `id` is passed in so each instance is unique — reusing this across
+// overrides must not collide with the Standard-options ids.
 const NumericOption = ({
-  field,
+  id,
   label,
+  kind,
   value,
-  onChange,
+  placeholder,
+  onValueChange,
 }: {
-  field: 'decimals' | 'min' | 'max';
+  id: string;
   label: string;
+  kind: 'decimals' | 'minmax';
   value: number | undefined;
-  onChange: (field: 'decimals' | 'min' | 'max', raw: string) => void;
+  placeholder?: string;
+  onValueChange: (raw: string) => void;
 }) => {
   const handleChange = useCallback(
     (e: React.ChangeEvent<HTMLInputElement>) => {
-      onChange(field, e.target.value);
+      onValueChange(e.target.value);
     },
-    [field, onChange],
+    [onValueChange],
   );
 
   return (
     <div className='space-y-1'>
-      <Label htmlFor={`panel-${field}`} className='text-muted-foreground text-xs font-normal'>
+      <Label htmlFor={id} className='text-muted-foreground text-xs font-normal'>
         {label}
       </Label>
-      {/* `decimals` is a non-negative integer count, so a numeric mobile keypad fits;
-          `min`/`max` may be negative, so we leave the default keyboard (which keeps the
-          minus key) and only widen the step to allow fractional bounds. */}
       <Input
-        id={`panel-${field}`}
+        id={id}
         type='number'
-        step={field === 'decimals' ? '1' : 'any'}
-        inputMode={field === 'decimals' ? 'numeric' : undefined}
-        placeholder='auto'
+        step={kind === 'decimals' ? '1' : 'any'}
+        inputMode={kind === 'decimals' ? 'numeric' : undefined}
+        placeholder={placeholder}
         value={value === undefined ? '' : String(value)}
         onChange={handleChange}
         className='text-sm'
@@ -569,16 +637,43 @@ const NumericOption = ({
   );
 };
 
+// The grouped unit Select (UNIT_CATALOG), shared by Standard options and the override unit
+// property. `id` is passed in so each trigger is unique across overrides. `items={UNIT_ITEMS}`
+// is required for the trigger to render the selected unit's label (base-ui-select rule).
+const UnitSelect = ({ id, value, onValueChange }: { id: string; value: string; onValueChange: (val: string | null) => void }) => (
+  <Select value={value} onValueChange={onValueChange} items={UNIT_ITEMS}>
+    <SelectTrigger id={id}>
+      <SelectValue />
+    </SelectTrigger>
+    <SelectContent>
+      {UNIT_CATALOG.map(group => (
+        <SelectGroup key={group.group}>
+          <SelectLabel>{group.group}</SelectLabel>
+          {group.options.map(o => (
+            <SelectItem key={o.id} value={o.id}>
+              {o.label}
+            </SelectItem>
+          ))}
+        </SelectGroup>
+      ))}
+    </SelectContent>
+  </Select>
+);
+
 const MappingRow = ({
   mapping,
   index,
   onUpdate,
   onRemove,
+  labelPrefix = 'Mapping',
 }: {
   mapping: ValueMapping;
   index: number;
   onUpdate: (index: number, next: ValueMapping) => void;
   onRemove: (index: number) => void;
+  // Disambiguates the row's aria-labels so a nested mappings editor (inside a field override)
+  // doesn't collide with the Standard-options mappings. Defaults to the standalone "Mapping".
+  labelPrefix?: string;
 }) => {
   // Type change rebuilds a fresh variant, carrying the result across.
   const handleTypeChange = useCallback(
@@ -648,6 +743,9 @@ const MappingRow = ({
     onRemove(index);
   }, [index, onRemove]);
 
+  // One accessible-name stem per row; `labelPrefix` keeps nested editors distinct.
+  const rowLabel = `${labelPrefix} ${String(index + 1)}`;
+
   return (
     <div className='space-y-2 rounded-md border p-3'>
       <div className='flex items-center gap-2'>
@@ -665,13 +763,7 @@ const MappingRow = ({
         </Select>
 
         {mapping.type === 'value' && (
-          <Input
-            placeholder='Match value'
-            value={mapping.value}
-            onChange={handleValueChange}
-            className='flex-1 text-sm'
-            aria-label={`Mapping ${String(index + 1)} value`}
-          />
+          <Input placeholder='Match value' value={mapping.value} onChange={handleValueChange} className='flex-1 text-sm' aria-label={`${rowLabel} value`} />
         )}
 
         {mapping.type === 'range' && (
@@ -683,7 +775,7 @@ const MappingRow = ({
               value={mapping.from}
               onChange={handleFromChange}
               className='w-20 text-sm'
-              aria-label={`Mapping ${String(index + 1)} from`}
+              aria-label={`${rowLabel} from`}
             />
             <Input
               type='number'
@@ -692,19 +784,13 @@ const MappingRow = ({
               value={mapping.to}
               onChange={handleToChange}
               className='w-20 text-sm'
-              aria-label={`Mapping ${String(index + 1)} to`}
+              aria-label={`${rowLabel} to`}
             />
           </>
         )}
 
         {mapping.type === 'regex' && (
-          <Input
-            placeholder='Pattern'
-            value={mapping.pattern}
-            onChange={handlePatternChange}
-            className='flex-1 text-sm'
-            aria-label={`Mapping ${String(index + 1)} pattern`}
-          />
+          <Input placeholder='Pattern' value={mapping.pattern} onChange={handlePatternChange} className='flex-1 text-sm' aria-label={`${rowLabel} pattern`} />
         )}
 
         {mapping.type === 'special' && (
@@ -722,7 +808,7 @@ const MappingRow = ({
           </Select>
         )}
 
-        <Button variant='ghost' size='icon' className='h-8 w-8 shrink-0' onClick={handleRemove} aria-label={`Remove mapping ${String(index + 1)}`}>
+        <Button variant='ghost' size='icon' className='h-8 w-8 shrink-0' onClick={handleRemove} aria-label={`Remove ${rowLabel}`}>
           <Trash2 className='h-3.5 w-3.5' />
         </Button>
       </div>
@@ -733,7 +819,7 @@ const MappingRow = ({
           value={mapping.result.color ?? '#000000'}
           onChange={handleResultColorChange}
           className='h-8 w-8 shrink-0 cursor-pointer rounded border-0'
-          aria-label={`Mapping ${String(index + 1)} color`}
+          aria-label={`${rowLabel} color`}
         />
         {/* Mirror the swatch's hex as text so the value is legible without relying on
             color perception. */}
@@ -743,9 +829,338 @@ const MappingRow = ({
           value={mapping.result.text ?? ''}
           onChange={handleResultTextChange}
           className='flex-1 text-sm'
-          aria-label={`Mapping ${String(index + 1)} display text`}
+          aria-label={`${rowLabel} display text`}
         />
       </div>
     </div>
   );
 };
+
+// The add-button header + editable list of value-mapping rows. Shared by Standard options and
+// the override "Value mappings" property. Owns the immutable add/remove/update of the array and
+// reports the next array through `onChange`; the caller decides where it lives (fieldConfig
+// defaults, or a single override property's value). `labelPrefix` + `addLabel` keep the row
+// aria-labels and the Add button's accessible name unique when more than one editor is on screen.
+const MappingsEditor = ({
+  mappings,
+  onChange,
+  labelPrefix,
+  addLabel,
+}: {
+  mappings: ValueMapping[];
+  onChange: (next: ValueMapping[]) => void;
+  labelPrefix: string;
+  addLabel: string;
+}) => {
+  const handleAdd = useCallback(() => {
+    onChange([...mappings, makeValueMapping('value', {})]);
+  }, [mappings, onChange]);
+
+  const handleRemove = useCallback(
+    (index: number) => {
+      onChange(mappings.filter((_, i) => i !== index));
+    },
+    [mappings, onChange],
+  );
+
+  const handleUpdate = useCallback(
+    (index: number, next: ValueMapping) => {
+      onChange(mappings.map((m, i) => (i === index ? next : m)));
+    },
+    [mappings, onChange],
+  );
+
+  return (
+    <div className='space-y-2'>
+      <div className='flex items-center justify-between'>
+        <Label>Value mappings</Label>
+        <Button variant='ghost' size='xs' onClick={handleAdd} aria-label={addLabel}>
+          <Plus className='mr-1 h-3 w-3' />
+          Add
+        </Button>
+      </div>
+
+      {mappings.map((m, i) => (
+        <MappingRow key={String(i)} mapping={m} index={i} onUpdate={handleUpdate} onRemove={handleRemove} labelPrefix={labelPrefix} />
+      ))}
+    </div>
+  );
+};
+
+// Parse a numeric override-property input. Unlike Standard options (where empty omits the key),
+// a property's numeric value is required by the schema, so empty / non-numeric falls back to 0
+// rather than producing `undefined` — no `!`/cast needed downstream.
+const parseRequiredNumber = (raw: string): number => {
+  const n = Number(raw);
+  return raw.trim() === '' || Number.isNaN(n) ? 0 : n;
+};
+
+// One property row inside an override. The control matches the property kind, reusing the exact
+// Standard-options controls (UnitSelect / NumericOption / MappingsEditor). Type safety: every
+// handler narrows on `property.id` first, then spreads `{ ...property, value }` so `value` keeps
+// the branch's type — the same no-cast discriminated-union edit MappingRow uses. The property's
+// id never changes here (only the Add-property Select picks an id), so we never rebuild a
+// discriminant. `ids` namespaces the DOM ids / aria-labels per override+property so reusing these
+// controls across rows can't collide.
+const OverridePropertyRow = ({
+  property,
+  index,
+  overrideLabel,
+  idPrefix,
+  onChange,
+  onRemove,
+}: {
+  property: FieldOverrideProperty;
+  index: number;
+  overrideLabel: string;
+  idPrefix: string;
+  onChange: (index: number, next: FieldOverrideProperty) => void;
+  onRemove: (index: number) => void;
+}) => {
+  const handleUnitChange = useCallback(
+    (val: string | null) => {
+      if (property.id === 'unit') onChange(index, { ...property, value: val ?? '' });
+    },
+    [index, property, onChange],
+  );
+
+  const handleDecimalsChange = useCallback(
+    (raw: string) => {
+      if (property.id === 'decimals') onChange(index, { ...property, value: parseRequiredNumber(raw) });
+    },
+    [index, property, onChange],
+  );
+
+  const handleMinChange = useCallback(
+    (raw: string) => {
+      if (property.id === 'min') onChange(index, { ...property, value: parseRequiredNumber(raw) });
+    },
+    [index, property, onChange],
+  );
+
+  const handleMaxChange = useCallback(
+    (raw: string) => {
+      if (property.id === 'max') onChange(index, { ...property, value: parseRequiredNumber(raw) });
+    },
+    [index, property, onChange],
+  );
+
+  const handleMappingsChange = useCallback(
+    (next: ValueMapping[]) => {
+      if (property.id === 'mappings') onChange(index, { ...property, value: next });
+    },
+    [index, property, onChange],
+  );
+
+  const handleRemove = useCallback(() => {
+    onRemove(index);
+  }, [index, onRemove]);
+
+  const propLabel = PROPERTY_ID_OPTIONS.find(o => o.value === property.id)?.label ?? property.id;
+  const rowLabel = `${overrideLabel} ${propLabel}`;
+
+  return (
+    // fieldset+legend exposes a `group` named by the (sr-only) legend, so AT and tests can scope to
+    // this property without the duplicate-name collisions reusing the inner controls would cause.
+    <fieldset className='bg-muted/30 space-y-2 rounded-md border p-3'>
+      <legend className='sr-only'>{rowLabel}</legend>
+      <div className='flex items-center justify-between'>
+        <span className='text-xs font-medium'>{propLabel}</span>
+        <Button variant='ghost' size='icon' className='h-6 w-6 shrink-0' onClick={handleRemove} aria-label={`Remove ${rowLabel}`}>
+          <X className='h-3 w-3' />
+        </Button>
+      </div>
+
+      {property.id === 'unit' && <UnitSelect id={`${idPrefix}-unit`} value={property.value} onValueChange={handleUnitChange} />}
+      {property.id === 'decimals' && (
+        <NumericOption id={`${idPrefix}-decimals`} label='Decimals' kind='decimals' value={property.value} onValueChange={handleDecimalsChange} />
+      )}
+      {property.id === 'min' && <NumericOption id={`${idPrefix}-min`} label='Min' kind='minmax' value={property.value} onValueChange={handleMinChange} />}
+      {property.id === 'max' && <NumericOption id={`${idPrefix}-max`} label='Max' kind='minmax' value={property.value} onValueChange={handleMaxChange} />}
+      {property.id === 'mappings' && (
+        <MappingsEditor mappings={property.value} onChange={handleMappingsChange} labelPrefix={`${rowLabel} mapping`} addLabel={`Add ${rowLabel} mapping`} />
+      )}
+    </fieldset>
+  );
+};
+
+// One override entry: a matcher (kind Select + adaptive single string-options input) plus its
+// list of property rows, each addable/removable. Matcher edits are plain spreads — `options` is a
+// string in every matcher branch (field-config fieldMatcherSchema), so changing `id` never
+// rebuilds a discriminant; the options input's label/placeholder is the only thing that adapts.
+// `<add property>` builds the right-typed property via makeFieldOverrideProperty. The fieldset's
+// (sr-only) legend gives each override a stable `Override N` group name, so assistive tech and
+// tests scope to one override and the reused inner controls keep their natural visible labels.
+const OverrideRow = ({
+  override,
+  index,
+  onUpdate,
+  onRemove,
+}: {
+  override: FieldOverride;
+  index: number;
+  onUpdate: (index: number, next: FieldOverride) => void;
+  onRemove: (index: number) => void;
+}) => {
+  const overrideLabel = `Override ${String(index + 1)}`;
+  const idPrefix = `override-${String(index)}`;
+  const matcherKind = MATCHER_TYPE_OPTIONS.find(o => o.value === override.matcher.id) ?? MATCHER_TYPE_OPTIONS[0];
+
+  const handleMatcherIdChange = useCallback(
+    (val: string | null) => {
+      // options is a string in every matcher branch, so the id swap is a plain spread —
+      // no factory, no discriminant rebuild. The kept options string just reads under a new label.
+      if (isMatcherId(val)) onUpdate(index, { ...override, matcher: { ...override.matcher, id: val } });
+    },
+    [index, override, onUpdate],
+  );
+
+  const handleMatcherOptionsChange = useCallback(
+    (e: React.ChangeEvent<HTMLInputElement>) => {
+      onUpdate(index, { ...override, matcher: { ...override.matcher, options: e.target.value } });
+    },
+    [index, override, onUpdate],
+  );
+
+  const handleAddProperty = useCallback(
+    (val: string | null) => {
+      if (isPropertyId(val)) onUpdate(index, { ...override, properties: [...override.properties, makeFieldOverrideProperty(val)] });
+    },
+    [index, override, onUpdate],
+  );
+
+  const handlePropertyChange = useCallback(
+    (propIndex: number, next: FieldOverrideProperty) => {
+      onUpdate(index, { ...override, properties: override.properties.map((p, i) => (i === propIndex ? next : p)) });
+    },
+    [index, override, onUpdate],
+  );
+
+  const handlePropertyRemove = useCallback(
+    (propIndex: number) => {
+      onUpdate(index, { ...override, properties: override.properties.filter((_, i) => i !== propIndex) });
+    },
+    [index, override, onUpdate],
+  );
+
+  const handleRemove = useCallback(() => {
+    onRemove(index);
+  }, [index, onRemove]);
+
+  return (
+    // fieldset+legend names the whole override as a `group`; tests/AT scope to "Override N" so the
+    // reused matcher/property controls keep their natural labels without colliding across overrides.
+    <fieldset className='space-y-3 rounded-md border p-3'>
+      <legend className='sr-only'>{overrideLabel}</legend>
+      <div className='flex items-center justify-between'>
+        <span className='text-xs font-medium'>{overrideLabel}</span>
+        <Button variant='ghost' size='icon' className='h-6 w-6 shrink-0' onClick={handleRemove} aria-label={`Remove ${overrideLabel}`}>
+          <X className='h-3 w-3' />
+        </Button>
+      </div>
+
+      <div className='space-y-2'>
+        <Label htmlFor={`${idPrefix}-matcher`} className='text-muted-foreground text-xs font-normal'>
+          Matcher
+        </Label>
+        <Select value={override.matcher.id} onValueChange={handleMatcherIdChange} items={MATCHER_TYPE_OPTIONS}>
+          <SelectTrigger id={`${idPrefix}-matcher`}>
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            {MATCHER_TYPE_OPTIONS.map(o => (
+              <SelectItem key={o.value} value={o.value}>
+                {o.label}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      </div>
+
+      <div className='space-y-2'>
+        <Label htmlFor={`${idPrefix}-options`} className='text-muted-foreground text-xs font-normal'>
+          {matcherKind.optionLabel}
+        </Label>
+        <Input
+          id={`${idPrefix}-options`}
+          value={override.matcher.options}
+          onChange={handleMatcherOptionsChange}
+          placeholder={matcherKind.placeholder}
+          className='text-sm'
+        />
+      </div>
+
+      <div className='space-y-2'>
+        <div className='flex items-center justify-between'>
+          <Label className='text-muted-foreground text-xs font-normal'>Properties</Label>
+          {/* An action menu, not a value picker: the trigger renders fixed children (not
+              SelectValue), and `value` stays null so every pick is a null→id change that fires
+              onValueChange — even picking the same id twice (verified against Base UI 1.5 in
+              jsdom). `items` is still passed per the base-ui-select rule; the trigger-label half
+              of that rule doesn't apply because there's no SelectValue to label. */}
+          <Select value={null} onValueChange={handleAddProperty} items={PROPERTY_ID_OPTIONS}>
+            <SelectTrigger id={`${idPrefix}-add-property`} size='sm' aria-label={`Add property to ${overrideLabel}`} className='w-auto gap-1'>
+              <Plus className='h-3 w-3' />
+              <span className='text-xs'>Add property</span>
+            </SelectTrigger>
+            <SelectContent>
+              {PROPERTY_ID_OPTIONS.map(o => (
+                <SelectItem key={o.value} value={o.value}>
+                  {o.label}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+
+        {override.properties.length === 0 ? (
+          <p className='text-muted-foreground text-xs'>No properties yet — matching fields use the panel defaults. Add one above.</p>
+        ) : (
+          override.properties.map((p, i) => (
+            <OverridePropertyRow
+              key={`${p.id}-${String(i)}`}
+              property={p}
+              index={i}
+              overrideLabel={overrideLabel}
+              idPrefix={`${idPrefix}-prop-${String(i)}`}
+              onChange={handlePropertyChange}
+              onRemove={handlePropertyRemove}
+            />
+          ))
+        )}
+      </div>
+    </fieldset>
+  );
+};
+
+// The "Field overrides" section: a header with an Add button, then one OverrideRow per entry (or
+// an empty-state hint). Each override's matcher selects fields by name/regex/type/refId and layers
+// its properties over fieldConfig.defaults at render time (see resolveFieldConfig); array order is
+// precedence (later wins), matching the data layer.
+const FieldOverridesEditor = ({
+  overrides,
+  onAdd,
+  onUpdate,
+  onRemove,
+}: {
+  overrides: FieldOverride[];
+  onAdd: () => void;
+  onUpdate: (index: number, next: FieldOverride) => void;
+  onRemove: (index: number) => void;
+}) => (
+  <div className='space-y-3'>
+    <div className='flex items-center justify-between'>
+      <Label>Field overrides</Label>
+      <Button variant='ghost' size='xs' onClick={onAdd} aria-label='Add field override'>
+        <Plus className='mr-1 h-3 w-3' />
+        Add
+      </Button>
+    </div>
+
+    {overrides.length === 0 ? (
+      <p className='text-muted-foreground text-xs'>No field overrides. Add one to style specific fields differently from the panel defaults.</p>
+    ) : (
+      overrides.map((o, i) => <OverrideRow key={String(i)} override={o} index={i} onUpdate={onUpdate} onRemove={onRemove} />)
+    )}
+  </div>
+);

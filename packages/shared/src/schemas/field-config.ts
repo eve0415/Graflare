@@ -97,6 +97,33 @@ export const fieldOverridePropertySchema = z.union([unitProperty, decimalsProper
 export type FieldOverrideProperty = z.infer<typeof fieldOverridePropertySchema>;
 export type FieldOverridePropertyId = FieldOverrideProperty['id'];
 
+// Build a fresh, well-formed override property of the given id with a neutral starting value
+// (same factory pattern as makeValueMapping above; mirrors applyProperty's switch-on-id so the
+// `value` type narrows per branch — never `any`/cast). The editor uses this when "Add property"
+// picks an id: the property array must stay a valid discriminated union, and a spread
+// (`{ ...prop, id }`) would leave a value of the wrong type for the new branch. Numeric props
+// default to 0 because their schema requires a number (unlike FieldConfigDefaults, where
+// min/max are optional and an empty input omits the key).
+export const makeFieldOverrideProperty = (id: FieldOverridePropertyId): FieldOverrideProperty => {
+  switch (id) {
+    case 'unit':
+      return { id, value: '' };
+    case 'decimals':
+      return { id, value: 0 };
+    case 'min':
+      return { id, value: 0 };
+    case 'max':
+      return { id, value: 0 };
+    case 'mappings':
+      return { id, value: [] };
+    default: {
+      // Exhaustiveness guard: a new override property must add a branch above.
+      const _exhaustive: never = id;
+      throw new Error(`Unknown override property id: ${String(_exhaustive)}`);
+    }
+  }
+};
+
 // One override entry — Grafana's `{ matcher, properties }` shape verbatim. Every field the
 // matcher selects has these properties merged onto the resolved config; later entries in
 // the array win (Grafana precedence), so the array order is significant.
