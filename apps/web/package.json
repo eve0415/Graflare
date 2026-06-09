@@ -45,6 +45,7 @@
     "@types/react": "19.2.17",
     "@types/react-dom": "19.2.3",
     "@vitejs/plugin-react": "6.0.2",
+    "axe-core": "4.12.0",
     "babel-plugin-react-compiler": "1.0.0",
     "codemirror": "6.0.2",
     "jsdom": "29.1.1",
