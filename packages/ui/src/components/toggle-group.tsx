@@ -36,6 +36,10 @@ function ToggleGroup({
   const groupStyle: React.CSSProperties & Record<`--${string}`, string | number> = { '--gap': spacing };
   return (
     <ToggleGroupPrimitive
+      // Base UI's ToggleGroup root sets `aria-orientation`, which is invalid on its default
+      // `role="group"` (axe `aria-allowed-attr`). It implements roving-tabindex arrow-key nav, so
+      // `toolbar` is the accurate role — and it permits `aria-orientation`.
+      role='toolbar'
       data-slot='toggle-group'
       data-variant={variant}
       data-size={size}
