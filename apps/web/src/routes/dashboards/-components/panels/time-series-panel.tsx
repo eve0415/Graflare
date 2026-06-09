@@ -2,17 +2,18 @@ import type { Annotation } from '@graflare/shared/schemas/annotation';
 import type { Panel } from '@graflare/shared/schemas/panel';
 import type uPlot from 'uplot';
 
-import { formatValue } from '@graflare/shared/format/value-format';
+import { resolveFieldConfig } from '@graflare/shared/format/resolve-field-config';
 import { seriesLabel } from '@graflare/shared/legend/resolve';
 import { resolveRange } from '@graflare/shared/time/resolve';
 import { useMemo } from 'react';
 
-import { chartThemeColors, themedAxes, timeScaleX } from '../../../-root/chart-theme';
+import { chartThemeColors, timeScaleX } from '../../../-root/chart-theme';
 import { QueryResultTable, formatPrometheusToTable } from '../../../-root/query-result-table';
 import { useTheme } from '../../../-root/theme-provider';
 
 import { annotationMarkers } from './annotations-plugin';
-import { extractResultSeriesWithQuery } from './panel-data-extract';
+import { resolveSharedAxisLayout } from './multi-axis';
+import { extractResultSeriesWithQuery, seriesDescriptor } from './panel-data-extract';
 import { UPlotPanel } from './uplot-panel';
 import { usePanelQuery } from './use-panel-query';
 
@@ -41,6 +42,15 @@ export const TimeSeriesPanel = ({ panel, timeRange, refetchInterval, width, heig
     [queried, panel.queries],
   );
 
+  // Effective field config per series (unit/min/max), resolved against the panel overrides keyed on
+  // the derived series label + the producing query's refId — the same descriptor path the bar-gauge
+  // panel uses. Index-aligned with `chartResult`; the chart groups by resolved unit into y-axes.
+  // With no overrides every series resolves to the defaults reference → one y-axis, as before.
+  const seriesConfigs = useMemo(
+    () => queried.map((q, i) => resolveFieldConfig(seriesDescriptor(q.series, i, q.refId), panel.fieldConfig)),
+    [queried, panel.fieldConfig],
+  );
+
   const markers = useMemo(() => {
     const { from, to } = resolveRange(timeRange.from, timeRange.to);
     return annotationMarkers(annotations, from, to);
@@ -61,13 +71,13 @@ export const TimeSeriesPanel = ({ panel, timeRange, refetchInterval, width, heig
   const chartOptions = useMemo((): uPlot.Options => {
     const thresholdBands: uPlot.Band[] = [];
     const sorted = [...panel.thresholds].sort((a, b) => a.value - b.value);
-    const { defaults } = panel.fieldConfig;
     const colors = chartThemeColors(resolved);
 
-    // y-axis tick formatting only — uPlot's DynamicValues hook over the y splits.
-    // Tooltip/legend and value-mappings (which don't apply to a continuous series)
-    // are intentionally left alone. Index 0 = x/time axis (default), index 1 = y.
-    const formatYTicks: uPlot.Axis.DynamicValues = (_u, splits) => splits.map(v => formatValue(v, defaults));
+    // Build the y-axis layout from each series' resolved unit: one y-axis on the default 'y' scale
+    // when every series shares a unit (the common case — byte-equivalent to before), or one
+    // left/right y-axis per distinct unit when overrides split them. Each axis formats its ticks
+    // with its own unit; the threshold lines below stay on the primary 'y' scale.
+    const layout = resolveSharedAxisLayout(seriesConfigs, colors);
 
     const { from: fromSec, to: toSec } = resolveRange(timeRange.from, timeRange.to);
 
@@ -76,16 +86,23 @@ export const TimeSeriesPanel = ({ panel, timeRange, refetchInterval, width, heig
       height: Math.max(80, height - 60),
       // Pin the x domain to the selected query window so the axis tracks the chosen range rather
       // than uPlot's auto-range (which balloons on a stray out-of-window sample — see `timeScaleX`).
-      scales: { x: timeScaleX(fromSec, toSec) },
-      axes: themedAxes(colors, formatYTicks),
+      // The y-scales the layout introduces (one per unit when multi-axis) merge in alongside.
+      scales: { x: timeScaleX(fromSec, toSec), ...layout.scales },
+      axes: layout.axes,
       series: [
         {},
-        ...chartResult.map((_r, i) => ({
-          label: seriesLabels[i] ?? `Series ${String(i + 1)}`,
-          stroke: `hsl(${String(i * 60)}, 70%, 50%)`,
-          width: panel.displayOptions.timeseries?.lineWidth ?? 1,
-          fill: `hsla(${String(i * 60)}, 70%, 50%, ${String((panel.displayOptions.timeseries?.fillOpacity ?? 10) / 100)})`,
-        })),
+        ...chartResult.map((_r, i): uPlot.Series => {
+          const scale = layout.seriesScales[i];
+          const base: uPlot.Series = {
+            label: seriesLabels[i] ?? `Series ${String(i + 1)}`,
+            stroke: `hsl(${String(i * 60)}, 70%, 50%)`,
+            width: panel.displayOptions.timeseries?.lineWidth ?? 1,
+            fill: `hsla(${String(i * 60)}, 70%, 50%, ${String((panel.displayOptions.timeseries?.fillOpacity ?? 10) / 100)})`,
+          };
+          // Assign a scale key only when the layout splits units; single-unit series stay on the
+          // default 'y' scale with no `scale` key (byte-identical to before).
+          return scale === undefined ? base : { ...base, scale };
+        }),
       ],
       bands: thresholdBands,
       plugins:
@@ -113,7 +130,7 @@ export const TimeSeriesPanel = ({ panel, timeRange, refetchInterval, width, heig
             ]
           : [],
     };
-  }, [width, height, chartResult, seriesLabels, panel, resolved, timeRange.from, timeRange.to]);
+  }, [width, height, chartResult, seriesLabels, seriesConfigs, panel, resolved, timeRange.from, timeRange.to]);
 
   const tableData = useMemo(() => formatPrometheusToTable(chartResult), [chartResult]);
   const dataTable = useMemo(() => <QueryResultTable data={tableData} scrollRegionLabel={`${panel.title} data table`} />, [tableData, panel.title]);

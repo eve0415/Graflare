@@ -7,8 +7,9 @@ import type uPlotNs from 'uplot';
 import { formatValue } from '@graflare/shared/format/value-format';
 import uPlot from 'uplot';
 
-import { themedAxes, timeScaleX } from '../../../-root/chart-theme';
+import { timeScaleX } from '../../../-root/chart-theme';
 
+import { resolveSharedAxisLayout } from './multi-axis';
 import { extractResultSeries } from './panel-data-extract';
 
 // A single plotted series: its label set plus the per-bucket samples. An instant
@@ -24,6 +25,15 @@ interface BuildBarChartOptionsArgs {
    */
   labels: readonly string[];
   defaults: FieldConfigDefaults;
+  /**
+   * Effective field config per series, index-aligned with `series` — each resolved via
+   * `resolveFieldConfig(seriesDescriptor(...), panel.fieldConfig)` by the caller (which holds the
+   * panel queries, so refId-based overrides match). OPTIONAL and additive: when omitted, every
+   * series falls back to `defaults`, which collapses to the prior single-y-axis layout (so callers
+   * and tests that pass only `defaults` are unchanged). When supplied, series are grouped by their
+   * resolved `unit` into multiple y-axes (see `resolveSharedAxisLayout`).
+   */
+  seriesConfigs?: readonly FieldConfigDefaults[];
   width: number;
   height: number;
   vertical: boolean;
@@ -71,37 +81,49 @@ export const barChartAlignedData = (series: BarChartSeries[]): uPlotNs.AlignedDa
 export const formatBarChartTicks = (splits: number[], defaults: FieldConfigDefaults): string[] => splits.map(v => formatValue(v, defaults));
 
 /**
- * Build the uPlot options for a bar chart: a bars path-builder on every data
- * series and a formatted y-axis. `vertical` is accepted for forward-compat; uPlot
- * 1.6 renders value bars vertically, so it currently has no visual branch.
+ * Build the uPlot options for a bar chart: a bars path-builder on every data series and a y-axis
+ * layout grouped by each series' resolved unit (see `resolveSharedAxisLayout`). `vertical` is
+ * accepted for forward-compat; uPlot 1.6 renders value bars vertically, so it currently has no
+ * visual branch.
+ *
+ * When `seriesConfigs` is omitted every series falls back to `defaults`, so the layout collapses to
+ * the prior single themed y-axis (same scale key 'y', no series `scale` key) — byte-equivalent to
+ * before overrides. Only ≥2 distinct resolved units split into multiple left/right y-axes.
  */
-export const buildBarChartOptions = ({ series, labels, defaults, width, height, colors, range }: BuildBarChartOptionsArgs): uPlotNs.Options => {
+export const buildBarChartOptions = ({ series, labels, defaults, seriesConfigs, width, height, colors, range }: BuildBarChartOptionsArgs): uPlotNs.Options => {
   // `paths` is optional on Series and uPlot.paths.bars is itself optional in the
   // types; build it once and include the key only when present (no undefined writes).
   const barsPaths = uPlot.paths.bars?.({ size: BAR_SIZE, align: 0 });
 
-  // Index 0 = x/bucket axis (default formatting). Index 1 = y, formatted via unit.
-  const formatYTicks: uPlotNs.Axis.DynamicValues = (_u, splits) => formatBarChartTicks(splits, defaults);
+  // Resolve the y-axis layout from each series' effective config. With no per-series configs every
+  // series uses `defaults` → one unit → the single-axis path the chart built before.
+  const configs = seriesConfigs ?? series.map(() => defaults);
+  const layout = resolveSharedAxisLayout(configs, colors);
 
   // Pin the x domain to the resolved query window (epoch seconds). `time: true` is uPlot's default
   // for x so it doesn't change bar geometry; the explicit range is what stops auto-range from
-  // ballooning the axis on a stray out-of-window sample (see `timeScaleX`).
+  // ballooning the axis on a stray out-of-window sample (see `timeScaleX`). The y-scales the layout
+  // introduces (one per unit when multi-axis) merge in alongside.
   const [fromSec, toSec] = range;
 
   return {
     width: Math.max(100, width - 16),
     height: Math.max(80, height - 60),
-    scales: { x: timeScaleX(fromSec, toSec) },
-    axes: themedAxes(colors, formatYTicks),
+    scales: { x: timeScaleX(fromSec, toSec), ...layout.scales },
+    axes: layout.axes,
     series: [
       {},
       ...series.map((_s, i): uPlotNs.Series => {
+        const scale = layout.seriesScales[i];
         const base: uPlotNs.Series = {
           label: labels[i] ?? `Series ${String(i + 1)}`,
           stroke: `hsl(${String(i * 60)}, 70%, 50%)`,
           fill: `hsla(${String(i * 60)}, 70%, 50%, 0.7)`,
         };
-        return barsPaths === undefined ? base : { ...base, paths: barsPaths };
+        const withPaths = barsPaths === undefined ? base : { ...base, paths: barsPaths };
+        // Assign a scale key only when the layout splits units; single-unit series stay on the
+        // default 'y' scale with no `scale` key (byte-identical to before).
+        return scale === undefined ? withPaths : { ...withPaths, scale };
       }),
     ],
   };

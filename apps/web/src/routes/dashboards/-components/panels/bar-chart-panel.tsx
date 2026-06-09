@@ -1,6 +1,7 @@
 import type { Annotation } from '@graflare/shared/schemas/annotation';
 import type { Panel } from '@graflare/shared/schemas/panel';
 
+import { resolveFieldConfig } from '@graflare/shared/format/resolve-field-config';
 import { seriesLabel } from '@graflare/shared/legend/resolve';
 import { resolveRange } from '@graflare/shared/time/resolve';
 import { useMemo } from 'react';
@@ -11,7 +12,7 @@ import { useTheme } from '../../../-root/theme-provider';
 
 import { annotationMarkers } from './annotations-plugin';
 import { barChartAlignedData, barChartSeries, buildBarChartOptions } from './bar-chart-data';
-import { extractResultSeriesWithQuery } from './panel-data-extract';
+import { extractResultSeriesWithQuery, seriesDescriptor } from './panel-data-extract';
 import { UPlotPanel } from './uplot-panel';
 import { usePanelQuery } from './use-panel-query';
 
@@ -42,6 +43,16 @@ export const BarChartPanel = ({ panel, timeRange, refetchInterval, width, height
     [data, panel.queries],
   );
 
+  // Resolve each series' effective field config (unit/min/max) against the panel overrides, keyed
+  // on the derived series label and the producing query's refId — the same descriptor path the
+  // bar-gauge panel uses, so a `byName`/`byFrameRefID` override matches the same field here.
+  // Index-aligned with `series`; `buildBarChartOptions` groups by the resolved unit into y-axes.
+  // With no overrides every series resolves to the defaults reference → one y-axis, as before.
+  const seriesConfigs = useMemo(
+    () => extractResultSeriesWithQuery(data, panel.queries).map((q, i) => resolveFieldConfig(seriesDescriptor(q.series, i, q.refId), panel.fieldConfig)),
+    [data, panel.queries, panel.fieldConfig],
+  );
+
   // Resolve the visible window once (epoch seconds) — shared by the annotation markers and the
   // chart's x-axis range pin so both track the same `[from, to]`.
   const queryWindow = useMemo(() => resolveRange(timeRange.from, timeRange.to), [timeRange.from, timeRange.to]);
@@ -55,13 +66,25 @@ export const BarChartPanel = ({ panel, timeRange, refetchInterval, width, height
       series,
       labels,
       defaults: panel.fieldConfig.defaults,
+      seriesConfigs,
       width,
       height,
       vertical,
       colors,
       range: [queryWindow.from, queryWindow.to],
     });
-  }, [series, labels, panel.fieldConfig.defaults, panel.displayOptions.barchart?.orientation, width, height, resolved, queryWindow.from, queryWindow.to]);
+  }, [
+    series,
+    labels,
+    seriesConfigs,
+    panel.fieldConfig.defaults,
+    panel.displayOptions.barchart?.orientation,
+    width,
+    height,
+    resolved,
+    queryWindow.from,
+    queryWindow.to,
+  ]);
 
   const tableData = useMemo(() => formatPrometheusToTable(series), [series]);
   const dataTable = useMemo(() => <QueryResultTable data={tableData} scrollRegionLabel={`${panel.title} data table`} />, [tableData, panel.title]);
