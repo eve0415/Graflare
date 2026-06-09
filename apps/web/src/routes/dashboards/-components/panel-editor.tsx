@@ -9,17 +9,20 @@ import type {
   ValueMappingType,
 } from '@graflare/shared/schemas/field-config';
 import type { Panel, PanelQuery } from '@graflare/shared/schemas/panel';
+import type { FilterFieldsMatch, ReduceCalc, Transformation, TransformationId } from '@graflare/shared/schemas/transformation';
 
 import { UNIT_CATALOG } from '@graflare/shared/format/value-format';
 import { FIELD_OVERRIDE_MATCHER_IDS, FIELD_OVERRIDE_PROPERTY_IDS, makeFieldOverrideProperty, makeValueMapping } from '@graflare/shared/schemas/field-config';
+import { FILTER_FIELDS_MATCH_KINDS, REDUCE_CALCS, TRANSFORMATION_IDS, makeTransformation } from '@graflare/shared/schemas/transformation';
 import { Button } from '@graflare/ui/components/button';
+import { Checkbox } from '@graflare/ui/components/checkbox';
 import { Input } from '@graflare/ui/components/input';
 import { Label } from '@graflare/ui/components/label';
 import { Select, SelectContent, SelectGroup, SelectItem, SelectLabel, SelectTrigger, SelectValue } from '@graflare/ui/components/select';
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@graflare/ui/components/sheet';
 import { Textarea } from '@graflare/ui/components/textarea';
 import { useQuery } from '@tanstack/react-query';
-import { Plus, Trash2, X } from 'lucide-react';
+import { ChevronDown, ChevronUp, Plus, Trash2, X } from 'lucide-react';
 import { useCallback, useState } from 'react';
 
 import { databaseSchemaQueryOptions } from '../../-root/introspection-queries';
@@ -100,6 +103,60 @@ const PROPERTY_ID_OPTIONS = FIELD_OVERRIDE_PROPERTY_IDS.map(id => ({ value: id, 
 
 const isMatcherId = (v: string | null): v is FieldMatcherId => FIELD_OVERRIDE_MATCHER_IDS.some(id => id === v);
 const isPropertyId = (v: string | null): v is FieldOverridePropertyId => FIELD_OVERRIDE_PROPERTY_IDS.some(id => id === v);
+
+// Human labels for each transform id (transformation transformationSchema). The id SET is
+// single-sourced from TRANSFORMATION_IDS; only the labels live here (keyed by id, so a new
+// transform forces a label). Drives the "Add transformation" menu and each card's title. The
+// transform's value editor is dispatched per id below — each picked id builds the right-typed
+// transform via makeTransformation, mirroring the override "Add property" flow.
+const TRANSFORMATION_LABELS: Record<TransformationId, string> = {
+  reduce: 'Reduce',
+  filterFieldsByName: 'Filter by name',
+  organize: 'Organize fields',
+  sortBy: 'Sort by',
+  limit: 'Limit',
+};
+
+const TRANSFORMATION_ID_OPTIONS = TRANSFORMATION_IDS.map(id => ({ value: id, label: TRANSFORMATION_LABELS[id] }));
+
+// reduce.calc — single-sourced off the exported REDUCE_CALCS so the dropdown items and the
+// narrowing guard never drift. Labels are inline copy keyed by the canonical calc id.
+const REDUCE_CALC_LABELS: Record<ReduceCalc, string> = {
+  last: 'Last',
+  first: 'First',
+  min: 'Min',
+  max: 'Max',
+  mean: 'Mean',
+  sum: 'Sum',
+  count: 'Count',
+};
+const REDUCE_CALC_OPTIONS = REDUCE_CALCS.map(calc => ({ value: calc, label: REDUCE_CALC_LABELS[calc] }));
+const isReduceCalc = (v: string | null): v is ReduceCalc => REDUCE_CALCS.some(c => c === v);
+
+// filterFieldsByName.match — single-sourced off the exported FILTER_FIELDS_MATCH_KINDS (byName /
+// byRegexp), same guard+items pattern as the reduce calc.
+const FILTER_MATCH_LABELS: Record<FilterFieldsMatch, string> = {
+  byName: 'By name',
+  byRegexp: 'By regex',
+};
+const FILTER_MATCH_OPTIONS = FILTER_FIELDS_MATCH_KINDS.map(match => ({ value: match, label: FILTER_MATCH_LABELS[match] }));
+const isFilterMatch = (v: string | null): v is FilterFieldsMatch => FILTER_FIELDS_MATCH_KINDS.some(m => m === v);
+
+// filterFieldsByName.mode and sortBy.by are inline z.enums in the schema (not exported), so their
+// option arrays + guards live here (same as the text-mode/mapping-type locals above).
+const FILTER_MODE_OPTIONS = [
+  { value: 'include', label: 'Include' },
+  { value: 'exclude', label: 'Exclude' },
+] as const;
+const isFilterMode = (v: string | null): v is 'include' | 'exclude' => v === 'include' || v === 'exclude';
+
+const SORT_BY_OPTIONS = [
+  { value: 'name', label: 'Name' },
+  { value: 'value', label: 'Value' },
+] as const;
+const isSortBy = (v: string | null): v is 'name' | 'value' => v === 'name' || v === 'value';
+
+const isTransformationId = (v: string | null): v is TransformationId => TRANSFORMATION_IDS.some(id => id === v);
 
 interface PanelEditorProps {
   panel: Panel;
@@ -305,6 +362,16 @@ export const PanelEditor = ({ panel, open, onClose, onSave }: PanelEditorProps) 
     [draft.fieldConfig, updateField],
   );
 
+  // Transformations are a top-level Panel field (not nested under fieldConfig), so the setter is a
+  // plain updateField — the TransformationsEditor owns its own add/update/remove/reorder on top of
+  // this array, same shape as FieldOverridesEditor.
+  const setTransformations = useCallback(
+    (transformations: Transformation[]) => {
+      updateField('transformations', transformations);
+    },
+    [updateField],
+  );
+
   return (
     <Sheet open={open} onOpenChange={handleOpenChange}>
       <SheetContent className='overflow-y-auto sm:max-w-[600px]'>
@@ -448,6 +515,8 @@ export const PanelEditor = ({ panel, open, onClose, onSave }: PanelEditorProps) 
           </div>
 
           <FieldOverridesEditor overrides={draft.fieldConfig.overrides} onChange={setOverrides} />
+
+          <TransformationsEditor transformations={draft.transformations} onChange={setTransformations} />
 
           <div className='flex justify-end gap-2'>
             <Button variant='outline' onClick={onClose}>
@@ -1159,6 +1228,664 @@ const FieldOverridesEditor = ({ overrides, onChange }: { overrides: FieldOverrid
         <p className='text-muted-foreground text-xs'>No field overrides. Add one to style specific fields differently from the panel defaults.</p>
       ) : (
         overrides.map((o, i) => <OverrideRow key={String(i)} override={o} index={i} onUpdate={handleUpdate} onRemove={handleRemove} />)
+      )}
+    </div>
+  );
+};
+
+// ── Transformations ──────────────────────────────────────────────────────────────────────────
+// Panel data transformations (transformation transformationSchema): an ORDERED pipeline edited as
+// draft.transformations. Each transform runs in array order, feeding the next (see transform/
+// apply.ts), so the editor exposes move-up / move-down per card alongside remove. Each per-type
+// options editor narrows on the discriminant `t.id` then spreads `{ ...t, options: { ...t.options,
+// … } }`, so the edited value keeps its branch's type — the same no-cast union edit the override
+// property rows use; a new transform id forces a new dispatch branch below.
+
+// organize keys rename/exclude by each series' CURRENT derived label, which the editor can't know
+// (labels come from query results, absent in the panel draft) — so the source label is free-text.
+// The editor owns local row state (the keys are user-typed and may be blank/duplicate mid-edit, so
+// re-deriving the record each change avoids a rekey-by-delete) and projects it back to the two
+// records on every change. `indexByName` has no UI yet (reorder-by-index is a future iteration); it
+// is preserved untouched on the spread so an imported organize round-trips unchanged.
+const OrganizeOptionsEditor = ({
+  options,
+  idPrefix,
+  cardLabel,
+  onChange,
+}: {
+  options: Extract<Transformation, { id: 'organize' }>['options'];
+  idPrefix: string;
+  cardLabel: string;
+  onChange: (next: Extract<Transformation, { id: 'organize' }>['options']) => void;
+}) => {
+  // Seed editable rows once from the incoming records (imported organize → editable rows). The
+  // records are the source of truth on save; this local state only backs the in-progress text so a
+  // blank or temporarily-duplicate source label stays typeable without churning the parent.
+  //
+  // KNOWN MVP LIMITATION (organize reorder): rows seed ONCE and the cards key by index, so if a panel
+  // has two+ organize transforms and they are reordered relative to each other (move up/down), each
+  // organize's rename/exclude rows stay with their old card position until the editor is reopened —
+  // the DISPLAY goes stale. The pipeline DATA order is always correct (handleMove swaps the array, so
+  // reorder→Apply with no further edit saves correctly); only editing a stale-displayed organize
+  // right after such a reorder can mis-apply. Rare (two organize in one panel + reorder + edit) and
+  // recoverable (reopen). Deferred per the simpler-organize MVP scope; the clean fix is to re-seed
+  // rows from props on a deep-diff against the last emitted value.
+  const [renameRows, setRenameRows] = useState<{ from: string; to: string }[]>(() => Object.entries(options.renameByName).map(([from, to]) => ({ from, to })));
+  const [excludeRows, setExcludeRows] = useState<string[]>(() => Object.keys(options.excludeByName).filter(label => options.excludeByName[label] === true));
+
+  // Project current rows → the two records, carrying indexByName through untouched. Last write wins
+  // for duplicate keys; blank source labels are dropped (they can't match a real series).
+  const emit = useCallback(
+    (rename: { from: string; to: string }[], exclude: string[]) => {
+      const renameByName: Record<string, string> = {};
+      for (const row of rename) {
+        if (row.from !== '') renameByName[row.from] = row.to;
+      }
+      const excludeByName: Record<string, boolean> = {};
+      for (const label of exclude) {
+        if (label !== '') excludeByName[label] = true;
+      }
+      onChange({ ...options, renameByName, excludeByName });
+    },
+    [options, onChange],
+  );
+
+  const handleAddRename = useCallback(() => {
+    setRenameRows(prev => {
+      const next = [...prev, { from: '', to: '' }];
+      emit(next, excludeRows);
+      return next;
+    });
+  }, [emit, excludeRows]);
+
+  const handleRenameFrom = useCallback(
+    (index: number, value: string) => {
+      setRenameRows(prev => {
+        const next = prev.map((r, i) => (i === index ? { ...r, from: value } : r));
+        emit(next, excludeRows);
+        return next;
+      });
+    },
+    [emit, excludeRows],
+  );
+
+  const handleRenameTo = useCallback(
+    (index: number, value: string) => {
+      setRenameRows(prev => {
+        const next = prev.map((r, i) => (i === index ? { ...r, to: value } : r));
+        emit(next, excludeRows);
+        return next;
+      });
+    },
+    [emit, excludeRows],
+  );
+
+  const handleRemoveRename = useCallback(
+    (index: number) => {
+      setRenameRows(prev => {
+        const next = prev.filter((_, i) => i !== index);
+        emit(next, excludeRows);
+        return next;
+      });
+    },
+    [emit, excludeRows],
+  );
+
+  const handleAddExclude = useCallback(() => {
+    setExcludeRows(prev => {
+      const next = [...prev, ''];
+      emit(renameRows, next);
+      return next;
+    });
+  }, [emit, renameRows]);
+
+  const handleExcludeChange = useCallback(
+    (index: number, value: string) => {
+      setExcludeRows(prev => {
+        const next = prev.map((label, i) => (i === index ? value : label));
+        emit(renameRows, next);
+        return next;
+      });
+    },
+    [emit, renameRows],
+  );
+
+  const handleRemoveExclude = useCallback(
+    (index: number) => {
+      setExcludeRows(prev => {
+        const next = prev.filter((_, i) => i !== index);
+        emit(renameRows, next);
+        return next;
+      });
+    },
+    [emit, renameRows],
+  );
+
+  return (
+    <div className='space-y-3'>
+      <div className='space-y-2'>
+        <div className='flex items-center justify-between'>
+          <Label className='text-muted-foreground text-xs font-normal'>Rename fields</Label>
+          <Button variant='ghost' size='xs' onClick={handleAddRename} aria-label={`Add rename to ${cardLabel}`}>
+            <Plus className='mr-1 h-3 w-3' />
+            Add
+          </Button>
+        </div>
+        {renameRows.length === 0 ? (
+          <p className='text-muted-foreground text-xs'>No renames. Add a row to relabel a field by its current name.</p>
+        ) : (
+          renameRows.map((row, i) => (
+            <OrganizeRenameRow
+              key={String(i)}
+              row={row}
+              index={i}
+              idPrefix={`${idPrefix}-rename-${String(i)}`}
+              cardLabel={cardLabel}
+              onFromChange={handleRenameFrom}
+              onToChange={handleRenameTo}
+              onRemove={handleRemoveRename}
+            />
+          ))
+        )}
+      </div>
+
+      <div className='space-y-2'>
+        <div className='flex items-center justify-between'>
+          <Label className='text-muted-foreground text-xs font-normal'>Exclude fields</Label>
+          <Button variant='ghost' size='xs' onClick={handleAddExclude} aria-label={`Add exclude to ${cardLabel}`}>
+            <Plus className='mr-1 h-3 w-3' />
+            Add
+          </Button>
+        </div>
+        {excludeRows.length === 0 ? (
+          <p className='text-muted-foreground text-xs'>No exclusions. Add a field name to drop it from the result.</p>
+        ) : (
+          excludeRows.map((label, i) => (
+            <OrganizeExcludeRow
+              key={String(i)}
+              value={label}
+              index={i}
+              idPrefix={`${idPrefix}-exclude-${String(i)}`}
+              cardLabel={cardLabel}
+              onChange={handleExcludeChange}
+              onRemove={handleRemoveExclude}
+            />
+          ))
+        )}
+      </div>
+    </div>
+  );
+};
+
+const OrganizeRenameRow = ({
+  row,
+  index,
+  idPrefix,
+  cardLabel,
+  onFromChange,
+  onToChange,
+  onRemove,
+}: {
+  row: { from: string; to: string };
+  index: number;
+  idPrefix: string;
+  cardLabel: string;
+  onFromChange: (index: number, value: string) => void;
+  onToChange: (index: number, value: string) => void;
+  onRemove: (index: number) => void;
+}) => {
+  const handleFrom = useCallback(
+    (e: React.ChangeEvent<HTMLInputElement>) => {
+      onFromChange(index, e.target.value);
+    },
+    [index, onFromChange],
+  );
+  const handleTo = useCallback(
+    (e: React.ChangeEvent<HTMLInputElement>) => {
+      onToChange(index, e.target.value);
+    },
+    [index, onToChange],
+  );
+  const handleRemove = useCallback(() => {
+    onRemove(index);
+  }, [index, onRemove]);
+  const rowLabel = `${cardLabel} rename ${String(index + 1)}`;
+
+  return (
+    <div className='flex items-center gap-2'>
+      <Input
+        id={`${idPrefix}-from`}
+        placeholder='Field name'
+        value={row.from}
+        onChange={handleFrom}
+        className='flex-1 text-sm'
+        aria-label={`${rowLabel} field`}
+      />
+      <span className='text-muted-foreground text-xs' aria-hidden>
+        →
+      </span>
+      <Input id={`${idPrefix}-to`} placeholder='New name' value={row.to} onChange={handleTo} className='flex-1 text-sm' aria-label={`${rowLabel} new name`} />
+      <Button variant='ghost' size='icon' className='h-8 w-8 shrink-0' onClick={handleRemove} aria-label={`Remove ${rowLabel}`}>
+        <Trash2 className='h-3.5 w-3.5' />
+      </Button>
+    </div>
+  );
+};
+
+const OrganizeExcludeRow = ({
+  value,
+  index,
+  idPrefix,
+  cardLabel,
+  onChange,
+  onRemove,
+}: {
+  value: string;
+  index: number;
+  idPrefix: string;
+  cardLabel: string;
+  onChange: (index: number, value: string) => void;
+  onRemove: (index: number) => void;
+}) => {
+  const handleChange = useCallback(
+    (e: React.ChangeEvent<HTMLInputElement>) => {
+      onChange(index, e.target.value);
+    },
+    [index, onChange],
+  );
+  const handleRemove = useCallback(() => {
+    onRemove(index);
+  }, [index, onRemove]);
+  const rowLabel = `${cardLabel} exclude ${String(index + 1)}`;
+
+  return (
+    <div className='flex items-center gap-2'>
+      <Input
+        id={`${idPrefix}-name`}
+        placeholder='Field name'
+        value={value}
+        onChange={handleChange}
+        className='flex-1 text-sm'
+        aria-label={`${rowLabel} field`}
+      />
+      <Button variant='ghost' size='icon' className='h-8 w-8 shrink-0' onClick={handleRemove} aria-label={`Remove ${rowLabel}`}>
+        <Trash2 className='h-3.5 w-3.5' />
+      </Button>
+    </div>
+  );
+};
+
+// The per-type options editor: dispatches on the discriminant and renders only that branch's
+// controls. Every handler narrows on `t.id` first, then spreads `{ ...t, options: { ...t.options,
+// … } }` so the edited transform stays a valid member of its branch — no cast, no `any` (the same
+// discriminated-union edit OverridePropertyRow uses). `idPrefix`/`cardLabel` namespace the DOM ids
+// and accessible names per card so two transforms of the same type never collide.
+const TransformationOptions = ({
+  transformation,
+  idPrefix,
+  cardLabel,
+  onChange,
+}: {
+  transformation: Transformation;
+  idPrefix: string;
+  cardLabel: string;
+  onChange: (next: Transformation) => void;
+}) => {
+  const t = transformation;
+
+  const handleReduceCalc = useCallback(
+    (val: string | null) => {
+      if (t.id === 'reduce' && isReduceCalc(val)) onChange({ ...t, options: { ...t.options, calc: val } });
+    },
+    [t, onChange],
+  );
+
+  const handleFilterMode = useCallback(
+    (val: string | null) => {
+      if (t.id === 'filterFieldsByName' && isFilterMode(val)) onChange({ ...t, options: { ...t.options, mode: val } });
+    },
+    [t, onChange],
+  );
+
+  const handleFilterMatch = useCallback(
+    (val: string | null) => {
+      if (t.id === 'filterFieldsByName' && isFilterMatch(val)) onChange({ ...t, options: { ...t.options, match: val } });
+    },
+    [t, onChange],
+  );
+
+  const handleFilterValue = useCallback(
+    (e: React.ChangeEvent<HTMLInputElement>) => {
+      if (t.id === 'filterFieldsByName') onChange({ ...t, options: { ...t.options, value: e.target.value } });
+    },
+    [t, onChange],
+  );
+
+  const handleOrganizeChange = useCallback(
+    (next: Extract<Transformation, { id: 'organize' }>['options']) => {
+      if (t.id === 'organize') onChange({ ...t, options: next });
+    },
+    [t, onChange],
+  );
+
+  const handleSortByBy = useCallback(
+    (val: string | null) => {
+      if (t.id === 'sortBy' && isSortBy(val)) onChange({ ...t, options: { ...t.options, by: val } });
+    },
+    [t, onChange],
+  );
+
+  const handleSortByDesc = useCallback(
+    (checked: boolean) => {
+      if (t.id === 'sortBy') onChange({ ...t, options: { ...t.options, desc: checked } });
+    },
+    [t, onChange],
+  );
+
+  const handleLimitCount = useCallback(
+    (e: React.ChangeEvent<HTMLInputElement>) => {
+      if (t.id === 'limit') {
+        const n = Number(e.target.value);
+        onChange({ ...t, options: { ...t.options, count: e.target.value.trim() === '' || Number.isNaN(n) ? 0 : Math.trunc(n) } });
+      }
+    },
+    [t, onChange],
+  );
+
+  if (t.id === 'reduce') {
+    return (
+      <div className='space-y-2'>
+        <Label htmlFor={`${idPrefix}-calc`} className='text-muted-foreground text-xs font-normal'>
+          Calculation
+        </Label>
+        <Select value={t.options.calc} onValueChange={handleReduceCalc} items={REDUCE_CALC_OPTIONS}>
+          <SelectTrigger id={`${idPrefix}-calc`}>
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            {REDUCE_CALC_OPTIONS.map(o => (
+              <SelectItem key={o.value} value={o.value}>
+                {o.label}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      </div>
+    );
+  }
+
+  if (t.id === 'filterFieldsByName') {
+    return (
+      <div className='space-y-2'>
+        <div className='grid grid-cols-2 gap-2'>
+          <div className='space-y-1'>
+            <Label htmlFor={`${idPrefix}-mode`} className='text-muted-foreground text-xs font-normal'>
+              Mode
+            </Label>
+            <Select value={t.options.mode} onValueChange={handleFilterMode} items={FILTER_MODE_OPTIONS}>
+              <SelectTrigger id={`${idPrefix}-mode`}>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {FILTER_MODE_OPTIONS.map(o => (
+                  <SelectItem key={o.value} value={o.value}>
+                    {o.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          <div className='space-y-1'>
+            <Label htmlFor={`${idPrefix}-match`} className='text-muted-foreground text-xs font-normal'>
+              Match
+            </Label>
+            <Select value={t.options.match} onValueChange={handleFilterMatch} items={FILTER_MATCH_OPTIONS}>
+              <SelectTrigger id={`${idPrefix}-match`}>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {FILTER_MATCH_OPTIONS.map(o => (
+                  <SelectItem key={o.value} value={o.value}>
+                    {o.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+        </div>
+        <div className='space-y-1'>
+          <Label htmlFor={`${idPrefix}-value`} className='text-muted-foreground text-xs font-normal'>
+            {t.options.match === 'byRegexp' ? 'Pattern' : 'Field name'}
+          </Label>
+          <Input
+            id={`${idPrefix}-value`}
+            value={t.options.value}
+            onChange={handleFilterValue}
+            placeholder={t.options.match === 'byRegexp' ? '/cpu.*/' : 'cpu_usage'}
+            className='text-sm'
+          />
+        </div>
+      </div>
+    );
+  }
+
+  if (t.id === 'organize') {
+    return <OrganizeOptionsEditor options={t.options} idPrefix={idPrefix} cardLabel={cardLabel} onChange={handleOrganizeChange} />;
+  }
+
+  if (t.id === 'sortBy') {
+    return (
+      <div className='space-y-3'>
+        <div className='space-y-1'>
+          <Label htmlFor={`${idPrefix}-by`} className='text-muted-foreground text-xs font-normal'>
+            Sort by
+          </Label>
+          <Select value={t.options.by} onValueChange={handleSortByBy} items={SORT_BY_OPTIONS}>
+            <SelectTrigger id={`${idPrefix}-by`}>
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {SORT_BY_OPTIONS.map(o => (
+                <SelectItem key={o.value} value={o.value}>
+                  {o.label}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+        <div className='flex items-center gap-2'>
+          {/* The visible <Label htmlFor> is the checkbox's accessible name (a single labelling path,
+              so getByLabelText resolves to exactly the control); no aria-label, which would duplicate it. */}
+          <Checkbox id={`${idPrefix}-desc`} checked={t.options.desc} onCheckedChange={handleSortByDesc} />
+          <Label htmlFor={`${idPrefix}-desc`} className='text-muted-foreground cursor-pointer text-xs font-normal'>
+            Descending
+          </Label>
+        </div>
+      </div>
+    );
+  }
+
+  // limit — the remaining branch; the union is exhausted, so `t` narrows to the limit transform
+  // here and `t.options.count` is its number. No default/cast needed.
+  return (
+    <div className='space-y-1'>
+      <Label htmlFor={`${idPrefix}-count`} className='text-muted-foreground text-xs font-normal'>
+        Limit
+      </Label>
+      <Input
+        id={`${idPrefix}-count`}
+        type='number'
+        inputMode='numeric'
+        step='1'
+        min='0'
+        value={String(t.options.count)}
+        onChange={handleLimitCount}
+        className='text-sm'
+      />
+    </div>
+  );
+};
+
+// One transform card: a header (index-numbered group name + visible type badge, then move-up /
+// move-down / remove icon buttons) over the per-type options editor. The group is named by INDEX
+// ("Transformation N"), not by type, so two same-type transforms keep unambiguous accessible names
+// (axe + getByRole('group',{name})); the type is shown as visible content inside. move-up/down keep
+// the pipeline order (execution order); first-up / last-down are disabled (not hidden) so the
+// header layout doesn't jump (matches the field-override card style + the action-group placement).
+const TransformationCard = ({
+  transformation,
+  index,
+  count,
+  onUpdate,
+  onRemove,
+  onMove,
+}: {
+  transformation: Transformation;
+  index: number;
+  count: number;
+  onUpdate: (index: number, next: Transformation) => void;
+  onRemove: (index: number) => void;
+  onMove: (index: number, direction: -1 | 1) => void;
+}) => {
+  const cardLabel = `Transformation ${String(index + 1)}`;
+  const idPrefix = `transform-${String(index)}`;
+  const typeLabel = TRANSFORMATION_LABELS[transformation.id];
+
+  const handleChange = useCallback(
+    (next: Transformation) => {
+      onUpdate(index, next);
+    },
+    [index, onUpdate],
+  );
+  const handleRemove = useCallback(() => {
+    onRemove(index);
+  }, [index, onRemove]);
+  const handleUp = useCallback(() => {
+    onMove(index, -1);
+  }, [index, onMove]);
+  const handleDown = useCallback(() => {
+    onMove(index, 1);
+  }, [index, onMove]);
+
+  return (
+    // fieldset+legend names the card as a `group` scoped to AT/tests by "Transformation N"; the
+    // reused inner controls keep their natural labels without colliding across cards.
+    <fieldset className='space-y-3 rounded-md border p-3'>
+      <legend className='sr-only'>{cardLabel}</legend>
+      <div className='flex items-center justify-between gap-2'>
+        <div className='flex items-center gap-2'>
+          <span
+            className='bg-muted text-muted-foreground inline-flex h-5 min-w-5 items-center justify-center rounded px-1 text-xs font-medium tabular-nums'
+            aria-hidden
+          >
+            {index + 1}
+          </span>
+          <span className='text-xs font-medium'>{typeLabel}</span>
+        </div>
+        <div className='flex items-center gap-1'>
+          <Button variant='ghost' size='icon' className='h-6 w-6 shrink-0' onClick={handleUp} disabled={index === 0} aria-label={`Move ${cardLabel} up`}>
+            <ChevronUp className='h-3.5 w-3.5' />
+          </Button>
+          <Button
+            variant='ghost'
+            size='icon'
+            className='h-6 w-6 shrink-0'
+            onClick={handleDown}
+            disabled={index === count - 1}
+            aria-label={`Move ${cardLabel} down`}
+          >
+            <ChevronDown className='h-3.5 w-3.5' />
+          </Button>
+          <Button variant='ghost' size='icon' className='h-6 w-6 shrink-0' onClick={handleRemove} aria-label={`Remove ${cardLabel}`}>
+            <X className='h-3 w-3' />
+          </Button>
+        </div>
+      </div>
+
+      <TransformationOptions transformation={transformation} idPrefix={idPrefix} cardLabel={cardLabel} onChange={handleChange} />
+    </fieldset>
+  );
+};
+
+// The "Transformations" section: a header with an "Add transformation" action-menu (a value={null}
+// Select of the transform ids, like the override "Add property" menu — appends a fresh transform
+// via makeTransformation), then one ordered TransformationCard per entry (or an empty-state hint).
+// Owns the immutable add / update / remove / reorder of the array and reports the next array through
+// `onChange` (same shape as FieldOverridesEditor) — array order IS execution order (see
+// transform/apply.ts), which the move controls edit.
+const TransformationsEditor = ({ transformations, onChange }: { transformations: Transformation[]; onChange: (next: Transformation[]) => void }) => {
+  const handleAdd = useCallback(
+    (val: string | null) => {
+      if (isTransformationId(val)) onChange([...transformations, makeTransformation(val)]);
+    },
+    [transformations, onChange],
+  );
+
+  const handleUpdate = useCallback(
+    (index: number, next: Transformation) => {
+      onChange(transformations.map((t, i) => (i === index ? next : t)));
+    },
+    [transformations, onChange],
+  );
+
+  const handleRemove = useCallback(
+    (index: number) => {
+      onChange(transformations.filter((_, i) => i !== index));
+    },
+    [transformations, onChange],
+  );
+
+  // Swap with the neighbour in `direction`. Read both ends and guard (noUncheckedIndexedAccess —
+  // no `!`/cast), then map-swap immutably; an out-of-range target (first-up / last-down) is a
+  // no-op, though the buttons are already disabled there.
+  const handleMove = useCallback(
+    (index: number, direction: -1 | 1) => {
+      const target = index + direction;
+      const current = transformations[index];
+      const neighbour = transformations[target];
+      if (current === undefined || neighbour === undefined) return;
+      onChange(transformations.map((t, i) => (i === index ? neighbour : i === target ? current : t)));
+    },
+    [transformations, onChange],
+  );
+
+  return (
+    <div className='space-y-3'>
+      <div className='flex items-center justify-between'>
+        <Label>Transformations</Label>
+        {/* An action menu, not a value picker (same as the override "Add property"): the trigger
+            renders fixed children and `value` stays null, so every pick is a null→id change that
+            fires onValueChange. `items` is passed per the base-ui-select rule; there's no
+            SelectValue to label. */}
+        <Select value={null} onValueChange={handleAdd} items={TRANSFORMATION_ID_OPTIONS}>
+          <SelectTrigger id='add-transformation' size='sm' aria-label='Add transformation' className='w-auto gap-1'>
+            <Plus className='h-3 w-3' />
+            <span className='text-xs'>Add transformation</span>
+          </SelectTrigger>
+          <SelectContent>
+            {TRANSFORMATION_ID_OPTIONS.map(o => (
+              <SelectItem key={o.value} value={o.value}>
+                {o.label}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      </div>
+
+      {transformations.length === 0 ? (
+        <p className='text-muted-foreground text-xs'>No transformations. Add one to reshape the query results before they render — they run top to bottom.</p>
+      ) : (
+        transformations.map((t, i) => (
+          <TransformationCard
+            key={String(i)}
+            transformation={t}
+            index={i}
+            count={transformations.length}
+            onUpdate={handleUpdate}
+            onRemove={handleRemove}
+            onMove={handleMove}
+          />
+        ))
       )}
     </div>
   );

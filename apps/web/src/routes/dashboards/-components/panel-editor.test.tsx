@@ -243,6 +243,164 @@ describe('panel-editor field overrides', () => {
   });
 });
 
+describe('panel-editor transformations', () => {
+  it('shows an empty-state hint and no transformation groups when there are none', () => {
+    renderEditor(basePanel(), vi.fn<(p: Panel) => void>());
+    expect(screen.getByText('Transformations')).toBeDefined();
+    expect(screen.getByText(/No transformations/)).toBeDefined();
+    expect(screen.queryByRole('group', { name: 'Transformation 1' })).toBeNull();
+  });
+
+  it('adds a reduce transform and sets its calc, writing the exact union shape', () => {
+    const onSave = vi.fn<(p: Panel) => void>();
+    renderEditor(basePanel(), onSave);
+
+    // The add control is a value={null} action-menu Select (5 types), not a plain Add button.
+    selectOption(screen.getByRole('combobox', { name: 'Add transformation' }), 'Reduce');
+    const group = screen.getByRole('group', { name: 'Transformation 1' });
+
+    // Fresh reduce defaults to calc 'last'; change it to 'mean' via the labelled Select.
+    selectOption(within(group).getByLabelText('Calculation'), 'Mean');
+
+    fireEvent.click(screen.getByRole('button', { name: 'Apply' }));
+    expect(onSave.mock.calls[0]?.[0].transformations).toEqual([{ id: 'reduce', options: { calc: 'mean' } }]);
+  });
+
+  it('adds a filterFieldsByName transform with mode/match selects and a value input', () => {
+    const onSave = vi.fn<(p: Panel) => void>();
+    renderEditor(basePanel(), onSave);
+
+    selectOption(screen.getByRole('combobox', { name: 'Add transformation' }), 'Filter by name');
+    const group = screen.getByRole('group', { name: 'Transformation 1' });
+
+    selectOption(within(group).getByLabelText('Mode'), 'Exclude');
+    selectOption(within(group).getByLabelText('Match'), 'By regex');
+    // byRegexp re-labels the value input to "Pattern".
+    fireEvent.change(within(group).getByLabelText('Pattern'), { target: { value: '/cpu.*/' } });
+
+    fireEvent.click(screen.getByRole('button', { name: 'Apply' }));
+    expect(onSave.mock.calls[0]?.[0].transformations).toEqual([
+      { id: 'filterFieldsByName', options: { mode: 'exclude', match: 'byRegexp', value: '/cpu.*/' } },
+    ]);
+  });
+
+  it('adds a sortBy transform and toggles desc', () => {
+    const onSave = vi.fn<(p: Panel) => void>();
+    renderEditor(basePanel(), onSave);
+
+    selectOption(screen.getByRole('combobox', { name: 'Add transformation' }), 'Sort by');
+    const group = screen.getByRole('group', { name: 'Transformation 1' });
+    selectOption(within(group).getByLabelText('Sort by'), 'Value');
+    // The Base UI Checkbox is role=checkbox named by its visible Label; querying the role hits the
+    // control once (getByLabelText would also match Base UI's hidden mirror input).
+    fireEvent.click(within(group).getByRole('checkbox', { name: 'Descending' }));
+
+    fireEvent.click(screen.getByRole('button', { name: 'Apply' }));
+    expect(onSave.mock.calls[0]?.[0].transformations).toEqual([{ id: 'sortBy', options: { by: 'value', desc: true } }]);
+  });
+
+  it('adds a limit transform and writes a truncated non-negative count', () => {
+    const onSave = vi.fn<(p: Panel) => void>();
+    renderEditor(basePanel(), onSave);
+
+    selectOption(screen.getByRole('combobox', { name: 'Add transformation' }), 'Limit');
+    const group = screen.getByRole('group', { name: 'Transformation 1' });
+    fireEvent.change(within(group).getByLabelText('Limit'), { target: { value: '5' } });
+
+    fireEvent.click(screen.getByRole('button', { name: 'Apply' }));
+    expect(onSave.mock.calls[0]?.[0].transformations).toEqual([{ id: 'limit', options: { count: 5 } }]);
+  });
+
+  it('removes a transformation back to the empty state', () => {
+    const onSave = vi.fn<(p: Panel) => void>();
+    renderEditor(basePanel(), onSave);
+
+    selectOption(screen.getByRole('combobox', { name: 'Add transformation' }), 'Reduce');
+    expect(screen.getByRole('group', { name: 'Transformation 1' })).toBeDefined();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Remove Transformation 1' }));
+    expect(screen.queryByRole('group', { name: 'Transformation 1' })).toBeNull();
+    expect(screen.getByText(/No transformations/)).toBeDefined();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Apply' }));
+    expect(onSave.mock.calls[0]?.[0].transformations).toEqual([]);
+  });
+
+  it('reorders transforms with move up/down — array order is execution order', () => {
+    // Seed two transforms so the pipeline order is observable on save (order = execution order).
+    const panel = basePanel();
+    panel.transformations = [
+      { id: 'reduce', options: { calc: 'last' } },
+      { id: 'limit', options: { count: 3 } },
+    ];
+    const onSave = vi.fn<(p: Panel) => void>();
+    renderEditor(panel, onSave);
+
+    // First card's "up" is disabled, last card's "down" is disabled (no jumpy hide).
+    expect(screen.getByRole('button', { name: 'Move Transformation 1 up' })).toHaveProperty('disabled', true);
+    expect(screen.getByRole('button', { name: 'Move Transformation 2 down' })).toHaveProperty('disabled', true);
+
+    // Move the second (limit) up — it should swap ahead of reduce.
+    fireEvent.click(screen.getByRole('button', { name: 'Move Transformation 2 up' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Apply' }));
+    expect(onSave.mock.calls[0]?.[0].transformations).toEqual([
+      { id: 'limit', options: { count: 3 } },
+      { id: 'reduce', options: { calc: 'last' } },
+    ]);
+
+    // Move the now-first (limit) back down — restores the original order.
+    fireEvent.click(screen.getByRole('button', { name: 'Move Transformation 1 down' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Apply' }));
+    expect(onSave.mock.calls[1]?.[0].transformations).toEqual([
+      { id: 'reduce', options: { calc: 'last' } },
+      { id: 'limit', options: { count: 3 } },
+    ]);
+  });
+
+  it('seeds imported transforms into editable cards (round-trip)', () => {
+    const panel = basePanel();
+    panel.transformations = [
+      { id: 'filterFieldsByName', options: { mode: 'include', match: 'byName', value: 'cpu' } },
+      { id: 'organize', options: { excludeByName: { mem: true }, renameByName: { cpu: 'CPU' }, indexByName: { cpu: 0 } } },
+      { id: 'sortBy', options: { by: 'value', desc: true } },
+    ];
+    const onSave = vi.fn<(p: Panel) => void>();
+    renderEditor(panel, onSave);
+
+    // Each imported transform renders as a scoped card with its values seeded into editable controls.
+    const filterGroup = screen.getByRole('group', { name: 'Transformation 1' });
+    expect(within(filterGroup).getByLabelText('Field name')).toHaveProperty('value', 'cpu');
+
+    const organizeGroup = screen.getByRole('group', { name: 'Transformation 2' });
+    expect(within(organizeGroup).getByLabelText('Transformation 2 rename 1 field')).toHaveProperty('value', 'cpu');
+    expect(within(organizeGroup).getByLabelText('Transformation 2 rename 1 new name')).toHaveProperty('value', 'CPU');
+    expect(within(organizeGroup).getByLabelText('Transformation 2 exclude 1 field')).toHaveProperty('value', 'mem');
+
+    const sortGroup = screen.getByRole('group', { name: 'Transformation 3' });
+    expect(within(sortGroup).getByRole('checkbox', { name: 'Descending' })).toHaveProperty('ariaChecked', 'true');
+
+    // Round-trips unchanged through Apply when nothing is edited — including organize's indexByName,
+    // which has no UI but is preserved on the options spread.
+    fireEvent.click(screen.getByRole('button', { name: 'Apply' }));
+    expect(onSave.mock.calls[0]?.[0].transformations).toEqual(panel.transformations);
+  });
+
+  it('preserves organize.indexByName (no UI) when editing a rename', () => {
+    const panel = basePanel();
+    panel.transformations = [{ id: 'organize', options: { excludeByName: {}, renameByName: { cpu: 'CPU' }, indexByName: { cpu: 2, mem: 1 } } }];
+    const onSave = vi.fn<(p: Panel) => void>();
+    renderEditor(panel, onSave);
+
+    const group = screen.getByRole('group', { name: 'Transformation 1' });
+    fireEvent.change(within(group).getByLabelText('Transformation 1 rename 1 new name'), { target: { value: 'CPU%' } });
+
+    fireEvent.click(screen.getByRole('button', { name: 'Apply' }));
+    expect(onSave.mock.calls[0]?.[0].transformations).toEqual([
+      { id: 'organize', options: { excludeByName: {}, renameByName: { cpu: 'CPU%' }, indexByName: { cpu: 2, mem: 1 } } },
+    ]);
+  });
+});
+
 const textPanel = (): Panel => ({ ...basePanel(), type: 'text', displayOptions: {} });
 
 describe('panel-editor text content', () => {

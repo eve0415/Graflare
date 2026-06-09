@@ -56,11 +56,23 @@ const populatedPanel = (): Panel => ({
       },
     ],
   },
-  transformations: [],
+  // A full transformation pipeline: every transform type at least once, plus a SECOND reduce so the
+  // index-based "Transformation N" group names (not type-based) are exercised against the collision
+  // axe would catch — two same-type cards, reused per-type controls (calc Select, organize's nested
+  // rename/exclude rows, the desc Checkbox), move-up/down + remove buttons must all keep unique
+  // accessible names and DOM ids. An empty list would pass trivially.
+  transformations: [
+    { id: 'reduce', options: { calc: 'mean' } },
+    { id: 'filterFieldsByName', options: { mode: 'exclude', match: 'byRegexp', value: '/cpu.*/' } },
+    { id: 'organize', options: { excludeByName: { mem: true }, renameByName: { cpu: 'CPU' }, indexByName: {} } },
+    { id: 'sortBy', options: { by: 'value', desc: true } },
+    { id: 'limit', options: { count: 5 } },
+    { id: 'reduce', options: { calc: 'last' } },
+  ],
 });
 
-describe('panel-editor field-overrides a11y', () => {
-  it('has no axe violations with multiple populated overrides (labelled controls, unique groups)', async () => {
+describe('panel-editor field-overrides + transformations a11y', () => {
+  it('has no axe violations with multiple populated overrides + a full transform pipeline (labelled controls, unique index-named groups)', async () => {
     const { container } = renderEditor(populatedPanel());
     await expectNoA11yViolations(container);
   });
