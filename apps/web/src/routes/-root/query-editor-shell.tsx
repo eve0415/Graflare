@@ -1,10 +1,12 @@
 import type { ReactNode } from 'react';
 
-import { Button } from '@graflare/ui/components/button';
+import { ToggleGroup, ToggleGroupItem } from '@graflare/ui/components/toggle-group';
 import { CodeIcon, LayoutListIcon } from 'lucide-react';
-import { useCallback } from 'react';
+import { useCallback, useMemo } from 'react';
 
 export type QueryEditorMode = 'builder' | 'code';
+
+const isQueryEditorMode = (value: string | undefined): value is QueryEditorMode => value === 'builder' || value === 'code';
 
 interface QueryEditorShellProps {
   mode: QueryEditorMode;
@@ -14,26 +16,31 @@ interface QueryEditorShellProps {
 }
 
 export const QueryEditorShell = ({ mode, onModeChange, preview, children }: QueryEditorShellProps) => {
-  const selectBuilder = useCallback(() => {
-    onModeChange('builder');
-  }, [onModeChange]);
+  const value = useMemo(() => [mode], [mode]);
 
-  const selectCode = useCallback(() => {
-    onModeChange('code');
-  }, [onModeChange]);
+  const handleModeChange = useCallback(
+    (values: string[]) => {
+      // Single-select, but Base UI hands back an array and lets the active item deselect to an
+      // empty array. The mode is required, so ignore an empty/invalid result and keep the
+      // current mode (the controlled `value` below holds it steady).
+      const [next] = values;
+      if (isQueryEditorMode(next)) onModeChange(next);
+    },
+    [onModeChange],
+  );
 
   return (
     <div className='flex flex-col gap-2'>
-      <div className='flex items-center gap-1' role='radiogroup' aria-label='Query editor mode'>
-        <Button variant={mode === 'builder' ? 'secondary' : 'ghost'} size='sm' aria-pressed={mode === 'builder'} onClick={selectBuilder}>
+      <ToggleGroup size='sm' value={value} onValueChange={handleModeChange} aria-label='Query editor mode'>
+        <ToggleGroupItem value='builder'>
           <LayoutListIcon data-icon='inline-start' />
           Builder
-        </Button>
-        <Button variant={mode === 'code' ? 'secondary' : 'ghost'} size='sm' aria-pressed={mode === 'code'} onClick={selectCode}>
+        </ToggleGroupItem>
+        <ToggleGroupItem value='code'>
           <CodeIcon data-icon='inline-start' />
           Code
-        </Button>
-      </div>
+        </ToggleGroupItem>
+      </ToggleGroup>
       {children}
       {mode === 'builder' && preview !== undefined && preview !== '' && (
         <pre className='bg-muted text-muted-foreground overflow-x-auto rounded-md p-3 font-mono text-xs leading-relaxed'>{preview}</pre>

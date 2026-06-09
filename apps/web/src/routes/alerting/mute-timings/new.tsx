@@ -2,6 +2,7 @@ import { Button } from '@graflare/ui/components/button';
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '@graflare/ui/components/card';
 import { Input } from '@graflare/ui/components/input';
 import { Label } from '@graflare/ui/components/label';
+import { ToggleGroup, ToggleGroupItem } from '@graflare/ui/components/toggle-group';
 import { createFileRoute, useNavigate } from '@tanstack/react-router';
 import { Plus, Trash2 } from 'lucide-react';
 import { useCallback, useMemo, useState } from 'react';
@@ -47,8 +48,8 @@ const IntervalEditor = ({
   onRemove,
   onStartTimeChange,
   onEndTimeChange,
-  onWeekdayToggle,
-  onMonthToggle,
+  onWeekdaysChange,
+  onMonthsChange,
 }: {
   index: number;
   interval: IntervalRow;
@@ -56,8 +57,8 @@ const IntervalEditor = ({
   onRemove: (index: number) => void;
   onStartTimeChange: (index: number, value: string) => void;
   onEndTimeChange: (index: number, value: string) => void;
-  onWeekdayToggle: (index: number, day: number) => void;
-  onMonthToggle: (index: number, month: number) => void;
+  onWeekdaysChange: (index: number, weekdays: number[]) => void;
+  onMonthsChange: (index: number, months: number[]) => void;
 }) => {
   const handleRemove = useCallback(() => {
     onRemove(index);
@@ -88,7 +89,7 @@ const IntervalEditor = ({
 
       <div className='space-y-2'>
         <Label className='text-xs'>Weekdays</Label>
-        <WeekdayPicker weekdays={interval.weekdays} intervalIndex={index} onToggle={onWeekdayToggle} />
+        <WeekdayPicker weekdays={interval.weekdays} intervalIndex={index} onChange={onWeekdaysChange} />
       </div>
 
       <div className='grid grid-cols-2 gap-3'>
@@ -108,57 +109,62 @@ const IntervalEditor = ({
 
       <div className='space-y-2'>
         <Label className='text-xs'>Months</Label>
-        <MonthPicker months={interval.months} intervalIndex={index} onToggle={onMonthToggle} />
+        <MonthPicker months={interval.months} intervalIndex={index} onChange={onMonthsChange} />
       </div>
     </div>
   );
 };
 
+// Base UI's ToggleGroup speaks string values; the form stores numeric weekday/month ids. Parse
+// the click-ordered string array back to numbers and re-sort ascending so the submitted payload
+// keeps its canonical order regardless of the order items were toggled.
+const toSortedNumbers = (values: string[]): number[] => values.map(Number).sort((a, b) => a - b);
+
 const WeekdayPicker = ({
   weekdays,
   intervalIndex,
-  onToggle,
+  onChange,
 }: {
   weekdays: number[];
   intervalIndex: number;
-  onToggle: (index: number, day: number) => void;
+  onChange: (index: number, weekdays: number[]) => void;
 }) => {
-  const handlers = useMemo(
-    () =>
-      WEEKDAYS.map(day => () => {
-        onToggle(intervalIndex, day.value);
-      }),
-    [intervalIndex, onToggle],
+  const handleChange = useCallback(
+    (values: string[]) => {
+      onChange(intervalIndex, toSortedNumbers(values));
+    },
+    [intervalIndex, onChange],
   );
+  const value = useMemo(() => weekdays.map(String), [weekdays]);
 
   return (
-    <div className='flex flex-wrap gap-1'>
-      {WEEKDAYS.map((day, i) => (
-        <Button key={day.value} type='button' variant={weekdays.includes(day.value) ? 'default' : 'outline'} size='xs' onClick={handlers[i]}>
+    <ToggleGroup multiple size='sm' value={value} onValueChange={handleChange} className='flex-wrap' aria-label='Weekdays'>
+      {WEEKDAYS.map(day => (
+        <ToggleGroupItem key={day.value} value={String(day.value)} variant='outline'>
           {day.label}
-        </Button>
+        </ToggleGroupItem>
       ))}
-    </div>
+    </ToggleGroup>
   );
 };
 
-const MonthPicker = ({ months, intervalIndex, onToggle }: { months: number[]; intervalIndex: number; onToggle: (index: number, month: number) => void }) => {
-  const handlers = useMemo(
-    () =>
-      MONTHS.map(month => () => {
-        onToggle(intervalIndex, month.value);
-      }),
-    [intervalIndex, onToggle],
+const MonthPicker = ({ months, intervalIndex, onChange }: { months: number[]; intervalIndex: number; onChange: (index: number, months: number[]) => void }) => {
+  const handleChange = useCallback(
+    (values: string[]) => {
+      onChange(intervalIndex, toSortedNumbers(values));
+    },
+    [intervalIndex, onChange],
   );
+  const value = useMemo(() => months.map(String), [months]);
 
   return (
-    <div className='flex flex-wrap gap-1'>
-      {MONTHS.map((month, i) => (
-        <Button key={month.value} type='button' variant={months.includes(month.value) ? 'default' : 'outline'} size='xs' onClick={handlers[i]}>
+    <ToggleGroup multiple size='sm' value={value} onValueChange={handleChange} className='flex-wrap' aria-label='Months'>
+      {MONTHS.map(month => (
+        <ToggleGroupItem key={month.value} value={String(month.value)} variant='outline'>
           {month.label}
-        </Button>
+        </ToggleGroupItem>
       ))}
-    </div>
+    </ToggleGroup>
   );
 };
 
@@ -231,25 +237,17 @@ const NewMuteTimingPage = () => {
     }));
   }, []);
 
-  const handleWeekdayToggle = useCallback((intervalIndex: number, day: number) => {
+  const handleWeekdaysChange = useCallback((intervalIndex: number, weekdays: number[]) => {
     setForm(prev => ({
       ...prev,
-      intervals: prev.intervals.map((interval, i) => {
-        if (i !== intervalIndex) return interval;
-        const has = interval.weekdays.includes(day);
-        return { ...interval, weekdays: has ? interval.weekdays.filter(d => d !== day) : [...interval.weekdays, day].sort((a, b) => a - b) };
-      }),
+      intervals: prev.intervals.map((interval, i) => (i === intervalIndex ? { ...interval, weekdays } : interval)),
     }));
   }, []);
 
-  const handleMonthToggle = useCallback((intervalIndex: number, month: number) => {
+  const handleMonthsChange = useCallback((intervalIndex: number, months: number[]) => {
     setForm(prev => ({
       ...prev,
-      intervals: prev.intervals.map((interval, i) => {
-        if (i !== intervalIndex) return interval;
-        const has = interval.months.includes(month);
-        return { ...interval, months: has ? interval.months.filter(m => m !== month) : [...interval.months, month].sort((a, b) => a - b) };
-      }),
+      intervals: prev.intervals.map((interval, i) => (i === intervalIndex ? { ...interval, months } : interval)),
     }));
   }, []);
 
@@ -287,8 +285,8 @@ const NewMuteTimingPage = () => {
                 onRemove={handleRemoveInterval}
                 onStartTimeChange={handleStartTimeChange}
                 onEndTimeChange={handleEndTimeChange}
-                onWeekdayToggle={handleWeekdayToggle}
-                onMonthToggle={handleMonthToggle}
+                onWeekdaysChange={handleWeekdaysChange}
+                onMonthsChange={handleMonthsChange}
               />
             ))}
           </div>
