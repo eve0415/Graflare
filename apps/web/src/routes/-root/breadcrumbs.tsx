@@ -27,7 +27,8 @@ export const Breadcrumbs = () => {
   if (trail.length === 0) return null;
 
   return (
-    <Breadcrumb>
+    // Override the primitive's lowercase default to the conventional capitalised label.
+    <Breadcrumb aria-label='Breadcrumb'>
       <BreadcrumbList>
         {trail.map((crumb, index) => {
           const isLast = index === trail.length - 1;
