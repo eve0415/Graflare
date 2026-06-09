@@ -86,14 +86,14 @@ describe('variable-form — per-type fields', () => {
     expect(screen.getByLabelText('Query')).toBeDefined();
     expect(screen.getByLabelText('Regex')).toBeDefined();
     expect(screen.getByLabelText('Sort')).toBeDefined();
-    expect(screen.getByLabelText('Multi-value')).toBeDefined();
-    expect(screen.getByLabelText('Include All option')).toBeDefined();
+    expect(screen.getByRole('checkbox', { name: 'Multi-value' })).toBeDefined();
+    expect(screen.getByRole('checkbox', { name: 'Include All option' })).toBeDefined();
   });
 
   it('custom type shows Values + checkboxes, not query/regex/sort', () => {
     renderForm(baseVariable({ type: 'custom' }));
     expect(screen.getByLabelText('Values')).toBeDefined();
-    expect(screen.getByLabelText('Multi-value')).toBeDefined();
+    expect(screen.getByRole('checkbox', { name: 'Multi-value' })).toBeDefined();
     expect(screen.queryByLabelText('Regex')).toBeNull();
     expect(screen.queryByLabelText('Sort')).toBeNull();
   });
@@ -120,7 +120,7 @@ describe('variable-form — per-type fields', () => {
   it('datasource type shows the type-filter field and a Multi-value checkbox', () => {
     renderForm(baseVariable({ type: 'datasource' }));
     expect(screen.getByLabelText('Data source type filter')).toBeDefined();
-    expect(screen.getByLabelText('Multi-value')).toBeDefined();
+    expect(screen.getByRole('checkbox', { name: 'Multi-value' })).toBeDefined();
     expect(screen.queryByLabelText('Include All option')).toBeNull();
   });
 });
@@ -210,7 +210,7 @@ describe('variable-form — field-to-schema mapping', () => {
   it('datasource type-filter maps to query and Multi-value toggles multi', () => {
     const { onSubmit } = renderForm(baseVariable({ name: 'src', type: 'datasource' }));
     fireEvent.change(screen.getByLabelText('Data source type filter'), { target: { value: 'prometheus' } });
-    fireEvent.click(screen.getByLabelText('Multi-value'));
+    fireEvent.click(screen.getByRole('checkbox', { name: 'Multi-value' }));
     submit();
     const emitted = firstSubmitArg(onSubmit);
     expect(emitted.query).toBe('prometheus');
@@ -221,7 +221,7 @@ describe('variable-form — field-to-schema mapping', () => {
     const { onSubmit } = renderForm(baseVariable({ name: 'inst', type: 'query' }));
     await selectOption('Data source', 'Prom A');
     fireEvent.change(screen.getByLabelText('Query'), { target: { value: 'label_values(up, instance)' } });
-    fireEvent.click(screen.getByLabelText('Include All option'));
+    fireEvent.click(screen.getByRole('checkbox', { name: 'Include All option' }));
     submit();
     const emitted = firstSubmitArg(onSubmit);
     expect(emitted.datasourceId).toBe(DS_PROM.id);

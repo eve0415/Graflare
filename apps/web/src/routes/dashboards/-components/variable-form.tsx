@@ -3,6 +3,7 @@ import type { NameError } from './variable-form-helpers';
 import type { Variable, VariableSort, VariableType } from '@graflare/shared/schemas/variable';
 
 import { Button } from '@graflare/ui/components/button';
+import { Checkbox } from '@graflare/ui/components/checkbox';
 import { Input } from '@graflare/ui/components/input';
 import { Label } from '@graflare/ui/components/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@graflare/ui/components/select';
@@ -144,15 +145,15 @@ export const VariableForm = ({ initial, existingNames, datasources, onSubmit, on
   }, []);
 
   const handleMultiChange = useCallback(
-    (e: React.ChangeEvent<HTMLInputElement>) => {
-      updateField('multi', e.currentTarget.checked);
+    (checked: boolean) => {
+      updateField('multi', checked);
     },
     [updateField],
   );
 
   const handleIncludeAllChange = useCallback(
-    (e: React.ChangeEvent<HTMLInputElement>) => {
-      updateField('includeAll', e.currentTarget.checked);
+    (checked: boolean) => {
+      updateField('includeAll', checked);
     },
     [updateField],
   );
@@ -328,17 +329,12 @@ export const VariableForm = ({ initial, existingNames, datasources, onSubmit, on
             <p className='text-muted-foreground text-xs'>Leave blank to list every data source.</p>
           </div>
 
-          <label htmlFor={multiId} className='flex cursor-pointer items-center gap-2 text-sm'>
-            <input
-              id={multiId}
-              type='checkbox'
-              checked={draft.multi}
-              onChange={handleMultiChange}
-              aria-label='Multi-value'
-              className='border-input text-primary focus-visible:ring-ring/30 size-4 rounded-sm border focus-visible:ring-3 focus-visible:outline-none'
-            />
-            <span className='text-muted-foreground'>Multi-value</span>
-          </label>
+          <div className='flex items-center gap-2'>
+            <Checkbox id={multiId} checked={draft.multi} onCheckedChange={handleMultiChange} aria-label='Multi-value' />
+            <Label htmlFor={multiId} className='text-muted-foreground cursor-pointer font-normal'>
+              Multi-value
+            </Label>
+          </div>
         </>
       )}
 
@@ -363,35 +359,26 @@ interface MultiAndIncludeAllProps {
   includeAll: boolean;
   multiId: string;
   includeAllId: string;
-  onMultiChange: (e: React.ChangeEvent<HTMLInputElement>) => void;
-  onIncludeAllChange: (e: React.ChangeEvent<HTMLInputElement>) => void;
+  onMultiChange: (checked: boolean) => void;
+  onIncludeAllChange: (checked: boolean) => void;
 }
 
-// The Multi-value + Include-All pair shared by the query and custom forms. Uses the native
-// checkbox + <label htmlFor> pattern (mirroring reveal-secret-panel) for a real labelled control.
+// The Multi-value + Include-All pair shared by the query and custom forms. Uses the Checkbox
+// component + sibling <Label htmlFor> pattern (mirroring notification-policy-form) for a real
+// labelled control.
 const MultiAndIncludeAll = ({ multi, includeAll, multiId, includeAllId, onMultiChange, onIncludeAllChange }: MultiAndIncludeAllProps) => (
   <div className='space-y-2'>
-    <label htmlFor={multiId} className='flex cursor-pointer items-center gap-2 text-sm'>
-      <input
-        id={multiId}
-        type='checkbox'
-        checked={multi}
-        onChange={onMultiChange}
-        aria-label='Multi-value'
-        className='border-input text-primary focus-visible:ring-ring/30 size-4 rounded-sm border focus-visible:ring-3 focus-visible:outline-none'
-      />
-      <span className='text-muted-foreground'>Multi-value</span>
-    </label>
-    <label htmlFor={includeAllId} className='flex cursor-pointer items-center gap-2 text-sm'>
-      <input
-        id={includeAllId}
-        type='checkbox'
-        checked={includeAll}
-        onChange={onIncludeAllChange}
-        aria-label='Include All option'
-        className='border-input text-primary focus-visible:ring-ring/30 size-4 rounded-sm border focus-visible:ring-3 focus-visible:outline-none'
-      />
-      <span className='text-muted-foreground'>Include All option</span>
-    </label>
+    <div className='flex items-center gap-2'>
+      <Checkbox id={multiId} checked={multi} onCheckedChange={onMultiChange} aria-label='Multi-value' />
+      <Label htmlFor={multiId} className='text-muted-foreground cursor-pointer font-normal'>
+        Multi-value
+      </Label>
+    </div>
+    <div className='flex items-center gap-2'>
+      <Checkbox id={includeAllId} checked={includeAll} onCheckedChange={onIncludeAllChange} aria-label='Include All option' />
+      <Label htmlFor={includeAllId} className='text-muted-foreground cursor-pointer font-normal'>
+        Include All option
+      </Label>
+    </div>
   </div>
 );

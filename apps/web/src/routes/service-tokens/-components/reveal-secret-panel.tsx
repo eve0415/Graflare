@@ -2,8 +2,10 @@ import type { ServiceTokenCreateResult } from '@graflare/shared/schemas/service-
 
 import { Alert, AlertDescription, AlertTitle } from '@graflare/ui/components/alert';
 import { Button } from '@graflare/ui/components/button';
+import { Checkbox } from '@graflare/ui/components/checkbox';
+import { Label } from '@graflare/ui/components/label';
 import { TriangleAlert } from 'lucide-react';
-import { useCallback, useEffect, useId, useRef, useState } from 'react';
+import { useEffect, useId, useRef, useState } from 'react';
 
 import { CopyField } from './copy-field';
 
@@ -34,10 +36,6 @@ export const RevealSecretPanel = ({ result, onDone }: RevealSecretPanelProps) =>
     warningRef.current?.focus();
   }, []);
 
-  const handleAckChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
-    setAcknowledged(e.currentTarget.checked);
-  }, []);
-
   return (
     <div className='space-y-4'>
       {/* Focus lands here on mount so screen readers start at the warning; the Alert's
@@ -58,17 +56,18 @@ export const RevealSecretPanel = ({ result, onDone }: RevealSecretPanelProps) =>
         <CopyField label='Client Secret' value={result.clientSecret} copyLabel='Copy Client Secret' mono />
       </div>
 
-      <label htmlFor={checkboxId} className='flex cursor-pointer items-start gap-2.5 text-sm'>
-        <input
+      <div className='flex items-start gap-2.5'>
+        <Checkbox
           id={checkboxId}
-          type='checkbox'
           checked={acknowledged}
-          onChange={handleAckChange}
+          onCheckedChange={setAcknowledged}
           aria-label='I’ve saved the client secret somewhere safe'
-          className='border-input text-primary focus-visible:ring-ring/30 mt-0.5 size-4 rounded-sm border focus-visible:ring-3 focus-visible:outline-none'
+          className='mt-0.5'
         />
-        <span className='text-muted-foreground'>I’ve saved the client secret somewhere safe.</span>
-      </label>
+        <Label htmlFor={checkboxId} className='text-muted-foreground cursor-pointer font-normal'>
+          I’ve saved the client secret somewhere safe.
+        </Label>
+      </div>
 
       <Button type='button' className='w-full' disabled={!acknowledged} onClick={onDone}>
         Done

@@ -3,6 +3,7 @@ import type { CreateNotificationPolicy, NotificationPolicy } from '@graflare/sha
 
 import { Button, buttonVariants } from '@graflare/ui/components/button';
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '@graflare/ui/components/card';
+import { Checkbox } from '@graflare/ui/components/checkbox';
 import { Input } from '@graflare/ui/components/input';
 import { Label } from '@graflare/ui/components/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@graflare/ui/components/select';
@@ -170,8 +171,8 @@ const MuteTimingCheckbox = ({
   onToggle: (id: string, checked: boolean) => void;
 }) => {
   const handleChange = useCallback(
-    (e: React.ChangeEvent<HTMLInputElement>) => {
-      onToggle(muteTiming.id, e.target.checked);
+    (next: boolean) => {
+      onToggle(muteTiming.id, next);
     },
     [muteTiming.id, onToggle],
   );
@@ -180,7 +181,7 @@ const MuteTimingCheckbox = ({
 
   return (
     <div className='flex items-center gap-2'>
-      <input type='checkbox' id={inputId} checked={checked} onChange={handleChange} aria-label={muteTiming.name} className='h-4 w-4' />
+      <Checkbox id={inputId} checked={checked} onCheckedChange={handleChange} aria-label={muteTiming.name} />
       <Label htmlFor={inputId} className='font-normal'>
         {muteTiming.name}
       </Label>
@@ -296,8 +297,7 @@ export const NotificationPolicyForm = ({ initialForm, submitLabel, contactPoints
     setForm(prev => ({ ...prev, repeatIntervalS: value }));
   }, []);
 
-  const handleContinueMatchingChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
-    const { checked } = e.target;
+  const handleContinueMatchingChange = useCallback((checked: boolean) => {
     setForm(prev => ({ ...prev, continueMatching: checked }));
   }, []);
 
@@ -410,13 +410,11 @@ export const NotificationPolicyForm = ({ initialForm, submitLabel, contactPoints
           </div>
 
           <div className='flex items-center gap-2'>
-            <input
-              type='checkbox'
+            <Checkbox
               id='continueMatching'
               checked={form.continueMatching}
-              onChange={handleContinueMatchingChange}
+              onCheckedChange={handleContinueMatchingChange}
               aria-label='Continue matching subsequent sibling policies'
-              className='h-4 w-4'
             />
             <Label htmlFor='continueMatching' className='font-normal'>
               Continue matching subsequent sibling policies
