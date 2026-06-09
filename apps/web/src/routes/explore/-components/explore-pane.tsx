@@ -1,6 +1,8 @@
 import type { QueryEditorMode } from '../../-root/query-editor-shell';
+import type { MergeInput, MergedChartData } from './explore-series-merge';
 import type { QueryHistoryEntry } from './query-history-store';
 import type { DatasourceDialect } from '@graflare/shared/schemas/datasource';
+import type { PrometheusData } from '@graflare/shared/schemas/prometheus';
 import type { SqlResponse } from '@graflare/shared/schemas/sql';
 import type { Options as UPlotOptions } from 'uplot';
 
@@ -10,7 +12,7 @@ import { Button } from '@graflare/ui/components/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@graflare/ui/components/select';
 import { Skeleton } from '@graflare/ui/components/skeleton';
 import { useQuery, useSuspenseQuery } from '@tanstack/react-query';
-import { BarChart3, History, Play, Table2 } from 'lucide-react';
+import { BarChart3, History, Play, Plus, Table2 } from 'lucide-react';
 import { Suspense, useCallback, useMemo, useState } from 'react';
 
 import { databaseSchemaQueryOptions } from '../../-root/introspection-queries';
@@ -21,6 +23,7 @@ import { sqlQuery } from '../../../lib/sql-proxy';
 import { datasourcesQueryOptions } from '../../datasources/-queries';
 
 import { ExploreQueryRow } from './explore-query-row';
+import { mergeSeries } from './explore-series-merge';
 import { QueryHistoryDrawer } from './query-history-drawer';
 import { useQueryHistory } from './use-query-history';
 
@@ -28,6 +31,8 @@ interface TimeRange {
   from: string;
   to: string;
 }
+
+type SqlFormat = 'time_series' | 'table';
 
 const SQL_FORMAT_OPTIONS = [
   { value: 'time_series', label: 'Time series' },
@@ -45,6 +50,7 @@ const VALID_DIALECTS = new Set<string>(['postgres', 'sqlite']);
 
 const isValidDialect = (value: string | null | undefined): value is DatasourceDialect => typeof value === 'string' && VALID_DIALECTS.has(value);
 
+/** Full parsed Prometheus matrix/vector series — carries `values` (range) and `value` (instant). */
 interface PrometheusSeries {
   metric: Record<string, string>;
   values?: [number, string][];
@@ -61,11 +67,61 @@ interface QueryRowEntry {
   seedMode?: QueryEditorMode;
 }
 
+/** One row's run outcome, discriminated so the post-run partition narrows without casts. */
+type RunOutcome =
+  | { kind: 'series'; refId: string; series: PrometheusSeries[] }
+  | { kind: 'table'; refId: string; result: SqlResponse }
+  | { kind: 'error'; refId: string; error: string };
+
+/** A successful SQL `table`-format result tagged with its row's ref id (stacked when >1). */
+interface TableResult {
+  refId: string;
+  result: SqlResponse;
+}
+
 /** Positional label for a row: A, B, C, … by index. */
 const refIdFor = (index: number): string => String.fromCodePoint(65 + index);
 
 const newRow = (seed?: { draft: string; mode: QueryEditorMode }): QueryRowEntry =>
-  seed === undefined ? { id: crypto.randomUUID(), query: '' } : { id: crypto.randomUUID(), query: '', seedDraft: seed.draft, seedMode: seed.mode };
+  seed === undefined ? { id: crypto.randomUUID(), query: '' } : { id: crypto.randomUUID(), query: seed.draft, seedDraft: seed.draft, seedMode: seed.mode };
+
+/**
+ * One SQL `table`-format result rendered as a table, optionally headed by its ref-id label
+ * (shown only when more than one query ran). A leaf so the table-data object is built here from
+ * the `result` prop rather than created inline in the parent's render map (react-perf).
+ */
+const StackedSqlTable = ({ refId, result, showLabel }: { refId: string; result: SqlResponse; showLabel: boolean }) => {
+  const data = useMemo(
+    () => ({
+      columns: result.columns.map(c => c.name),
+      rows: result.rows.map(row => row.map(v => (v === null ? '' : String(v)))),
+    }),
+    [result],
+  );
+  return (
+    <div className='space-y-1'>
+      {showLabel && <span className='text-muted-foreground text-xs font-medium'>Query {refId}</span>}
+      <QueryResultTable data={data} />
+    </div>
+  );
+};
+
+/** Pull the typed metric+sample series out of a Prometheus query-range/SQL-adapted response. */
+const parsePrometheusSeries = (data: PrometheusData | undefined): PrometheusSeries[] => {
+  if (data === undefined || !('resultType' in data) || !Array.isArray(data.result)) return [];
+  const parsed: PrometheusSeries[] = [];
+  for (const item of data.result) {
+    // `result` may be a bare scalar sample tuple ([number, string]); skip those — only metric
+    // series have a `metric`. matrix items carry `values`; vector items carry `value`.
+    if (typeof item !== 'object' || !('metric' in item)) continue;
+    if ('values' in item) {
+      parsed.push({ metric: item.metric, values: item.values });
+    } else {
+      parsed.push({ metric: item.metric, value: item.value });
+    }
+  }
+  return parsed;
+};
 
 export const ExplorePane = ({ timeRange, label }: ExplorePaneProps) => {
   const { data: datasources } = useSuspenseQuery(datasourcesQueryOptions());
@@ -75,9 +131,11 @@ export const ExplorePane = ({ timeRange, label }: ExplorePaneProps) => {
   const [rows, setRows] = useState<QueryRowEntry[]>(() => [newRow()]);
 
   const [resultView, setResultView] = useState<ResultView>('graph');
-  const [sqlFormat, setSqlFormat] = useState<'time_series' | 'table'>('time_series');
-  const [queryResult, setQueryResult] = useState<{ resultType: string; result: PrometheusSeries[] } | null>(null);
-  const [sqlTableResult, setSqlTableResult] = useState<SqlResponse | null>(null);
+  const [sqlFormat, setSqlFormat] = useState<SqlFormat>('time_series');
+  // Combined series across all run rows (graph + the prometheus-style table both derive from it).
+  const [seriesResult, setSeriesResult] = useState<PrometheusSeries[] | null>(null);
+  // SQL `table`-format results, one per run row (stacked in the table view).
+  const [tableResults, setTableResults] = useState<TableResult[] | null>(null);
   const [loading, setLoading] = useState(false);
   const [queryError, setQueryError] = useState<string | null>(null);
   const [historyOpen, setHistoryOpen] = useState(false);
@@ -102,94 +160,122 @@ export const ExplorePane = ({ timeRange, label }: ExplorePaneProps) => {
   }, [selectedDs?.dialect]);
 
   // A row reports its effective query here; we store it on the matching row by id. Functional
-  // update keeps this callback dependency-free so it never churns (react-perf) and the rows
-  // array identity stays stable across rows.
+  // update keeps this callback dependency-free so it never churns (react-perf) and one shared
+  // instance is passed to every row (no per-row closures in the render map).
   const handleRowChange = useCallback((id: string, query: string) => {
     setRows(prev => prev.map(r => (r.id === id ? { ...r, query } : r)));
   }, []);
 
-  // Core runner: takes the datasource/query/dialect explicitly so a history re-run can run a
-  // restored query without waiting for the state it just set (setState is async, so reading
-  // back in the same tick would be stale). History is recorded only on a successful run, tracked
-  // by a local `ok` flag — `queryError` is set inside this async closure and can't be read
-  // synchronously after it.
-  const runQuery = useCallback(
-    (args: { datasourceId: string; query: string; isSql: boolean }) => {
-      const { datasourceId: dsId, query, isSql: runIsSql } = args;
-      if (dsId === '' || query.trim() === '') return;
+  const handleRemoveRow = useCallback((id: string) => {
+    // Min one row; the remove affordance is hidden on the last row, but guard anyway.
+    setRows(prev => (prev.length <= 1 ? prev : prev.filter(r => r.id !== id)));
+  }, []);
+
+  const handleAddRow = useCallback(() => {
+    setRows(prev => [...prev, newRow()]);
+  }, []);
+
+  /** Run one row's query, returning a tagged outcome (never throws; errors are tagged). */
+  const runOne = useCallback(
+    async (refId: string, dsId: string, query: string, runIsSql: boolean, runSqlFormat: SqlFormat): Promise<RunOutcome> => {
+      try {
+        if (runIsSql) {
+          const result = await sqlQuery({
+            data: {
+              datasourceId: dsId,
+              rawSql: query,
+              format: runSqlFormat,
+              timeRange: { from: String(resolveTime(timeRange.from)), to: String(resolveTime(timeRange.to)) },
+            },
+          });
+          if (result.error !== undefined) return { kind: 'error', refId, error: result.error };
+          if (runSqlFormat === 'table') return { kind: 'table', refId, result };
+
+          const adapted = sqlRowsToSeries(result);
+          if (adapted.status === 'error') return { kind: 'error', refId, error: adapted.error ?? 'Failed to convert to series' };
+          return { kind: 'series', refId, series: parsePrometheusSeries(adapted.data) };
+        }
+
+        const step = computeStep(timeRange.from, timeRange.to);
+        const result = await proxyQuery({
+          data: {
+            datasourceId: dsId,
+            endpoint: '/api/v1/query_range',
+            params: { query, start: String(resolveTime(timeRange.from)), end: String(resolveTime(timeRange.to)), step },
+          },
+        });
+        if (result.status === 'error') return { kind: 'error', refId, error: result.error ?? 'Query failed' };
+        return { kind: 'series', refId, series: parsePrometheusSeries(result.data) };
+      } catch (error) {
+        return { kind: 'error', refId, error: error instanceof Error ? error.message : 'Query failed' };
+      }
+    },
+    [timeRange],
+  );
+
+  // The single run path for both the Run button and a history re-run, so the two can never
+  // drift. Queries are run CONCURRENTLY; each is tagged with its ref id. After all settle we do
+  // ONE commit: merged successes + a combined error listing any failed ref ids, so a partial
+  // failure still shows the rows that succeeded. History is recorded per successful query.
+  const runQueries = useCallback(
+    (args: { datasourceId: string; isSql: boolean; sqlFormat: SqlFormat; queries: { refId: string; query: string }[] }) => {
+      const { datasourceId: dsId, isSql: runIsSql, sqlFormat: runSqlFormat, queries } = args;
+      const runnable = queries.filter(q => q.query.trim() !== '');
+      if (dsId === '' || runnable.length === 0) return;
 
       const run = async () => {
         setLoading(true);
         setQueryError(null);
-        setQueryResult(null);
-        setSqlTableResult(null);
-        let ok = false;
+        setSeriesResult(null);
+        setTableResults(null);
 
         try {
-          if (runIsSql) {
-            const result = await sqlQuery({
-              data: {
-                datasourceId: dsId,
-                rawSql: query,
-                format: sqlFormat,
-                timeRange: {
-                  from: String(resolveTime(timeRange.from)),
-                  to: String(resolveTime(timeRange.to)),
-                },
-              },
-            });
+          const outcomes = await Promise.all(runnable.map(q => runOne(q.refId, dsId, q.query, runIsSql, runSqlFormat)));
 
-            if (result.error !== undefined) {
-              setQueryError(result.error);
-            } else if (sqlFormat === 'table') {
-              setSqlTableResult(result);
-              ok = true;
-            } else {
-              const adapted = sqlRowsToSeries(result);
-              if (adapted.status === 'error') {
-                setQueryError(adapted.error ?? 'Failed to convert to series');
-              } else if (adapted.data !== undefined && 'result' in adapted.data && Array.isArray(adapted.data.result)) {
-                const parsed: PrometheusSeries[] = [];
-                for (const item of adapted.data.result) {
-                  if (typeof item === 'object' && item !== null && 'metric' in item) {
-                    parsed.push(item);
-                  }
-                }
-                setQueryResult({ resultType: adapted.data.resultType, result: parsed });
-                ok = true;
-              }
-            }
-          } else {
-            const step = computeStep(timeRange.from, timeRange.to);
-            const result = await proxyQuery({
-              data: {
-                datasourceId: dsId,
-                endpoint: '/api/v1/query_range',
-                params: {
-                  query,
-                  start: String(resolveTime(timeRange.from)),
-                  end: String(resolveTime(timeRange.to)),
-                  step,
-                },
-              },
-            });
+          const combinedSeries: PrometheusSeries[] = [];
+          const tables: TableResult[] = [];
+          const failures: { refId: string; error: string }[] = [];
+          let successCount = 0;
 
-            if (result.status === 'error') {
-              setQueryError(result.error ?? 'Query failed');
-            } else if (result.data !== undefined && 'resultType' in result.data && Array.isArray(result.data.result)) {
-              const parsed: PrometheusSeries[] = [];
-              for (const item of result.data.result) {
-                if (typeof item === 'object' && item !== null && 'metric' in item) {
-                  parsed.push(item);
-                }
-              }
-              setQueryResult({ resultType: result.data.resultType, result: parsed });
-              ok = true;
+          for (const outcome of outcomes) {
+            switch (outcome.kind) {
+              case 'series':
+                // Tag each series with its ref id (reserved metric key) so the merge can group
+                // and label per query; the table strips it and only surfaces it when >1 query ran.
+                for (const s of outcome.series) combinedSeries.push({ ...s, metric: { __refId__: outcome.refId, ...s.metric } });
+                successCount++;
+                break;
+              case 'table':
+                tables.push({ refId: outcome.refId, result: outcome.result });
+                successCount++;
+                break;
+              case 'error':
+                failures.push({ refId: outcome.refId, error: outcome.error });
+                break;
             }
           }
 
-          if (ok) {
-            record({ datasourceId: dsId, datasourceType: runIsSql ? 'sql' : 'prometheus', query });
+          // Record each non-empty query that ran without erroring (table or series both count).
+          const failedSet = new Set(failures.map(f => f.refId));
+          for (const q of runnable) {
+            if (!failedSet.has(q.refId)) {
+              record({ datasourceId: dsId, datasourceType: runIsSql ? 'sql' : 'prometheus', query: q.query });
+            }
+          }
+
+          // Only render the result chrome when something succeeded, so an all-failed run shows the
+          // error alone (not an empty "0 series" header). Successes + a combined error coexist.
+          if (successCount > 0) {
+            if (runIsSql && runSqlFormat === 'table') {
+              setTableResults(tables);
+            } else {
+              setSeriesResult(combinedSeries);
+            }
+          }
+          if (failures.length > 0) {
+            // Keep each failure's real message (parse errors etc.) and prefix it with its ref id.
+            const sorted = [...failures].sort((a, b) => a.refId.localeCompare(b.refId));
+            setQueryError(sorted.map(f => `${f.refId}: ${f.error}`).join('; '));
           }
         } catch (error) {
           setQueryError(error instanceof Error ? error.message : 'Query failed');
@@ -199,28 +285,34 @@ export const ExplorePane = ({ timeRange, label }: ExplorePaneProps) => {
       };
       void run();
     },
-    [timeRange, sqlFormat, record],
+    [runOne, record],
   );
 
   const handleRun = useCallback(() => {
-    const [firstRow] = rows;
-    if (firstRow === undefined) return;
-    runQuery({ datasourceId, query: firstRow.query, isSql });
-  }, [runQuery, datasourceId, rows, isSql]);
+    runQueries({
+      datasourceId,
+      isSql,
+      sqlFormat,
+      queries: rows.map((r, i) => ({ refId: refIdFor(i), query: r.query })),
+    });
+  }, [runQueries, datasourceId, isSql, sqlFormat, rows]);
 
   const handleHistoryRun = useCallback(
     (entry: QueryHistoryEntry) => {
       const entryIsSql = entry.datasourceType === 'sql';
       // Restore the editor UI for display only; the run uses the entry's own values directly.
-      // Collapse to a single row remounted (fresh id) with the entry seeded into code mode.
+      // A history re-run collapses to a single row remounted (fresh id) with the entry seeded
+      // into code mode — the simplest correct behavior (it replaces, rather than appends to, the
+      // current rows). The run uses the entry's datasource/type explicitly to avoid reading the
+      // datasource state we just set (setState is async).
       if (datasources.some(d => d.id === entry.datasourceId)) {
         setDatasourceId(entry.datasourceId);
       }
       setRows([newRow({ draft: entry.query, mode: 'code' })]);
       setHistoryOpen(false);
-      runQuery({ datasourceId: entry.datasourceId, query: entry.query, isSql: entryIsSql });
+      runQueries({ datasourceId: entry.datasourceId, isSql: entryIsSql, sqlFormat, queries: [{ refId: refIdFor(0), query: entry.query }] });
     },
-    [runQuery, datasources],
+    [runQueries, datasources, sqlFormat],
   );
 
   const openHistory = useCallback(() => {
@@ -245,28 +337,32 @@ export const ExplorePane = ({ timeRange, label }: ExplorePaneProps) => {
     setResultView(v => (v === 'graph' ? 'table' : 'graph'));
   }, []);
 
-  const tableData = useMemo(() => {
-    if (sqlTableResult !== null) {
-      return {
-        columns: sqlTableResult.columns.map(c => c.name),
-        rows: sqlTableResult.rows.map(row => row.map(v => (v === null ? '' : String(v)))),
-      };
+  // Graph data + labels come from ONE merge pass so the stroke-series count can't drift from the
+  // value-array count. SQL-table results never reach here (they render as stacked tables).
+  const mergeInputs = useMemo((): MergeInput[] => {
+    if (seriesResult === null) return [];
+    // Group the flat combined series back by their ref id (carried on a reserved metric key).
+    const byRef = new Map<string, MergeInput>();
+    const order: string[] = [];
+    for (const s of seriesResult) {
+      const refId = s.metric.__refId__ ?? '';
+      let entry = byRef.get(refId);
+      if (entry === undefined) {
+        entry = { refId, series: [] };
+        byRef.set(refId, entry);
+        order.push(refId);
+      }
+      entry.series.push({ metric: s.metric, values: s.values });
     }
-    if (queryResult === null) return { columns: [], rows: [] };
-    return formatPrometheusToTable(queryResult.result);
-  }, [queryResult, sqlTableResult]);
+    return order.map(r => {
+      const entry = byRef.get(r);
+      return entry ?? { refId: r, series: [] };
+    });
+  }, [seriesResult]);
 
-  const chartData = useMemo((): [number[], ...number[][]] => {
-    if (queryResult === null || queryResult.result.length === 0) return [[]];
+  const merged = useMemo(() => mergeSeries(mergeInputs), [mergeInputs]);
 
-    const [firstSeries] = queryResult.result;
-    if (firstSeries?.values === undefined) return [[]];
-
-    const timestamps = firstSeries.values.map(v => v[0]);
-    const series = queryResult.result.map(r => (r.values ?? []).map(v => Number(v[1])));
-
-    return [timestamps, ...series];
-  }, [queryResult]);
+  const chartData = useMemo((): MergedChartData => merged.data, [merged]);
 
   const chartFallback = useMemo(() => <Skeleton className='h-72 w-full' />, []);
 
@@ -274,18 +370,45 @@ export const ExplorePane = ({ timeRange, label }: ExplorePaneProps) => {
     (): UPlotOptions => ({
       width: 800,
       height: 300,
-      series: [
-        {},
-        ...(queryResult?.result ?? []).map((r, i) => ({
-          label: r.metric.__name__ ?? `Series ${String(i + 1)}`,
-          stroke: `hsl(${String(i * 60)}, 70%, 50%)`,
-        })),
-      ],
+      series: [{}, ...merged.labels.map((labelText, i) => ({ label: labelText, stroke: `hsl(${String(i * 60)}, 70%, 50%)` }))],
     }),
-    [queryResult],
+    [merged],
   );
 
-  const [onlyRow] = rows;
+  // The table view. SQL-table results stack one table per ref id; otherwise the combined series
+  // feed the existing prometheus formatter. The ref-id `Query` column appears only when more than
+  // one query contributed, so a single query's table is byte-identical to the old behavior.
+  const seriesTableData = useMemo(() => {
+    if (seriesResult === null) return { columns: [], rows: [] };
+    const refIds = new Set<string>();
+    for (const s of seriesResult) refIds.add(s.metric.__refId__ ?? '');
+    const multi = refIds.size > 1;
+    // Strip the reserved key; only surface a `Query` column when >1 query contributed.
+    const forTable: PrometheusSeries[] = seriesResult.map(s => {
+      const metric: Record<string, string> = {};
+      if (multi) metric.Query = s.metric.__refId__ ?? '';
+      for (const [k, v] of Object.entries(s.metric)) {
+        if (k !== '__refId__') metric[k] = v;
+      }
+      const out: PrometheusSeries = { metric };
+      if (s.values !== undefined) out.values = s.values;
+      if (s.value !== undefined) out.value = s.value;
+      return out;
+    });
+    return formatPrometheusToTable(forTable);
+  }, [seriesResult]);
+
+  const hasResults = seriesResult !== null || tableResults !== null;
+  const resultCount = useMemo(() => {
+    if (tableResults !== null) {
+      let total = 0;
+      for (const t of tableResults) total += t.result.rows.length;
+      return total;
+    }
+    return seriesResult?.length ?? 0;
+  }, [seriesResult, tableResults]);
+
+  const canRemove = rows.length > 1;
 
   return (
     <div className='space-y-3' aria-label={label}>
@@ -328,21 +451,36 @@ export const ExplorePane = ({ timeRange, label }: ExplorePaneProps) => {
         </Button>
       </div>
 
-      {onlyRow !== undefined && (
-        <ExploreQueryRow
-          key={onlyRow.id}
-          id={onlyRow.id}
-          refId={refIdFor(0)}
-          datasourceId={datasourceId}
-          isSql={isSql}
-          dialect={selectedDialect}
-          schema={codeEditorSchema}
-          initialDraft={onlyRow.seedDraft}
-          initialMode={onlyRow.seedMode}
-          onChange={handleRowChange}
-          onRun={handleRun}
-        />
-      )}
+      <div className='space-y-2'>
+        {rows.map((row, i) => (
+          <ExploreQueryRow
+            key={row.id}
+            id={row.id}
+            refId={refIdFor(i)}
+            datasourceId={datasourceId}
+            isSql={isSql}
+            dialect={selectedDialect}
+            schema={codeEditorSchema}
+            initialDraft={row.seedDraft}
+            initialMode={row.seedMode}
+            onChange={handleRowChange}
+            onRun={handleRun}
+            onRemove={canRemove ? handleRemoveRow : undefined}
+          />
+        ))}
+
+        <Button
+          variant='ghost'
+          size='sm'
+          className='border-border/60 text-muted-foreground hover:text-foreground w-full justify-center border border-dashed'
+          onClick={handleAddRow}
+          disabled={datasourceId === ''}
+          aria-label='Add query'
+        >
+          <Plus data-icon='inline-start' />
+          Add query
+        </Button>
+      </div>
 
       <QueryHistoryDrawer
         open={historyOpen}
@@ -364,24 +502,32 @@ export const ExplorePane = ({ timeRange, label }: ExplorePaneProps) => {
 
       {loading && <Skeleton className='h-64 w-full' />}
 
-      {(queryResult !== null || sqlTableResult !== null) && !loading && (
+      {hasResults && !loading && (
         <div className='space-y-2'>
           <div className='flex items-center gap-2'>
             <Button variant='ghost' size='xs' onClick={toggleView} aria-label={`Switch to ${resultView === 'graph' ? 'table' : 'graph'} view`}>
               {resultView === 'graph' ? <Table2 className='h-4 w-4' /> : <BarChart3 className='h-4 w-4' />}
             </Button>
             <span className='text-muted-foreground text-xs'>
-              {sqlTableResult === null ? `${String(queryResult?.result.length ?? 0)} series` : `${String(sqlTableResult.rows.length)} rows`}, {resultView} view
+              {tableResults === null ? `${String(resultCount)} series` : `${String(resultCount)} rows`}, {resultView} view
             </span>
           </div>
 
-          {resultView === 'graph' && chartData[0] !== undefined && chartData[0].length > 0 && (
+          {resultView === 'graph' && tableResults === null && chartData[0] !== undefined && chartData[0].length > 0 && (
             <Suspense fallback={chartFallback}>
               <UPlotChart options={chartOptions} data={chartData} className='w-full' />
             </Suspense>
           )}
 
-          {resultView === 'table' && <QueryResultTable data={tableData} />}
+          {resultView === 'graph' && tableResults !== null && (
+            <p className='text-muted-foreground text-sm'>Table format has no graph view. Switch the result view to see the rows.</p>
+          )}
+
+          {resultView === 'table' && tableResults === null && <QueryResultTable data={seriesTableData} />}
+
+          {resultView === 'table' &&
+            tableResults !== null &&
+            tableResults.map(t => <StackedSqlTable key={t.refId} refId={t.refId} result={t.result} showLabel={tableResults.length > 1} />)}
         </div>
       )}
     </div>

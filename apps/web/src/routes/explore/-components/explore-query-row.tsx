@@ -127,41 +127,49 @@ export const ExploreQueryRow = ({ id, refId, datasourceId, isSql, dialect, schem
   }, [onRemove, id]);
 
   return (
-    <div className='border-border/60 bg-card/40 rounded-lg border p-3' aria-label={`Query ${refId}`}>
-      <div className='mb-2 flex items-center gap-2'>
+    <fieldset className='border-border/60 bg-card/40 m-0 flex min-w-0 gap-3 rounded-lg border p-3 pl-2.5' aria-label={`Query ${refId}`}>
+      {/* refId rail — a narrow left gutter so stacked rows read A / B / C at a glance. */}
+      <div className='border-border/60 flex shrink-0 flex-col items-center gap-2 border-r pr-2.5'>
         <span
-          className='bg-muted text-muted-foreground flex h-6 w-6 shrink-0 items-center justify-center rounded-md font-mono text-xs font-medium'
+          className='bg-muted text-foreground flex h-7 w-7 items-center justify-center rounded-md font-mono text-sm font-semibold tabular-nums'
           aria-hidden='true'
         >
           {refId}
         </span>
-        <div className='flex-1' />
         {onRemove !== undefined && (
-          <Button variant='ghost' size='icon-sm' onClick={handleRemove} aria-label={`Remove query ${refId}`}>
-            <XIcon className='h-4 w-4' />
+          <Button
+            variant='ghost'
+            size='icon-sm'
+            className='text-muted-foreground hover:text-destructive'
+            onClick={handleRemove}
+            aria-label={`Remove query ${refId}`}
+          >
+            <XIcon />
           </Button>
         )}
       </div>
 
-      <QueryEditorShell mode={mode} onModeChange={handleModeChange} preview={builderPreview === '' ? undefined : builderPreview}>
-        {mode === 'builder' ? (
-          isSql ? (
-            <SqlBuilder datasourceId={datasourceId} state={sqlBuilderState} onStateChange={handleSqlStateChange} />
+      <div className='min-w-0 flex-1'>
+        <QueryEditorShell mode={mode} onModeChange={handleModeChange} preview={builderPreview === '' ? undefined : builderPreview}>
+          {mode === 'builder' ? (
+            isSql ? (
+              <SqlBuilder datasourceId={datasourceId} state={sqlBuilderState} onStateChange={handleSqlStateChange} />
+            ) : (
+              <PromqlBuilder datasourceId={datasourceId} state={promqlBuilderState} dispatch={handlePromqlDispatch} />
+            )
           ) : (
-            <PromqlBuilder datasourceId={datasourceId} state={promqlBuilderState} dispatch={handlePromqlDispatch} />
-          )
-        ) : (
-          <QueryCodeEditor
-            datasourceType={isSql ? 'sql' : 'prometheus'}
-            {...(dialect === undefined ? {} : { dialect })}
-            {...(schema === undefined ? {} : { schema })}
-            value={codeDraft}
-            onChange={handleCodeChange}
-            onRun={onRun}
-            placeholder={isSql ? 'Enter a SQL query...' : 'Enter a PromQL query...'}
-          />
-        )}
-      </QueryEditorShell>
+            <QueryCodeEditor
+              datasourceType={isSql ? 'sql' : 'prometheus'}
+              {...(dialect === undefined ? {} : { dialect })}
+              {...(schema === undefined ? {} : { schema })}
+              value={codeDraft}
+              onChange={handleCodeChange}
+              onRun={onRun}
+              placeholder={isSql ? 'Enter a SQL query...' : 'Enter a PromQL query...'}
+            />
+          )}
+        </QueryEditorShell>
+      </div>
 
       <Dialog open={confirmReset} onOpenChange={setConfirmReset}>
         <DialogContent>
@@ -173,6 +181,6 @@ export const ExploreQueryRow = ({ id, refId, datasourceId, isSql, dialect, schem
           </DialogFooter>
         </DialogContent>
       </Dialog>
-    </div>
+    </fieldset>
   );
 };
