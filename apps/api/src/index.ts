@@ -1,4 +1,5 @@
 import type { AlertRuleDO } from './alerting/alert-rule-do';
+import type { ServiceTokenClient } from './cloudflare/access-service-tokens';
 import type { AlertInstanceListQuery, UpsertAlertInstance } from '@graflare/shared/schemas/alert-instance';
 import type { CreateAlertRule, UpdateAlertRule } from '@graflare/shared/schemas/alert-rule';
 import type { CreateAlertRuleGroup, UpdateAlertRuleGroup } from '@graflare/shared/schemas/alert-rule-group';
@@ -18,6 +19,7 @@ import type {
 import type { CreateMuteTiming, UpdateMuteTiming } from '@graflare/shared/schemas/mute-timing';
 import type { CreateNotificationPolicy, UpdateNotificationPolicy } from '@graflare/shared/schemas/notification-policy';
 import type { PrometheusResponse } from '@graflare/shared/schemas/prometheus';
+import type { CreateServiceToken, ServiceTokenCreateResult, ServiceTokenMetadata } from '@graflare/shared/schemas/service-token';
 import type { CreateSilence, UpdateSilence } from '@graflare/shared/schemas/silence';
 import type { SqlFormat, SqlResponse } from '@graflare/shared/schemas/sql';
 
@@ -45,6 +47,7 @@ import {
 import { createMuteTimingSchema, updateMuteTimingSchema } from '@graflare/shared/schemas/mute-timing';
 import { createNotificationPolicySchema, updateNotificationPolicySchema } from '@graflare/shared/schemas/notification-policy';
 import { prometheusResponseSchema } from '@graflare/shared/schemas/prometheus';
+import { createServiceTokenSchema, serviceTokenIdParamSchema } from '@graflare/shared/schemas/service-token';
 import { createSilenceSchema, updateSilenceSchema } from '@graflare/shared/schemas/silence';
 import { expandSqlMacros } from '@graflare/shared/sql/macros';
 import { resolveTime } from '@graflare/shared/time/resolve';
@@ -54,9 +57,11 @@ import { Hono } from 'hono';
 
 import { encryptSecret, redactSecret, resolveSecretOnUpdate } from './alerting/contact-point-secrets';
 import { CacheApiStore, cachedProxyQuery } from './cache/query-cache';
+import { createServiceTokenClient } from './cloudflare/access-service-tokens';
 import { decryptCredentials, encryptCredentials } from './crypto/credentials';
 import { createDb } from './db';
 import {
+  accessServiceTokens,
   alertInstances,
   alertRuleGroups,
   alertRules,
@@ -89,6 +94,7 @@ import { datasourceRoutes } from './routes/datasources/datasources';
 import { datasourceTestRoutes } from './routes/datasources/datasources-test';
 import { proxyRoutes } from './routes/datasources/proxy';
 import { folderRoutes } from './routes/folders/folders';
+import { serviceTokenRoutes } from './routes/service-tokens/service-tokens';
 import { slugify } from './slugify';
 import { SqlClient } from './sql/client';
 import { createSqlClient } from './sql/factory';
@@ -104,6 +110,10 @@ interface Bindings {
   NOTIFICATION_WORKFLOW: Workflow;
   EMAIL: SendEmail;
   BRIDGE?: Fetcher;
+  // Maintainer-provisioned secrets (set via `wrangler secret put`). Used to drive
+  // the Cloudflare API for Access service tokens. Never log CF_API_TOKEN.
+  CF_API_TOKEN: string;
+  CF_ACCOUNT_ID: string;
 }
 
 export interface AppEnv {
@@ -135,6 +145,7 @@ app.route('/api/v1/notification-policies', notificationPolicyRoutes);
 app.route('/api/v1/silences', silenceRoutes);
 app.route('/api/v1/mute-timings', muteTimingRoutes);
 app.route('/api/v1/annotations', annotationRoutes);
+app.route('/api/v1/service-tokens', serviceTokenRoutes);
 
 export default app;
 
@@ -148,6 +159,16 @@ export class GraflareAPI extends WorkerEntrypoint<Bindings> {
       return this.env.BRIDGE.fetch.bind(this.env.BRIDGE);
     }
     return fetch;
+  }
+
+  /**
+   * The Cloudflare Access service-token client, bound to this worker's
+   * maintainer-provisioned credentials. Exposed as a method so tests can
+   * substitute a fake (the real one calls api.cloudflare.com, which the test
+   * isolate can't reach).
+   */
+  serviceTokens(): ServiceTokenClient {
+    return createServiceTokenClient({ apiToken: this.env.CF_API_TOKEN, accountId: this.env.CF_ACCOUNT_ID });
   }
 
   private async resolveAuth(jwt: string): Promise<{ orgId: string; email: string }> {
@@ -1829,6 +1850,96 @@ export class GraflareAPI extends WorkerEntrypoint<Bindings> {
     } catch (error) {
       console.error('deleteAnnotation failed:', error);
       throw new Error('Failed to delete annotation', { cause: error });
+    }
+  }
+
+  // --- Access Service Token RPC ---
+  //
+  // Cloudflare creates and validates the secret; we persist only the public
+  // link (org → client_id + cf token id). The `client_secret` is surfaced to the
+  // caller exactly once, by createServiceToken, and is never stored or re-read.
+
+  async listServiceTokens(jwt: string): Promise<ServiceTokenMetadata[]> {
+    const { orgId } = await this.resolveAuth(jwt);
+    const rows = await this.db
+      .select({
+        id: accessServiceTokens.id,
+        clientId: accessServiceTokens.clientId,
+        name: accessServiceTokens.name,
+        createdAt: accessServiceTokens.createdAt,
+        expiresAt: accessServiceTokens.expiresAt,
+      })
+      .from(accessServiceTokens)
+      .where(eq(accessServiceTokens.orgId, orgId));
+
+    // timestamp_ms columns come back as Date; the metadata contract is epoch ms.
+    return rows.map(row => ({
+      id: row.id,
+      clientId: row.clientId,
+      name: row.name,
+      createdAt: row.createdAt.getTime(),
+      expiresAt: row.expiresAt === null ? null : row.expiresAt.getTime(),
+    }));
+  }
+
+  async createServiceToken(jwt: string, input: CreateServiceToken): Promise<ServiceTokenCreateResult> {
+    const { orgId } = await this.resolveAuth(jwt);
+    const parsed = createServiceTokenSchema.parse(input);
+
+    const created = await this.serviceTokens().create(parsed);
+
+    const id = crypto.randomUUID();
+    const createdAt = new Date();
+    const expiresAt = created.expires_at === undefined ? null : new Date(created.expires_at);
+
+    try {
+      await this.db.insert(accessServiceTokens).values({
+        id,
+        orgId,
+        cfTokenId: created.id,
+        clientId: created.client_id,
+        name: created.name,
+        createdAt,
+        expiresAt,
+      });
+    } catch (error) {
+      console.error('createServiceToken failed:', error);
+      throw new Error('Failed to create service token', { cause: error });
+    }
+
+    // The secret is returned ONCE here and never persisted.
+    return {
+      id,
+      clientId: created.client_id,
+      name: created.name,
+      createdAt: createdAt.getTime(),
+      expiresAt: expiresAt === null ? null : expiresAt.getTime(),
+      clientSecret: created.client_secret,
+    };
+  }
+
+  async revokeServiceToken(jwt: string, id: string): Promise<void> {
+    const { orgId } = await this.resolveAuth(jwt);
+    serviceTokenIdParamSchema.parse({ id });
+
+    const rows = await this.db
+      .select({ cfTokenId: accessServiceTokens.cfTokenId })
+      .from(accessServiceTokens)
+      .where(and(eq(accessServiceTokens.id, id), eq(accessServiceTokens.orgId, orgId)))
+      .limit(1);
+
+    const [row] = rows;
+    if (row === undefined) {
+      // Not found for this org — no cross-org revoke, no Cloudflare call.
+      return;
+    }
+
+    try {
+      await this.serviceTokens().delete(row.cfTokenId);
+      await this.db.delete(accessServiceTokens).where(and(eq(accessServiceTokens.id, id), eq(accessServiceTokens.orgId, orgId)));
+    } catch (error) {
+      console.error('revokeServiceToken failed:', error);
+      throw new Error('Failed to revoke service token', { cause: error });
     }
   }
 }
