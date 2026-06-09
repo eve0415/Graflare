@@ -595,23 +595,58 @@ describe('importClassic', () => {
       expect(result.dashboard.variables[0]?.type).toBe('constant');
     });
 
-    it('maps other variable types to "custom"', () => {
+    it('maps interval-type variable, deriving choices from the comma-separated query', () => {
       const result = importClassic({
         ...minimalDashboard,
-        templating: {
-          list: [
-            {
-              name: 'interval',
-              type: 'interval',
-              query: '1m,5m,15m',
-              current: { value: '5m' },
-              options: [],
-            },
-          ],
-        },
+        templating: { list: [{ name: 'step', type: 'interval', query: '1m,5m,15m', current: { value: '5m' }, options: [] }] },
+      });
+
+      const [v] = result.dashboard.variables;
+      expect(v?.type).toBe('interval');
+      expect(v?.options).toEqual(['1m', '5m', '15m']);
+      expect(v?.current).toBe('5m');
+    });
+
+    it('maps interval-type variable from enumerated options when present', () => {
+      const result = importClassic({
+        ...minimalDashboard,
+        templating: { list: [{ name: 'step', type: 'interval', query: '', current: { value: '10m' }, options: [{ value: '10m' }, { value: '30m' }] }] },
+      });
+
+      expect(result.dashboard.variables[0]?.options).toEqual(['10m', '30m']);
+    });
+
+    it('maps textbox-type variable', () => {
+      const result = importClassic({
+        ...minimalDashboard,
+        templating: { list: [{ name: 'search', type: 'textbox', query: 'default-text', current: { value: 'current-text' }, options: [] }] },
+      });
+
+      const [v] = result.dashboard.variables;
+      expect(v?.type).toBe('textbox');
+      expect(v?.query).toBe('default-text');
+      expect(v?.current).toBe('current-text');
+    });
+
+    it('maps datasource-type variable, keeping the type filter in query', () => {
+      const result = importClassic({
+        ...minimalDashboard,
+        templating: { list: [{ name: 'ds', type: 'datasource', query: 'prometheus', current: { value: '' }, options: [] }] },
+      });
+
+      const [v] = result.dashboard.variables;
+      expect(v?.type).toBe('datasource');
+      expect(v?.query).toBe('prometheus');
+    });
+
+    it('maps an unsupported type (adhoc) to custom and warns', () => {
+      const result = importClassic({
+        ...minimalDashboard,
+        templating: { list: [{ name: 'filters', type: 'adhoc', query: '', current: { value: '' }, options: [] }] },
       });
 
       expect(result.dashboard.variables[0]?.type).toBe('custom');
+      expect(result.warnings.some(w => w.includes('adhoc'))).toBe(true);
     });
 
     it('skips variables with empty name', () => {

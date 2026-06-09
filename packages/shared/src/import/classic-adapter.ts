@@ -6,6 +6,8 @@ import type { ImportResult } from './types';
 
 import { grafanaClassicSchema } from '../schemas/grafana-classic';
 
+import { resolveVariableType, splitCsv } from './variable-mapping';
+
 const PANEL_TYPE_MAP: Record<string, string> = {
   graph: 'timeseries',
   timeseries: 'timeseries',
@@ -65,15 +67,17 @@ const mapThresholds = (fc: GrafanaPanel['fieldConfig']) =>
     color: s.color,
   }));
 
-const mapVariable = (v: GrafanaVariable): Variable | null => {
+const mapVariable = (v: GrafanaVariable, warnings: string[]): Variable | null => {
   if (v.name === '') return null;
 
-  let type: 'query' | 'custom' | 'constant' = 'custom';
-  if (v.type === 'query') type = 'query';
-  else if (v.type === 'constant') type = 'constant';
+  const type = resolveVariableType(v.type, v.name, warnings);
 
   const query = typeof v.query === 'string' ? v.query : '';
   const currentValue = typeof v.current.value === 'string' ? v.current.value : Array.isArray(v.current.value) ? v.current.value.join(',') : '';
+  const enumerated = v.options.map(o => o.value);
+  // Grafana interval variables list their steps in the comma-separated `query`;
+  // fall back to that when `options` isn't enumerated so the choices survive import.
+  const options = type === 'interval' && enumerated.length === 0 ? splitCsv(query) : enumerated;
 
   return {
     name: v.name,
@@ -85,7 +89,7 @@ const mapVariable = (v: GrafanaVariable): Variable | null => {
     multi: v.multi,
     includeAll: v.includeAll,
     current: currentValue,
-    options: v.options.map(o => o.value),
+    options,
   };
 };
 
@@ -168,7 +172,7 @@ export const importClassic = (json: Record<string, unknown>): ImportResult => {
 
   const variables: Variable[] = [];
   for (const v of d.templating.list) {
-    const mapped = mapVariable(v);
+    const mapped = mapVariable(v, warnings);
     if (mapped !== null) variables.push(mapped);
   }
 

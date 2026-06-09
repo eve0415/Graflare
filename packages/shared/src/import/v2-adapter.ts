@@ -6,6 +6,8 @@ import type { ImportResult } from './types';
 
 import { grafanaV2Schema } from '../schemas/grafana-v2';
 
+import { resolveVariableType, splitCsv } from './variable-mapping';
+
 // Grafana V2 element kinds whose lowercased name differs from our internal panel
 // type. Identity is assumed for the rest (e.g. `barchart` → `barchart`), so only the
 // exceptions live here, mirroring the classic adapter's PANEL_TYPE_MAP.
@@ -47,12 +49,13 @@ const mapV2Queries = (el: V2Element): PanelQuery[] =>
     format: 'time_series',
   }));
 
-const mapV2Variable = (v: V2Variable): Variable | null => {
+const mapV2Variable = (v: V2Variable, warnings: string[]): Variable | null => {
   if (v.name === '') return null;
 
-  let type: 'query' | 'custom' | 'constant' = 'custom';
-  if (v.type === 'query') type = 'query';
-  else if (v.type === 'constant') type = 'constant';
+  const type = resolveVariableType(v.type, v.name, warnings);
+  // V2 variables carry no enumerated options, so interval steps come from the
+  // comma-separated query.
+  const options = type === 'interval' ? splitCsv(v.query) : [];
 
   return {
     name: v.name,
@@ -64,7 +67,7 @@ const mapV2Variable = (v: V2Variable): Variable | null => {
     multi: v.multi,
     includeAll: v.includeAll,
     current: '',
-    options: [],
+    options,
   };
 };
 
@@ -150,7 +153,7 @@ export const importV2 = (json: Record<string, unknown>): ImportResult => {
 
   const variables: Variable[] = [];
   for (const v of spec.variables) {
-    const mapped = mapV2Variable(v);
+    const mapped = mapV2Variable(v, warnings);
     if (mapped !== null) variables.push(mapped);
   }
 

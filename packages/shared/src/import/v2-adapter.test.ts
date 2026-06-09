@@ -483,23 +483,45 @@ describe('importV2', () => {
       expect(result.dashboard.variables[0]?.type).toBe('constant');
     });
 
-    it('maps other types to custom', () => {
+    it('maps interval-type variable, deriving steps from the query', () => {
       const result = importV2({
         ...validV2Dashboard,
-        spec: {
-          ...validV2Dashboard.spec,
-          variables: [
-            {
-              name: 'interval',
-              type: 'interval',
-              label: 'Interval',
-              query: '1m,5m',
-            },
-          ],
-        },
+        spec: { ...validV2Dashboard.spec, variables: [{ name: 'step', type: 'interval', label: 'Step', query: '1m,5m' }] },
+      });
+
+      const [v] = result.dashboard.variables;
+      expect(v?.type).toBe('interval');
+      expect(v?.options).toEqual(['1m', '5m']);
+    });
+
+    it('maps textbox-type variable', () => {
+      const result = importV2({
+        ...validV2Dashboard,
+        spec: { ...validV2Dashboard.spec, variables: [{ name: 'search', type: 'textbox', query: 'default-text' }] },
+      });
+
+      const [v] = result.dashboard.variables;
+      expect(v?.type).toBe('textbox');
+      expect(v?.query).toBe('default-text');
+    });
+
+    it('maps datasource-type variable', () => {
+      const result = importV2({
+        ...validV2Dashboard,
+        spec: { ...validV2Dashboard.spec, variables: [{ name: 'ds', type: 'datasource', query: 'prometheus' }] },
+      });
+
+      expect(result.dashboard.variables[0]?.type).toBe('datasource');
+    });
+
+    it('maps an unsupported type (adhoc) to custom and warns', () => {
+      const result = importV2({
+        ...validV2Dashboard,
+        spec: { ...validV2Dashboard.spec, variables: [{ name: 'filters', type: 'adhoc', query: '' }] },
       });
 
       expect(result.dashboard.variables[0]?.type).toBe('custom');
+      expect(result.warnings.some(w => w.includes('adhoc'))).toBe(true);
     });
 
     it('skips variables with empty name', () => {
