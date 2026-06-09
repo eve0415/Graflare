@@ -11,6 +11,8 @@ import { dashboardsQueryOptions } from '../dashboards/-queries';
 
 import { assembleCommands } from './command-data';
 import { rankCommands } from './command-filter';
+import { useTheme } from './theme-provider';
+import { useRecentDashboards } from './use-recent-dashboards';
 
 // Stable so it isn't recreated per render (react-perf): how Base UI stringifies a command
 // value for its input/announce text.
@@ -55,8 +57,16 @@ export interface CommandPaletteProps {
  */
 export const CommandPalette = ({ open, onOpenChange }: CommandPaletteProps) => {
   const navigate = useNavigate();
+  const { resolved, setTheme } = useTheme();
+  const { recents } = useRecentDashboards();
   const [query, setQuery] = useState('');
   const inputRef = useRef<HTMLInputElement>(null);
+
+  // `setTheme` accepts 'system' | 'light' | 'dark'; toggling off `resolved` (the concrete
+  // applied theme) flips between explicit light and dark regardless of a 'system' setting.
+  const toggleTheme = useCallback(() => {
+    setTheme(resolved === 'dark' ? 'light' : 'dark');
+  }, [resolved, setTheme]);
 
   // Only fetch dashboards while the palette is open — it lives on every route, so an
   // unconditional fetch would hit the server fn on every page load.
@@ -83,7 +93,10 @@ export const CommandPalette = ({ open, onOpenChange }: CommandPaletteProps) => {
     { preventDefault: true, ignoreInputs: false },
   );
 
-  const commands = useMemo(() => assembleCommands({ navigate, dashboards: dashboards ?? [] }), [navigate, dashboards]);
+  const commands = useMemo(
+    () => assembleCommands({ navigate, dashboards: dashboards ?? [], recents, toggleTheme }),
+    [navigate, dashboards, recents, toggleTheme],
+  );
   const groups = useMemo(() => rankCommands(query, commands), [query, commands]);
 
   const select = useCallback(

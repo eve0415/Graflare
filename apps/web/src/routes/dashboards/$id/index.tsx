@@ -10,7 +10,7 @@ import { Button } from '@graflare/ui/components/button';
 import { useQuery, useQueryClient, useSuspenseQuery } from '@tanstack/react-query';
 import { createFileRoute } from '@tanstack/react-router';
 import { Plus } from 'lucide-react';
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 
 import { updateDashboard } from '../-api';
 import { AnnotationsDialog } from '../-components/annotations-dialog';
@@ -23,6 +23,7 @@ import { PanelActionsProvider } from '../-components/panels/panel-actions-contex
 import { VariableBar } from '../-components/variable-bar';
 import { buildEffectiveValues } from '../-components/variable-defaults';
 import { annotationsQueryOptions, dashboardQueryOptions } from '../-queries';
+import { useRecentDashboards } from '../../-root/use-recent-dashboards';
 import { datasourcesQueryOptions } from '../../datasources/-queries';
 
 const MS_PER_SECOND = 1000;
@@ -73,6 +74,7 @@ const DashboardViewPage = () => {
   const { id } = Route.useParams();
   const queryClient = useQueryClient();
   const { data: dashboard } = useSuspenseQuery(dashboardQueryOptions(id));
+  const { record: recordRecent } = useRecentDashboards();
 
   const [timeRange, setTimeRange] = useState({ from: 'now-1h', to: 'now' });
   const [refreshInterval, setRefreshInterval] = useState<RefreshInterval>('off');
@@ -227,6 +229,15 @@ const DashboardViewPage = () => {
       return next;
     });
   }, []);
+
+  // Record this dashboard as recently-viewed once it (and its title) have loaded. Writing
+  // through the external recents store — not React state — so this is a side effect, not a
+  // set-state-in-effect. `dashboard` keeps a stable react-query identity until a refetch, so
+  // this fires once per loaded id rather than every render.
+  useEffect(() => {
+    if (dashboard === null) return;
+    recordRecent({ id, title: dashboard.title });
+  }, [id, dashboard, recordRecent]);
 
   if (dashboard === null) {
     return <p className='text-muted-foreground'>Dashboard not found.</p>;

@@ -9,6 +9,7 @@ export interface RankedCommandGroup {
 
 /** Canonical group order + display headings. Drives both ordering and labels. */
 const GROUP_ORDER: readonly { readonly id: CommandGroupId; readonly heading: string }[] = [
+  { id: 'recents', heading: 'Recent' },
   { id: 'pages', heading: 'Pages' },
   { id: 'actions', heading: 'Actions' },
   { id: 'dashboards', heading: 'Dashboards' },

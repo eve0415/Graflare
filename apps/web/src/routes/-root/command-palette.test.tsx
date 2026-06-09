@@ -7,6 +7,10 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { CommandPalette } from './command-palette';
 import { isMacPlatform } from './platform';
+import { resetRecentDashboardsCacheForTests } from './recent-dashboards-store';
+import { ThemeProvider, useTheme } from './theme-provider';
+
+const RECENTS_STORAGE_KEY = 'graflare.recentDashboards';
 
 // The search field is queried by its accessible name; narrow to HTMLInputElement once,
 // here, so the tests stay free of inline type guards.
@@ -39,6 +43,8 @@ vi.mock('../dashboards/-queries', () => ({
 afterEach(() => {
   cleanup();
   navigateSpy.mockClear();
+  localStorage.clear();
+  resetRecentDashboardsCacheForTests();
 });
 
 // Simulate real typing: set the controlled value through the native setter, then dispatch
@@ -57,6 +63,12 @@ const typeInto = (input: HTMLInputElement, value: string) => {
 const IS_MAC = isMacPlatform();
 const fireModK = () => fireEvent.keyDown(document, { key: 'k', ctrlKey: !IS_MAC, metaKey: IS_MAC });
 
+// Surfaces the active resolved theme so a test can assert the toggle flipped it.
+const ThemeProbe = () => {
+  const { resolved } = useTheme();
+  return <span data-testid='resolved-theme'>{resolved}</span>;
+};
+
 const Harness = ({ onOpenChange }: { onOpenChange: (open: boolean) => void }) => {
   const [open, setOpen] = useState(true);
   const handleOpenChange = useCallback(
@@ -66,7 +78,12 @@ const Harness = ({ onOpenChange }: { onOpenChange: (open: boolean) => void }) =>
     },
     [onOpenChange],
   );
-  return <CommandPalette open={open} onOpenChange={handleOpenChange} />;
+  return (
+    <ThemeProvider>
+      <ThemeProbe />
+      <CommandPalette open={open} onOpenChange={handleOpenChange} />
+    </ThemeProvider>
+  );
 };
 
 // Renders the palette starting open, exposing the latest open state for assertions.
@@ -184,5 +201,35 @@ describe('command palette', () => {
     });
     // The full list is back (the previously-filtered "Alerting" page returns), proving the filter cleared.
     expect(screen.getByText('Alerting')).toBeDefined();
+  });
+
+  it('flips the resolved theme when the Toggle theme command runs', async () => {
+    renderOpen();
+    const before = screen.getByTestId('resolved-theme').textContent;
+    fireEvent.click(screen.getByText('Toggle theme'));
+    await waitFor(() => {
+      expect(screen.getByTestId('resolved-theme').textContent).not.toBe(before);
+    });
+    // The toggle moves between the two explicit themes off `resolved`.
+    const after = screen.getByTestId('resolved-theme').textContent;
+    expect([before, after].sort()).toEqual(['dark', 'light']);
+  });
+
+  it('renders a Recent group with persisted recents at rest', async () => {
+    // Seed a recent that is NOT one of the mocked dashboards, so its label is unique to the
+    // Recent group. Reset the live snapshot cache so the store reads the seed.
+    localStorage.setItem(RECENTS_STORAGE_KEY, JSON.stringify([{ id: 'id-disk', title: 'Disk IO' }]));
+    resetRecentDashboardsCacheForTests();
+    renderOpen();
+    await waitFor(() => {
+      expect(screen.getByText('Recent')).toBeDefined();
+    });
+    const recent = screen.getByText('Disk IO');
+    expect(recent).toBeDefined();
+    // The recent entry navigates to its dashboard route when chosen.
+    fireEvent.click(recent);
+    await waitFor(() => {
+      expect(navigateSpy).toHaveBeenCalledWith({ to: '/dashboards/$id', params: { id: 'id-disk' } });
+    });
   });
 });

@@ -1,7 +1,8 @@
+import type { RecentDashboard } from './recent-dashboards-store';
 import type { useNavigate } from '@tanstack/react-router';
 import type { LucideIcon } from 'lucide-react';
 
-import { Bell, Database, FileText, Home, LayoutDashboard } from 'lucide-react';
+import { Bell, Clock, Database, FileText, Home, LayoutDashboard, Sun } from 'lucide-react';
 
 import { navItems } from './nav-items';
 
@@ -16,7 +17,7 @@ type Navigate = ReturnType<typeof useNavigate>;
  * The buckets a command can belong to. A union (not a free string) so the palette can
  * render groups in a known order and new groups are an explicit, additive change.
  */
-export type CommandGroupId = 'pages' | 'actions' | 'dashboards';
+export type CommandGroupId = 'recents' | 'pages' | 'actions' | 'dashboards';
 
 /**
  * A single executable entry in the command palette. Commands are plain data so the list
@@ -45,6 +46,10 @@ export interface DashboardSummary {
 export interface AssembleCommandsDeps {
   readonly navigate: Navigate;
   readonly dashboards: readonly DashboardSummary[];
+  /** Recently-viewed dashboards, newest-first, surfaced as a top group. */
+  readonly recents: readonly RecentDashboard[];
+  /** Flip the active theme between light and dark. */
+  readonly toggleTheme: () => void;
 }
 
 const buildPageCommands = (navigate: Navigate): CommandDescriptor[] => [
@@ -60,7 +65,7 @@ const buildPageCommands = (navigate: Navigate): CommandDescriptor[] => [
   ),
 ];
 
-const buildActionCommands = (navigate: Navigate): CommandDescriptor[] => [
+const buildActionCommands = (navigate: Navigate, toggleTheme: () => void): CommandDescriptor[] => [
   {
     id: 'action:new-dashboard',
     group: 'actions',
@@ -85,6 +90,14 @@ const buildActionCommands = (navigate: Navigate): CommandDescriptor[] => [
     keywords: ['create', 'add', 'alerting'],
     run: () => void navigate({ to: '/alerting/rules/new' }),
   },
+  {
+    id: 'action:toggle-theme',
+    group: 'actions',
+    label: 'Toggle theme',
+    icon: Sun,
+    keywords: ['dark', 'light', 'appearance', 'mode'],
+    run: toggleTheme,
+  },
 ];
 
 const buildDashboardCommands = (dashboards: readonly DashboardSummary[], navigate: Navigate): CommandDescriptor[] =>
@@ -99,12 +112,30 @@ const buildDashboardCommands = (dashboards: readonly DashboardSummary[], navigat
   );
 
 /**
- * Assemble the full, flat command list from the current navigation context and the
- * loaded dashboards. Order is canonical (pages, actions, dashboards); the filter layer
- * groups and ranks from here.
+ * Recently-viewed dashboards as their own group. The `recent:` id prefix keeps each entry
+ * distinct from its `dashboard:`-prefixed twin, so a dashboard surfacing in both Recents and
+ * Dashboards search collides on neither React keys nor the unique-id invariant — Grafana
+ * shows recents alongside search results the same way.
  */
-export const assembleCommands = ({ navigate, dashboards }: AssembleCommandsDeps): CommandDescriptor[] => [
+const buildRecentCommands = (recents: readonly RecentDashboard[], navigate: Navigate): CommandDescriptor[] =>
+  recents.map(
+    (r): CommandDescriptor => ({
+      id: `recent:${r.id}`,
+      group: 'recents',
+      label: r.title,
+      icon: Clock,
+      run: () => void navigate({ to: '/dashboards/$id', params: { id: r.id } }),
+    }),
+  );
+
+/**
+ * Assemble the full, flat command list from the current navigation context, recently-viewed
+ * dashboards, and the loaded dashboards. Order is canonical (recents, pages, actions,
+ * dashboards); the filter layer groups and ranks from here.
+ */
+export const assembleCommands = ({ navigate, dashboards, recents, toggleTheme }: AssembleCommandsDeps): CommandDescriptor[] => [
+  ...buildRecentCommands(recents, navigate),
   ...buildPageCommands(navigate),
-  ...buildActionCommands(navigate),
+  ...buildActionCommands(navigate, toggleTheme),
   ...buildDashboardCommands(dashboards, navigate),
 ];
