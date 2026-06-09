@@ -51,9 +51,11 @@ describe('create-token-dialog', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Done' }));
 
     await waitFor(() => {
+      // The real proof: the secret-bearing input is gone (its value is not a text node,
+      // so a textContent check alone would pass even if it survived).
       expect(screen.queryByDisplayValue(SECRET)).toBeNull();
     });
-    // The secret string must not survive anywhere in the document (DOM or a11y tree).
+    // Belt-and-suspenders: also catch the secret leaking into any plain text node.
     expect(document.body.textContent).not.toContain(SECRET);
   });
 
