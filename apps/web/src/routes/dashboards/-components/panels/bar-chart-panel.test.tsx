@@ -26,6 +26,7 @@ const barChartPanel = (unit: string): Panel => ({
   thresholds: [],
   displayOptions: {},
   fieldConfig: { defaults: { unit, mappings: [] }, overrides: [] },
+  transformations: [],
 });
 
 const matrix = (rows: { metric: Record<string, string>; values: [number, number][] }[]): PanelDataResult[] => [

@@ -1,6 +1,7 @@
 import type { PanelDataResult } from './use-panel-data';
 import type { FieldConfig } from '@graflare/shared/schemas/field-config';
 import type { Panel } from '@graflare/shared/schemas/panel';
+import type { Transformation } from '@graflare/shared/schemas/transformation';
 
 import { cleanup, render, screen } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
@@ -22,6 +23,7 @@ const tablePanel = (fieldConfig: FieldConfig): Panel => ({
   thresholds: [],
   displayOptions: {},
   fieldConfig,
+  transformations: [],
 });
 
 // A SQL response: two columns (a numeric `bytes` and a string `label`), one row. The table
@@ -33,6 +35,27 @@ const sqlData = (): PanelDataResult[] => [
       { name: 'label', type: 'string' },
     ],
     rows: [[1536, 'ok']],
+  },
+];
+
+// A Prometheus matrix response: one series with three samples. Transformations operate on this
+// ResultSeries shape; SQL frames pass through untransformed.
+const promData = (): PanelDataResult[] => [
+  {
+    status: 'success',
+    data: {
+      resultType: 'matrix',
+      result: [
+        {
+          metric: { __name__: 'requests' },
+          values: [
+            [0, '10'],
+            [1, '20'],
+            [2, '30'],
+          ],
+        },
+      ],
+    },
   },
 ];
 
@@ -82,5 +105,30 @@ describe('table-panel per-field overrides', () => {
     });
     expect(screen.getByText('1.5 KiB')).toBeDefined();
     expect(screen.getByText('ok')).toBeDefined();
+  });
+});
+
+describe('table-panel transformations', () => {
+  const promPanel = (transformations: Transformation[]): Panel => ({
+    ...tablePanel({ defaults: { unit: '', mappings: [] }, overrides: [] }),
+    queries: [{ refId: 'A', expr: 'requests', legendFormat: '', format: 'time_series' }],
+    transformations,
+  });
+
+  const renderProm = (transformations: Transformation[]) => {
+    mockUsePanelData.mockReturnValue({ data: promData(), isLoading: false, error: null, refetch: vi.fn<() => void>() });
+    render(<TablePanel panel={promPanel(transformations)} timeRange={timeRange} refetchInterval={false} />);
+  };
+
+  it('with no transformations the table shows the latest value (regression: unchanged)', () => {
+    renderProm([]);
+    // formatPrometheusToTable shows the series' latest sample (30) — the pre-transform behavior.
+    expect(screen.getByText('30')).toBeDefined();
+  });
+
+  it('a reduce(sum) transform collapses the series to its summed value', () => {
+    renderProm([{ id: 'reduce', options: { calc: 'sum' } }]);
+    // 10+20+30 = 60 — proves the transform fed the table.
+    expect(screen.getByText('60')).toBeDefined();
   });
 });

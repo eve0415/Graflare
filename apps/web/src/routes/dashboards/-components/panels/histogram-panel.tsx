@@ -26,7 +26,7 @@ export const HistogramPanel = ({ panel, timeRange, refetchInterval, width, heigh
   const { resolved } = useTheme();
 
   const buckets = useMemo(() => {
-    const values = histogramValues(data);
+    const values = histogramValues(data, panel.transformations);
     const display = panel.displayOptions.histogram;
     // Build opts by only assigning keys that are set, so the helper's own defaults
     // apply and `exactOptionalPropertyTypes` never sees an `undefined` write.
@@ -34,7 +34,7 @@ export const HistogramPanel = ({ panel, timeRange, refetchInterval, width, heigh
     if (display?.bucketCount !== undefined) opts.bucketCount = display.bucketCount;
     if (display?.bucketSize !== undefined) opts.bucketSize = display.bucketSize;
     return histogramBuckets(values, opts);
-  }, [data, panel.displayOptions.histogram]);
+  }, [data, panel.transformations, panel.displayOptions.histogram]);
 
   const chartData = useMemo(() => histogramAlignedData(buckets), [buckets]);
 

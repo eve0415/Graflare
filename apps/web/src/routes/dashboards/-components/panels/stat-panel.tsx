@@ -18,9 +18,9 @@ interface StatPanelProps {
 export const StatPanel = ({ panel, timeRange, refetchInterval }: StatPanelProps) => {
   const { data, isLoading, error, handleRetry } = usePanelQuery(panel, timeRange, refetchInterval);
 
-  // Latest scalar of the first series, kept as the raw token (stat displays the
-  // string verbatim when it isn't numeric).
-  const value = useMemo(() => firstScalar(data), [data]);
+  // Latest scalar of the first series (after the panel transformations), kept as the raw token
+  // (stat displays the string verbatim when it isn't numeric).
+  const value = useMemo(() => firstScalar(data, panel.transformations), [data, panel.transformations]);
 
   // Stat shows a single value field (the first series); resolve that field's effective
   // config against the panel overrides through the shared `seriesDescriptor`, so a byName /

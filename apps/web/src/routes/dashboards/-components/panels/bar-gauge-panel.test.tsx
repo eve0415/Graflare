@@ -28,6 +28,7 @@ const barGaugePanel = (unit: string, mappings: ValueMapping[] = [], min?: number
   thresholds: [],
   displayOptions: {},
   fieldConfig: fieldConfig(unit, mappings, min, max),
+  transformations: [],
 });
 
 // Same panel but with a full field config so a test can supply per-field overrides.
@@ -41,6 +42,7 @@ const barGaugePanelWithConfig = (config: FieldConfig): Panel => ({
   thresholds: [],
   displayOptions: {},
   fieldConfig: config,
+  transformations: [],
 });
 
 const vector = (samples: { metric: Record<string, string>; value: number }[]): PanelDataResult[] => [

@@ -1,15 +1,18 @@
 import type { PanelDataResult } from './use-panel-data';
 import type { FieldDescriptor } from '@graflare/shared/format/resolve-field-config';
 import type { PanelQuery } from '@graflare/shared/schemas/panel';
+import type { Transformation } from '@graflare/shared/schemas/transformation';
+import type { ResultSeries } from '@graflare/shared/transform/series';
 
-// One Prometheus result row, flattened out of the `PanelDataResult` union: a label
-// set plus either an instant `value` tuple (vector) or a `values` array (matrix).
-// `value`/`values` are both optional so vector and matrix rows share one shape.
-export interface ResultSeries {
-  metric: Record<string, string>;
-  values?: [number, string][];
-  value?: [number, string];
-}
+import { applyTransformations } from '@graflare/shared/transform/apply';
+import { deriveSeriesLabel, latestSample } from '@graflare/shared/transform/series';
+
+// `ResultSeries`, `deriveSeriesLabel` and `latestSample` are defined once in `@graflare/shared`
+// (the transform pipeline operates on the same row shape and the same label rule the panels render
+// with). They are re-exported here so every panel keeps importing them from this local module —
+// the long-standing import path — rather than reaching into shared directly.
+export type { ResultSeries };
+export { latestSample };
 
 // A result row paired with the refId of the query that produced it. `data[i]` is
 // index-aligned with `queries[i]` (both come from the same `Promise.all(queries.map(…))` in
@@ -59,21 +62,48 @@ export const extractResultSeriesWithQuery = (data: PanelDataResult[] | null | un
  */
 export const extractResultSeries = (data: PanelDataResult[] | null | undefined): ResultSeries[] => extractResultSeriesWithQuery(data).map(q => q.series);
 
-// The label-derivation rule shared by every per-series panel, factored out of the four data
-// helpers where it was verbatim-identical: the metric `__name__` wins, else the first other
-// label value (e.g. instance), else a 1-based positional fallback.
-const deriveSeriesLabel = (metric: Record<string, string>, index: number): string => {
-  const name = metric.__name__;
-  if (name !== undefined && name !== '') return name;
-  for (const [key, value] of Object.entries(metric)) {
-    if (key !== '__name__' && value !== '') return value;
-  }
-  return `Series ${String(index + 1)}`;
+/**
+ * Extract the flat series and run the panel's transformations over them (Grafana's transform step,
+ * applied before the viz). This is the transform-aware replacement for `extractResultSeries` at the
+ * panel data path: panels that read the refId-free series (bar-chart/histogram/heatmap/table) call
+ * THIS so transformations feed the viz.
+ *
+ * When `transformations` is empty (every current panel), `applyTransformations` returns the same
+ * array reference `extractResultSeries` produced — byte-for-byte identical output, no behavior
+ * change. Only a panel that actually configures transformations sees transformed series.
+ */
+export const extractTransformedSeries = (data: PanelDataResult[] | null | undefined, transformations: readonly Transformation[]): ResultSeries[] =>
+  applyTransformations(extractResultSeries(data), transformations);
+
+/**
+ * The refId-carrying counterpart of `extractTransformedSeries`, for panels that resolve per-field
+ * overrides (pie/bar-gauge/gauge/state-timeline/status-history/bar-chart-configs).
+ *
+ * With NO transformations the original `QueriedSeries[]` is returned untouched — same references,
+ * refId pairing intact — so byFrameRefID overrides keep matching exactly as before. With
+ * transformations, the structural operations (filter/sort/reorder/reduce) break the 1:1 series↔query
+ * association, so each transformed row is returned WITHOUT a refId — byFrameRefID then can't match it
+ * (the long-standing "undefined refId leaves byFrameRefID unmatchable" path, which the override
+ * resolver already handles). This matches Grafana, where overrides apply after transforms and
+ * structural transforms likewise sever the refId link. Re-pairing refId through structural transforms
+ * is deferred with the transform editor (Phase 2).
+ */
+export const extractTransformedSeriesWithQuery = (
+  data: PanelDataResult[] | null | undefined,
+  queries: readonly PanelQuery[] | undefined,
+  transformations: readonly Transformation[],
+): QueriedSeries[] => {
+  const queried = extractResultSeriesWithQuery(data, queries);
+  if (transformations.length === 0) return queried;
+  return applyTransformations(
+    queried.map(q => q.series),
+    transformations,
+  ).map(series => ({ series }));
 };
 
 /**
- * Describe a series as a field for override matching: its derived label as `name` (the single
- * rule above) plus the source query's `refId` when known (so byFrameRefID can match).
+ * Describe a series as a field for override matching: its derived label as `name` (the shared
+ * `deriveSeriesLabel` rule) plus the source query's `refId` when known (so byFrameRefID can match).
  * Prometheus series carry no data type, so `type` is omitted and byType can't match them.
  *
  * `index` is caller-supplied because the panels count positions differently: bar-gauge/pie
@@ -85,18 +115,16 @@ export const seriesDescriptor = (series: ResultSeries, index: number, refId?: st
   return refId === undefined ? { name } : { name, refId };
 };
 
-// Latest sample of a series: an instant vector carries a single `value` tuple; a
-// matrix carries a `values` array whose last entry is the most recent.
-export const latestSample = (series: ResultSeries): [number, string] | undefined => series.value ?? series.values?.at(-1);
-
 /**
- * Raw value token of the first series' latest sample, or `null` when there is no
- * series. Kept as the verbatim Prometheus string — callers coerce as they need
- * (stat keeps the string, gauge wraps it in `Number`), so a non-numeric token like
- * `"NaN"` survives unchanged.
+ * Raw value token of the first series' latest sample (after the panel's transformations), or `null`
+ * when there is no series. Kept as the verbatim Prometheus string — callers coerce as they need
+ * (stat keeps the string, gauge wraps it in `Number`), so a non-numeric token like `"NaN"` survives
+ * unchanged. With no transformations the first series is the untransformed first series, so the
+ * scalar is byte-identical to before; a `reduce` transform lets stat/gauge show e.g. the series mean
+ * instead of its last sample.
  */
-export const firstScalar = (data: PanelDataResult[] | null | undefined): string | null => {
-  const [first] = extractResultSeries(data);
+export const firstScalar = (data: PanelDataResult[] | null | undefined, transformations: readonly Transformation[] = []): string | null => {
+  const [first] = extractTransformedSeries(data, transformations);
   if (first === undefined) return null;
   return latestSample(first)?.[1] ?? null;
 };

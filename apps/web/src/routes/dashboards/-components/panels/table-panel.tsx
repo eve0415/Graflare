@@ -3,6 +3,7 @@ import type { PanelDataResult } from './use-panel-data';
 import type { FieldDescriptor } from '@graflare/shared/format/resolve-field-config';
 import type { FieldConfigDefaults } from '@graflare/shared/schemas/field-config';
 import type { Panel } from '@graflare/shared/schemas/panel';
+import type { Transformation } from '@graflare/shared/schemas/transformation';
 
 import { resolveFieldConfig } from '@graflare/shared/format/resolve-field-config';
 import { formatValue } from '@graflare/shared/format/value-format';
@@ -11,7 +12,7 @@ import { useCallback, useMemo } from 'react';
 
 import { QueryResultTable, formatPrometheusToTable } from '../../../-root/query-result-table';
 
-import { extractResultSeries } from './panel-data-extract';
+import { extractTransformedSeries } from './panel-data-extract';
 import { PanelFrame } from './panel-frame';
 import { usePanelQuery } from './use-panel-query';
 
@@ -30,11 +31,13 @@ interface TableData {
   fields: FieldDescriptor[];
 }
 
-const toTableData = (data: PanelDataResult[] | null | undefined): TableData => {
+const toTableData = (data: PanelDataResult[] | null | undefined, transformations: readonly Transformation[]): TableData => {
   if (data === null || data === undefined) return { columns: [], rows: [], fields: [] };
 
   // A SQL data source returns its own columns/rows shape (no `status`); render it
-  // directly. Prometheus responses fall through to the shared series extraction.
+  // directly. Transformations operate on Prometheus `ResultSeries`, so a SQL frame is passed
+  // through untransformed (a SQL→table transform belongs to the deferred follow-up). Prometheus
+  // responses fall through to the shared transform-aware extraction.
   for (const res of data) {
     if ('columns' in res && 'rows' in res && !('status' in res)) {
       return {
@@ -46,14 +49,14 @@ const toTableData = (data: PanelDataResult[] | null | undefined): TableData => {
     }
   }
 
-  const prom = formatPrometheusToTable(extractResultSeries(data));
+  const prom = formatPrometheusToTable(extractTransformedSeries(data, transformations));
   return { ...prom, fields: prom.columns.map(name => ({ name })) };
 };
 
 export const TablePanel = ({ panel, timeRange, refetchInterval }: TablePanelProps) => {
   const { data, isLoading, error, handleRetry } = usePanelQuery(panel, timeRange, refetchInterval);
 
-  const tableData = useMemo(() => toTableData(data), [data]);
+  const tableData = useMemo(() => toTableData(data, panel.transformations), [data, panel.transformations]);
 
   // Per-column effective config: resolve each column's field against the panel's overrides
   // once (not per cell — react-perf), index-aligned with the columns. With no matching

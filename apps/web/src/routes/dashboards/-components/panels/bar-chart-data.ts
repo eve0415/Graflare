@@ -2,6 +2,7 @@ import type { ChartThemeColors } from '../../../-root/chart-theme';
 import type { ResultSeries } from './panel-data-extract';
 import type { PanelDataResult } from './use-panel-data';
 import type { FieldConfigDefaults } from '@graflare/shared/schemas/field-config';
+import type { Transformation } from '@graflare/shared/schemas/transformation';
 import type uPlotNs from 'uplot';
 
 import { formatValue } from '@graflare/shared/format/value-format';
@@ -10,7 +11,7 @@ import uPlot from 'uplot';
 import { timeScaleX } from '../../../-root/chart-theme';
 
 import { resolveSharedAxisLayout } from './multi-axis';
-import { extractResultSeries } from './panel-data-extract';
+import { extractTransformedSeries } from './panel-data-extract';
 
 // A single plotted series: its label set plus the per-bucket samples. An instant
 // `value` may ride along (shared `ResultSeries` shape); bar charts read `values`.
@@ -53,10 +54,12 @@ interface BuildBarChartOptionsArgs {
 const BAR_SIZE: [factor: number, max: number] = [0.6, 60];
 
 /**
- * Reduce panel query results to one series per result row. Pure: no DOM. Error and
- * non-prometheus responses are skipped via the shared `extractResultSeries`.
+ * Reduce panel query results to one series per result row, after the panel's transformations. Pure:
+ * no DOM. Error and non-prometheus responses are skipped via the shared extractor; with no
+ * transformations the output is the untransformed series, byte-identical to before.
  */
-export const barChartSeries = (data: PanelDataResult[] | null | undefined): BarChartSeries[] => extractResultSeries(data);
+export const barChartSeries = (data: PanelDataResult[] | null | undefined, transformations: readonly Transformation[] = []): BarChartSeries[] =>
+  extractTransformedSeries(data, transformations);
 
 /**
  * Build uPlot AlignedData: `[timestamps, ...perSeriesValues]`. The bucket axis is

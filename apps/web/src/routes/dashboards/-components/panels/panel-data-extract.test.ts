@@ -1,8 +1,17 @@
 import type { PanelDataResult } from './use-panel-data';
+import type { Transformation } from '@graflare/shared/schemas/transformation';
 
 import { describe, expect, it } from 'vitest';
 
-import { extractResultSeries, firstScalar, getThresholdColor, latestSample, readableTextColor } from './panel-data-extract';
+import {
+  extractResultSeries,
+  extractTransformedSeries,
+  extractTransformedSeriesWithQuery,
+  firstScalar,
+  getThresholdColor,
+  latestSample,
+  readableTextColor,
+} from './panel-data-extract';
 
 // Minimal Prometheus instant-vector success shape, one entry per series.
 const vector = (samples: { metric: Record<string, string>; value: number }[]): PanelDataResult[] => [
@@ -228,5 +237,48 @@ describe('readableTextColor', () => {
     expect(readableTextColor('')).toBe('#000');
     expect(readableTextColor('#12')).toBe('#000');
     expect(readableTextColor('#zzzzzz')).toBe('#000');
+  });
+});
+
+describe('extractTransformedSeries', () => {
+  const data = vector([
+    { metric: { __name__: 'cpu' }, value: 5 },
+    { metric: { __name__: 'mem' }, value: 9 },
+  ]);
+
+  it('with NO transformations returns the same series the plain extractor produces', () => {
+    expect(extractTransformedSeries(data, [])).toEqual(extractResultSeries(data));
+  });
+
+  it('applies the transformations to the extracted series', () => {
+    const transforms: Transformation[] = [{ id: 'filterFieldsByName', options: { mode: 'include', match: 'byName', value: 'cpu' } }];
+    const out = extractTransformedSeries(data, transforms);
+    expect(out.map(s => s.metric.__name__)).toEqual(['cpu']);
+  });
+
+  it('handles null data (returns empty) under any transform', () => {
+    expect(extractTransformedSeries(null, [{ id: 'limit', options: { count: 1 } }])).toEqual([]);
+  });
+});
+
+describe('extractTransformedSeriesWithQuery', () => {
+  const data = vector([
+    { metric: { __name__: 'cpu' }, value: 5 },
+    { metric: { __name__: 'mem' }, value: 9 },
+  ]);
+  const queries = [{ refId: 'A', expr: 'cpu', legendFormat: '', format: 'time_series' as const }];
+
+  it('with NO transformations preserves the refId pairing (byte-identical to the plain extractor)', () => {
+    const out = extractTransformedSeriesWithQuery(data, queries, []);
+    // The first row keeps its producing query's refId — the override layer depends on this.
+    expect(out[0]?.refId).toBe('A');
+    expect(out).toHaveLength(2);
+  });
+
+  it('with transformations applies them and DROPS the refId (byFrameRefID then unmatchable)', () => {
+    const transforms: Transformation[] = [{ id: 'sortBy', options: { by: 'value', desc: true } }];
+    const out = extractTransformedSeriesWithQuery(data, queries, transforms);
+    expect(out.map(q => q.series.metric.__name__)).toEqual(['mem', 'cpu']); // sorted by value desc
+    expect(out.every(q => q.refId === undefined)).toBe(true);
   });
 });

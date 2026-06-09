@@ -36,6 +36,19 @@ const grafanaOverrideSchema = z.object({
 
 export type GrafanaOverride = z.infer<typeof grafanaOverrideSchema>;
 
+// Grafana transformation entry as it appears in dashboard JSON: `{ id, options, disabled? }`. The
+// `options` shape is per-transform-id and heterogeneous (reduce, filter, organize, … all differ), so
+// it's kept as `z.unknown()` here and narrowed per id in the adapter (import/transformation-mapping.ts)
+// — same approach as the override matcher's options. Import-only: parsed then discarded into our
+// Panel, so it never crosses the RPC boundary where an unbounded type would blow the depth limit.
+const grafanaTransformationSchema = z.object({
+  id: z._default(z.string(), ''),
+  options: z.optional(z.unknown()),
+  disabled: z.optional(z.boolean()),
+});
+
+export type GrafanaTransformation = z.infer<typeof grafanaTransformationSchema>;
+
 const grafanaFieldConfigSchema = z.object({
   defaults: z._default(
     z.object({
@@ -71,6 +84,9 @@ const grafanaBasePanelSchema = z.object({
   // `overrides`), so a panel that omits `fieldConfig` would otherwise leave overrides
   // undefined and crash the override mapper's for…of.
   fieldConfig: z._default(grafanaFieldConfigSchema, { defaults: { thresholds: { steps: [] } }, overrides: [] }),
+  // Panel data transformations (`[{ id, options }]`), mapped to ours in the adapter. Defaults to an
+  // empty list so a panel that omits the key imports with no transformations.
+  transformations: z._default(z.array(grafanaTransformationSchema), []),
   options: z.optional(grafanaPanelOptionsSchema),
 });
 
@@ -131,4 +147,5 @@ export {
   grafanaThresholdStepSchema,
   grafanaGridPosSchema,
   grafanaOverrideSchema,
+  grafanaTransformationSchema,
 };

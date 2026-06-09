@@ -144,8 +144,8 @@ export const StateTimelinePanel = ({ panel, timeRange, refetchInterval }: StateT
   // Each lane resolves its own config (per-field overrides) keyed on its label and the query
   // refId, inside the helper. With no overrides every lane resolves to the panel defaults
   // reference — byte-identical formatting and colour to before.
-  const { fieldConfig, queries } = panel;
-  const lanes = useMemo(() => stateTimelineLanes(data, fieldConfig, queries), [data, fieldConfig, queries]);
+  const { fieldConfig, queries, transformations } = panel;
+  const lanes = useMemo(() => stateTimelineLanes(data, fieldConfig, queries, transformations), [data, fieldConfig, queries, transformations]);
   const domain = useMemo(() => timeDomain(lanes), [lanes]);
 
   // Accessible name for the timeline-as-image: series count, so screen-reader users get

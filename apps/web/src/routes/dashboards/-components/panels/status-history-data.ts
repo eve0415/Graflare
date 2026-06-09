@@ -1,11 +1,12 @@
 import type { PanelDataResult } from './use-panel-data';
 import type { FieldConfig, FieldConfigDefaults } from '@graflare/shared/schemas/field-config';
 import type { PanelQuery } from '@graflare/shared/schemas/panel';
+import type { Transformation } from '@graflare/shared/schemas/transformation';
 
 import { resolveFieldConfig } from '@graflare/shared/format/resolve-field-config';
 import { formatValue } from '@graflare/shared/format/value-format';
 
-import { extractResultSeriesWithQuery, seriesDescriptor } from './panel-data-extract';
+import { extractTransformedSeriesWithQuery, seriesDescriptor } from './panel-data-extract';
 
 // One discrete status sample: its timestamp (unix seconds), the numeric state `value`,
 // and its formatted `displayValue`. Unlike a state-timeline segment, a cell is a single
@@ -44,10 +45,11 @@ export const statusHistoryCells = (
   data: PanelDataResult[] | null | undefined,
   fieldConfig: FieldConfig,
   queries?: readonly PanelQuery[],
+  transformations: readonly Transformation[] = [],
 ): StatusHistoryLane[] => {
   const lanes: StatusHistoryLane[] = [];
 
-  for (const [index, { series, refId }] of extractResultSeriesWithQuery(data, queries).entries()) {
+  for (const [index, { series, refId }] of extractTransformedSeriesWithQuery(data, queries, transformations).entries()) {
     const descriptor = seriesDescriptor(series, index, refId);
     const config = resolveFieldConfig(descriptor, fieldConfig);
     const cells: StatusCell[] = [];

@@ -1,10 +1,11 @@
 import type { PanelDataResult } from './use-panel-data';
 import type { FieldConfig, FieldConfigDefaults } from '@graflare/shared/schemas/field-config';
 import type { PanelQuery } from '@graflare/shared/schemas/panel';
+import type { Transformation } from '@graflare/shared/schemas/transformation';
 
 import { resolveFieldConfig } from '@graflare/shared/format/resolve-field-config';
 
-import { extractResultSeriesWithQuery, latestSample, seriesDescriptor } from './panel-data-extract';
+import { extractTransformedSeriesWithQuery, latestSample, seriesDescriptor } from './panel-data-extract';
 
 // One wedge of a pie/donut: a labelled series, its latest value, that value's share
 // of the total (0..1), the cumulative sweep [startAngle, endAngle) in degrees
@@ -42,11 +43,12 @@ export const pieSlices = (
   palette: readonly string[],
   fieldConfig: FieldConfig,
   queries?: readonly PanelQuery[],
+  transformations: readonly Transformation[] = [],
 ): PieSlice[] => {
   // First pass: keep finite latest samples with their label/colour/config, so the total
   // is taken over exactly the slices that will be drawn.
   const kept: { label: string; value: number; color: string; config: FieldConfigDefaults }[] = [];
-  for (const { series, refId } of extractResultSeriesWithQuery(data, queries)) {
+  for (const { series, refId } of extractTransformedSeriesWithQuery(data, queries, transformations)) {
     const sample = latestSample(series);
     if (sample === undefined) continue;
     const value = Number(sample[1]);

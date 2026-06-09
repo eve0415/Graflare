@@ -26,6 +26,7 @@ const piePanel = (unit: string, mappings: ValueMapping[] = [], pie?: PieDisplay)
   thresholds: [],
   displayOptions: pie === undefined ? {} : { pie },
   fieldConfig: fieldConfig(unit, mappings),
+  transformations: [],
 });
 
 // Same panel but with a full field config, so a test can supply per-field overrides.
@@ -39,6 +40,7 @@ const piePanelWithConfig = (config: FieldConfig): Panel => ({
   thresholds: [],
   displayOptions: {},
   fieldConfig: config,
+  transformations: [],
 });
 
 const vector = (samples: { metric: Record<string, string>; value: number }[]): PanelDataResult[] => [

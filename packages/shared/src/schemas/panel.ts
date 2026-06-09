@@ -2,6 +2,7 @@ import * as z from 'zod/mini';
 
 import { fieldConfigSchema } from './field-config';
 import { thresholdsSchema } from './threshold';
+import { transformationSchema } from './transformation';
 
 export const panelTypeSchema = z.enum([
   'timeseries',
@@ -186,6 +187,11 @@ export const panelSchema = z.object({
   thresholds: z._default(thresholdsSchema, []),
   displayOptions: z._default(displayOptionsSchema, {}),
   fieldConfig: z._default(fieldConfigSchema, { defaults: { unit: '', mappings: [] }, overrides: [] }),
+  // Data transformations applied to the extracted series before the viz renders, in array order
+  // (see transform/apply.ts). Backward compatible — stored panels with `transformations: []` (or
+  // the key absent) default to an empty list and render exactly as before (the empty case is an
+  // identity no-op, same array reference).
+  transformations: z._default(z.array(transformationSchema), []),
   description: z._default(z.string().check(z.maxLength(2048)), ''),
 });
 

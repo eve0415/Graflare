@@ -1,6 +1,7 @@
 import type { ChartThemeColors } from '../../../-root/chart-theme';
 import type { PanelDataResult } from './use-panel-data';
 import type { FieldConfigDefaults } from '@graflare/shared/schemas/field-config';
+import type { Transformation } from '@graflare/shared/schemas/transformation';
 import type uPlotNs from 'uplot';
 
 import { formatValue } from '@graflare/shared/format/value-format';
@@ -8,7 +9,7 @@ import uPlot from 'uplot';
 
 import { themedAxis } from '../../../-root/chart-theme';
 
-import { extractResultSeries } from './panel-data-extract';
+import { extractTransformedSeries } from './panel-data-extract';
 
 // One histogram bar: the half-open bin [start, end) and how many samples fell in it.
 // (The final bin is inclusive of the maximum — the max value is clamped into it.)
@@ -25,9 +26,9 @@ export interface HistogramBucket {
  * instant `value` tuple and matrix `values` array are read; raw tokens coerce through
  * `Number`, and `histogramBuckets` drops any that aren't finite.
  */
-export const histogramValues = (data: PanelDataResult[] | null | undefined): number[] => {
+export const histogramValues = (data: PanelDataResult[] | null | undefined, transformations: readonly Transformation[] = []): number[] => {
   const values: number[] = [];
-  for (const series of extractResultSeries(data)) {
+  for (const series of extractTransformedSeries(data, transformations)) {
     if (series.value !== undefined) values.push(Number(series.value[1]));
     for (const sample of series.values ?? []) {
       values.push(Number(sample[1]));

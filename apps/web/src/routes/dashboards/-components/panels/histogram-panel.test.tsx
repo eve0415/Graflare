@@ -27,6 +27,7 @@ const histogramPanel = (unit: string, histogram?: HistogramDisplay): Panel => ({
   thresholds: [],
   displayOptions: histogram === undefined ? {} : { histogram },
   fieldConfig: { defaults: { unit, mappings: [] }, overrides: [] },
+  transformations: [],
 });
 
 const matrix = (rows: { metric: Record<string, string>; values: [number, number][] }[]): PanelDataResult[] => [

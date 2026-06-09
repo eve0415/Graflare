@@ -641,4 +641,42 @@ describe('importV2', () => {
       expect(result.dashboard.panels[0]?.fieldConfig.overrides).toEqual([]);
     });
   });
+
+  describe('transformations', () => {
+    // A v2 dashboard with one stat element carrying the given transformations under spec.data.
+    const dashboardWithTransformations = (transformations: unknown[]) => ({
+      ...validV2Dashboard,
+      spec: {
+        ...validV2Dashboard.spec,
+        elements: {
+          cpu: { kind: 'Stat', spec: { title: 'CPU', data: { queries: [{ refId: 'A', expr: 'up' }], transformations } } },
+        },
+        layout: { items: [{ element: 'cpu', x: 0, y: 0, width: 12, height: 8 }] },
+      },
+    });
+
+    it('round-trips a supported transformation chain from spec.data.transformations', () => {
+      const result = importV2(
+        dashboardWithTransformations([
+          { id: 'organize', options: { renameByName: { up: 'Uptime' } } },
+          { id: 'sortBy', options: { sort: [{ field: 'Value', desc: true }] } },
+        ]),
+      );
+      expect(result.dashboard.panels[0]?.transformations).toEqual([
+        { id: 'organize', options: { renameByName: { up: 'Uptime' }, excludeByName: {}, indexByName: {} } },
+        { id: 'sortBy', options: { by: 'value', desc: true } },
+      ]);
+    });
+
+    it('warn-drops an unsupported transformation', () => {
+      const result = importV2(dashboardWithTransformations([{ id: 'groupBy', options: {} }]));
+      expect(result.dashboard.panels[0]?.transformations).toEqual([]);
+      expect(result.warnings.some(w => w.includes('groupBy'))).toBe(true);
+    });
+
+    it('defaults transformations to [] when an element omits them', () => {
+      const result = importV2(validV2Dashboard);
+      expect(result.dashboard.panels[0]?.transformations).toEqual([]);
+    });
+  });
 });

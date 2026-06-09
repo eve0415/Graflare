@@ -5,7 +5,7 @@ import { formatValue } from '@graflare/shared/format/value-format';
 import { applyValueMappings } from '@graflare/shared/format/value-mappings';
 import { useMemo } from 'react';
 
-import { extractResultSeriesWithQuery, firstScalar, getThresholdColor, seriesDescriptor } from './panel-data-extract';
+import { extractTransformedSeriesWithQuery, firstScalar, getThresholdColor, seriesDescriptor } from './panel-data-extract';
 import { PanelFrame } from './panel-frame';
 import { usePanelQuery } from './use-panel-query';
 
@@ -31,12 +31,12 @@ const describeArc = (startAngle: number, endAngle: number, radius: number): stri
 export const GaugePanel = ({ panel, timeRange, refetchInterval }: GaugePanelProps) => {
   const { data, isLoading, error, handleRetry } = usePanelQuery(panel, timeRange, refetchInterval);
 
-  // Latest scalar of the first series as a number; a non-numeric token coerces to
-  // NaN (preserved downstream, where the gauge clamps/normalizes it).
+  // Latest scalar of the first series (after the panel transformations) as a number; a non-numeric
+  // token coerces to NaN (preserved downstream, where the gauge clamps/normalizes it).
   const value = useMemo(() => {
-    const raw = firstScalar(data);
+    const raw = firstScalar(data, panel.transformations);
     return raw === null ? null : Number(raw);
-  }, [data]);
+  }, [data, panel.transformations]);
 
   // Gauge shows a single value field (the first series); resolve its effective config
   // against the panel overrides through the shared `seriesDescriptor` — the single home for
@@ -44,12 +44,12 @@ export const GaugePanel = ({ panel, timeRange, refetchInterval }: GaugePanelProp
   // query refId) every per-series panel keys on. With no series the descriptor name is ''
   // (the no-data path is unchanged); with no matching override this returns the defaults
   // reference, so the memo deps stay reference-stable.
-  const { fieldConfig, queries } = panel;
+  const { fieldConfig, queries, transformations } = panel;
   const config = useMemo(() => {
-    const [first] = extractResultSeriesWithQuery(data, queries);
+    const [first] = extractTransformedSeriesWithQuery(data, queries, transformations);
     const descriptor = first === undefined ? { name: '' } : seriesDescriptor(first.series, 0, first.refId);
     return resolveFieldConfig(descriptor, fieldConfig);
-  }, [data, queries, fieldConfig]);
+  }, [data, queries, transformations, fieldConfig]);
 
   const min = config.min ?? 0;
   const max = config.max ?? 100;

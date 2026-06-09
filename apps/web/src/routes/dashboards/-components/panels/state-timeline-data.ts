@@ -1,11 +1,12 @@
 import type { PanelDataResult } from './use-panel-data';
 import type { FieldConfig, FieldConfigDefaults } from '@graflare/shared/schemas/field-config';
 import type { PanelQuery } from '@graflare/shared/schemas/panel';
+import type { Transformation } from '@graflare/shared/schemas/transformation';
 
 import { resolveFieldConfig } from '@graflare/shared/format/resolve-field-config';
 import { formatValue } from '@graflare/shared/format/value-format';
 
-import { extractResultSeriesWithQuery, seriesDescriptor } from './panel-data-extract';
+import { extractTransformedSeriesWithQuery, seriesDescriptor } from './panel-data-extract';
 
 // One merged run of equal state values: the [startTime, endTime] span it covers (unix
 // seconds), the numeric state `value`, and its formatted `displayValue`. A run ends
@@ -48,10 +49,11 @@ export const stateTimelineLanes = (
   data: PanelDataResult[] | null | undefined,
   fieldConfig: FieldConfig,
   queries?: readonly PanelQuery[],
+  transformations: readonly Transformation[] = [],
 ): StateTimelineLane[] => {
   const lanes: StateTimelineLane[] = [];
 
-  for (const [index, { series, refId }] of extractResultSeriesWithQuery(data, queries).entries()) {
+  for (const [index, { series, refId }] of extractTransformedSeriesWithQuery(data, queries, transformations).entries()) {
     const descriptor = seriesDescriptor(series, index, refId);
     const config = resolveFieldConfig(descriptor, fieldConfig);
     const segments: StateSegment[] = [];

@@ -27,6 +27,7 @@ const panel = (display?: StateTimelineDisplay): Panel => ({
   ],
   displayOptions: display === undefined ? {} : { 'state-timeline': display },
   fieldConfig: { defaults: { unit: 'short', mappings: [] }, overrides: [] },
+  transformations: [],
 });
 
 // Same panel but with a full field config so a test can supply per-field overrides.
@@ -40,6 +41,7 @@ const panelWithConfig = (config: FieldConfig): Panel => ({
   thresholds: [],
   displayOptions: {},
   fieldConfig: config,
+  transformations: [],
 });
 
 const matrix = (rows: { metric: Record<string, string>; values: [number, number][] }[]): PanelDataResult[] => [

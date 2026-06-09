@@ -1,6 +1,6 @@
 import * as z from 'zod/mini';
 
-import { grafanaOverrideSchema } from './grafana-classic';
+import { grafanaOverrideSchema, grafanaTransformationSchema } from './grafana-classic';
 
 const v2QuerySchema = z.object({
   refId: z._default(z.string(), ''),
@@ -20,8 +20,11 @@ const v2ElementSpecSchema = z.object({
   data: z._default(
     z.object({
       queries: z._default(z.array(v2QuerySchema), []),
+      // Transformations live under `spec.data` in this simplified v2 layout (the adapter reads them
+      // from here). Defaults to empty so an element without transformations maps to `[]`.
+      transformations: z._default(z.array(grafanaTransformationSchema), []),
     }),
-    { queries: [] },
+    { queries: [], transformations: [] },
   ),
   options: z.optional(v2ElementOptionsSchema),
   // Per-field overrides, reusing the classic override shape. NB: this follows the adapter's
@@ -37,7 +40,11 @@ const v2ElementSpecSchema = z.object({
 
 const v2ElementSchema = z.object({
   kind: z._default(z.string(), 'unknown'),
-  spec: z._default(v2ElementSpecSchema, { title: '', data: { queries: [] } }),
+  // The fallback literal spells out `data.transformations: []` for the same reason `overrides: []` is
+  // spelled out in grafana-classic: Zod `_default` returns the literal as-is when `spec` is absent
+  // (it doesn't re-run the inner schema to fill `transformations`), so an element with no `spec` would
+  // otherwise leave it undefined and crash the transformation mapper's for…of.
+  spec: z._default(v2ElementSpecSchema, { title: '', data: { queries: [], transformations: [] } }),
 });
 
 export type V2Element = z.infer<typeof v2ElementSchema>;

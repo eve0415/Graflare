@@ -28,6 +28,7 @@ const statPanel = (unit: string, mappings: ValueMapping[] = []): Panel => ({
   thresholds: [],
   displayOptions: {},
   fieldConfig: fieldConfig(mappings, unit),
+  transformations: [],
 });
 
 const instantValue = (raw: string): PanelDataResult[] => [
@@ -60,6 +61,7 @@ const statPanelWithOverride = (seriesName: string): Panel => ({
     defaults: { unit: '', mappings: [] },
     overrides: [{ matcher: { id: 'byName', options: seriesName }, properties: [{ id: 'unit', value: 'bytes' }] }],
   },
+  transformations: [],
 });
 
 const timeRange = { from: 'now-1h', to: 'now' };

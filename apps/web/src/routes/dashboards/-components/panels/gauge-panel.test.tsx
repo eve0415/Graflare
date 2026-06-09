@@ -29,6 +29,7 @@ const gaugePanel = (fieldConfig: FieldConfig): Panel => ({
   thresholds: [],
   displayOptions: {},
   fieldConfig,
+  transformations: [],
 });
 
 const byNameUnit = (seriesName: string): FieldConfig => ({

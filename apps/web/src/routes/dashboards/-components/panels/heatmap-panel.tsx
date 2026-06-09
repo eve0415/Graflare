@@ -133,7 +133,10 @@ export const HeatmapPanel = ({ panel, timeRange, refetchInterval }: HeatmapPanel
   const yBuckets = display?.yBuckets ?? DEFAULT_Y_BUCKETS;
   const scheme = display?.colorScheme ?? DEFAULT_SCHEME;
 
-  const grid = useMemo(() => heatmapGrid(heatmapSamples(data), { xBuckets, yBuckets }), [data, xBuckets, yBuckets]);
+  const grid = useMemo(
+    () => heatmapGrid(heatmapSamples(data, panel.transformations), { xBuckets, yBuckets }),
+    [data, panel.transformations, xBuckets, yBuckets],
+  );
 
   // Accessible name for the grid-as-image: cell count + peak density, so screen-reader
   // users get a summary of an otherwise visual-only chart.

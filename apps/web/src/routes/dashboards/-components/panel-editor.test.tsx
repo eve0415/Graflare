@@ -28,6 +28,7 @@ const basePanel = (): Panel => ({
   thresholds: [],
   displayOptions: {},
   fieldConfig: { defaults: { unit: '', mappings: [] }, overrides: [] },
+  transformations: [],
 });
 
 const renderEditor = (panel: Panel, onSave: (p: Panel) => void) => {

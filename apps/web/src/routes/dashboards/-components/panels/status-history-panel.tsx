@@ -152,8 +152,8 @@ export const StatusHistoryPanel = ({ panel, timeRange, refetchInterval }: Status
   // Each lane resolves its own config (per-field overrides) keyed on its label and the query
   // refId, inside the helper. With no overrides every lane resolves to the panel defaults
   // reference — byte-identical formatting and colour to before.
-  const { fieldConfig, queries } = panel;
-  const lanes = useMemo(() => statusHistoryCells(data, fieldConfig, queries), [data, fieldConfig, queries]);
+  const { fieldConfig, queries, transformations } = panel;
+  const lanes = useMemo(() => statusHistoryCells(data, fieldConfig, queries, transformations), [data, fieldConfig, queries, transformations]);
   const layout = useMemo(() => layoutOf(lanes), [lanes]);
 
   // Accessible name for the grid-as-image: series count, so screen-reader users get a

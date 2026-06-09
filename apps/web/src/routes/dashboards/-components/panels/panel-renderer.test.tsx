@@ -20,6 +20,7 @@ const tablePanel = (expr: string): Panel => ({
   thresholds: [],
   displayOptions: {},
   fieldConfig: { defaults: { unit: '', mappings: [] }, overrides: [] },
+  transformations: [],
 });
 
 const timeRange = { from: 'now-1h', to: 'now' };

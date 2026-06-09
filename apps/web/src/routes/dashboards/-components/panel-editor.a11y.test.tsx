@@ -56,6 +56,7 @@ const populatedPanel = (): Panel => ({
       },
     ],
   },
+  transformations: [],
 });
 
 describe('panel-editor field-overrides a11y', () => {

@@ -911,3 +911,53 @@ describe('importClassic — field overrides', () => {
     expect(result.dashboard.panels[0]?.fieldConfig.overrides).toEqual([]);
   });
 });
+
+// A classic dashboard with a single stat panel carrying the given transformations.
+const dashboardWithTransformations = (transformations: unknown[]) => ({
+  title: 'D',
+  panels: [
+    {
+      type: 'stat',
+      title: 'X',
+      targets: [{ refId: 'A', expr: 'up' }],
+      gridPos: { x: 0, y: 0, w: 4, h: 4 },
+      transformations,
+    },
+  ],
+});
+
+describe('importClassic — transformations', () => {
+  it('round-trips a supported transformation chain onto the panel', () => {
+    const result = importClassic(
+      dashboardWithTransformations([
+        { id: 'reduce', options: { reducers: ['mean'] } },
+        { id: 'filterFieldsByName', options: { include: { pattern: '^cpu' } } },
+        { id: 'limit', options: { limitField: 5 } },
+      ]),
+    );
+    expect(result.dashboard.panels[0]?.transformations).toEqual([
+      { id: 'reduce', options: { calc: 'mean' } },
+      { id: 'filterFieldsByName', options: { mode: 'include', match: 'byRegexp', value: '^cpu' } },
+      { id: 'limit', options: { count: 5 } },
+    ]);
+  });
+
+  it('warn-drops an unsupported transformation, keeping the rest in order', () => {
+    const result = importClassic(
+      dashboardWithTransformations([
+        { id: 'merge', options: {} },
+        { id: 'limit', options: { limitField: 2 } },
+      ]),
+    );
+    expect(result.dashboard.panels[0]?.transformations).toEqual([{ id: 'limit', options: { count: 2 } }]);
+    expect(result.warnings.some(w => w.includes('merge'))).toBe(true);
+  });
+
+  it('defaults transformations to [] when the panel omits the key', () => {
+    const result = importClassic({
+      title: 'D',
+      panels: [{ type: 'stat', title: 'X', targets: [{ refId: 'A', expr: 'up' }], gridPos: { x: 0, y: 0, w: 4, h: 4 } }],
+    });
+    expect(result.dashboard.panels[0]?.transformations).toEqual([]);
+  });
+});

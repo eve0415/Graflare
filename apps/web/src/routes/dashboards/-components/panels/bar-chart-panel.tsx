@@ -11,8 +11,8 @@ import { QueryResultTable, formatPrometheusToTable } from '../../../-root/query-
 import { useTheme } from '../../../-root/theme-provider';
 
 import { annotationMarkers } from './annotations-plugin';
-import { barChartAlignedData, barChartSeries, buildBarChartOptions } from './bar-chart-data';
-import { extractResultSeriesWithQuery, seriesDescriptor } from './panel-data-extract';
+import { barChartAlignedData, buildBarChartOptions } from './bar-chart-data';
+import { extractTransformedSeriesWithQuery, seriesDescriptor } from './panel-data-extract';
 import { UPlotPanel } from './uplot-panel';
 import { usePanelQuery } from './use-panel-query';
 
@@ -29,28 +29,28 @@ export const BarChartPanel = ({ panel, timeRange, refetchInterval, width, height
   const { data, isLoading, error, handleRetry } = usePanelQuery(panel, timeRange, refetchInterval);
   const { resolved } = useTheme();
 
-  const series = useMemo(() => barChartSeries(data), [data]);
+  // Extract + transform ONCE, then derive bars, labels, and configs from this single array so all
+  // three stay index-aligned (a per-extraction transform would desync bars from their labels/configs
+  // — the failure the transform pipeline must avoid). With no transformations this is the same
+  // refId-tagged series the panel extracted before; with transformations, refId is dropped (the
+  // structural ops sever the series↔query link), so byFrameRefID/legendFormat fall back to the
+  // metric-derived label — the documented post-transform behavior.
+  const queried = useMemo(() => extractTransformedSeriesWithQuery(data, panel.queries, panel.transformations), [data, panel.queries, panel.transformations]);
+  const series = useMemo(() => queried.map(q => q.series), [queried]);
   const chartData = useMemo(() => barChartAlignedData(series), [series]);
 
-  // Resolve each series' legend label here (where the panel queries are in scope), tagging by the
-  // refId of the producing query so `legendFormat` applies even when one query yields many series.
-  // Index-aligned with `series` (both come from the same ordered extractor).
   const labels = useMemo(
-    () =>
-      extractResultSeriesWithQuery(data, panel.queries).map((q, i) =>
-        seriesLabel(panel.queries.find(x => x.refId === q.refId)?.legendFormat, q.series.metric, i),
-      ),
-    [data, panel.queries],
+    () => queried.map((q, i) => seriesLabel(panel.queries.find(x => x.refId === q.refId)?.legendFormat, q.series.metric, i)),
+    [queried, panel.queries],
   );
 
-  // Resolve each series' effective field config (unit/min/max) against the panel overrides, keyed
-  // on the derived series label and the producing query's refId — the same descriptor path the
-  // bar-gauge panel uses, so a `byName`/`byFrameRefID` override matches the same field here.
+  // Effective field config per series (unit/min/max), resolved against the panel overrides keyed on
+  // the derived label + producing query refId — the same descriptor path the bar-gauge panel uses.
   // Index-aligned with `series`; `buildBarChartOptions` groups by the resolved unit into y-axes.
   // With no overrides every series resolves to the defaults reference → one y-axis, as before.
   const seriesConfigs = useMemo(
-    () => extractResultSeriesWithQuery(data, panel.queries).map((q, i) => resolveFieldConfig(seriesDescriptor(q.series, i, q.refId), panel.fieldConfig)),
-    [data, panel.queries, panel.fieldConfig],
+    () => queried.map((q, i) => resolveFieldConfig(seriesDescriptor(q.series, i, q.refId), panel.fieldConfig)),
+    [queried, panel.fieldConfig],
   );
 
   // Resolve the visible window once (epoch seconds) — shared by the annotation markers and the

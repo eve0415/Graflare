@@ -13,7 +13,7 @@ import { useTheme } from '../../../-root/theme-provider';
 
 import { annotationMarkers } from './annotations-plugin';
 import { resolveSharedAxisLayout } from './multi-axis';
-import { extractResultSeriesWithQuery, seriesDescriptor } from './panel-data-extract';
+import { extractTransformedSeriesWithQuery, seriesDescriptor } from './panel-data-extract';
 import { UPlotPanel } from './uplot-panel';
 import { usePanelQuery } from './use-panel-query';
 
@@ -34,7 +34,7 @@ export const TimeSeriesPanel = ({ panel, timeRange, refetchInterval, width, heig
   // resolves against that query's `legendFormat` even when ONE query yields multiple series
   // (the canonical Prometheus case `{{job}} {{method}}` is built for). `chartResult` stays the
   // flat `ResultSeries[]` the data/table readers already consume.
-  const queried = useMemo(() => extractResultSeriesWithQuery(data, panel.queries), [data, panel.queries]);
+  const queried = useMemo(() => extractTransformedSeriesWithQuery(data, panel.queries, panel.transformations), [data, panel.queries, panel.transformations]);
   const chartResult = useMemo(() => queried.map(q => q.series), [queried]);
 
   const seriesLabels = useMemo(

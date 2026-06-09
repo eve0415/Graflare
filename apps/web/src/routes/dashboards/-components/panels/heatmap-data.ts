@@ -1,6 +1,7 @@
 import type { PanelDataResult } from './use-panel-data';
+import type { Transformation } from '@graflare/shared/schemas/transformation';
 
-import { extractResultSeries } from './panel-data-extract';
+import { extractTransformedSeries } from './panel-data-extract';
 
 // One occupied grid cell: integer bucket coordinates (`x` = time bucket, `y` = value
 // bucket) and how many samples fell in it. Empty cells are omitted from the grid, so a
@@ -33,14 +34,14 @@ export interface HeatmapGridOptions {
  * instant `value` tuple and the matrix `values` array are read; the raw value token
  * coerces through `Number`, and any pair with a non-finite time or value is dropped.
  */
-export const heatmapSamples = (data: PanelDataResult[] | null | undefined): [number, number][] => {
+export const heatmapSamples = (data: PanelDataResult[] | null | undefined, transformations: readonly Transformation[] = []): [number, number][] => {
   const samples: [number, number][] = [];
   const push = (sample: [number, string]): void => {
     const time = Number(sample[0]);
     const value = Number(sample[1]);
     if (Number.isFinite(time) && Number.isFinite(value)) samples.push([time, value]);
   };
-  for (const series of extractResultSeries(data)) {
+  for (const series of extractTransformedSeries(data, transformations)) {
     if (series.value !== undefined) push(series.value);
     for (const point of series.values ?? []) push(point);
   }
