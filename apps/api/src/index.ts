@@ -781,7 +781,11 @@ export class GraflareAPI extends WorkerEntrypoint<Bindings> {
       throw new Error('Failed to update folder', { cause: error });
     }
 
-    const rows = await this.db.select().from(folders).where(eq(folders.id, id)).limit(1);
+    const rows = await this.db
+      .select()
+      .from(folders)
+      .where(and(eq(folders.id, id), eq(folders.orgId, orgId)))
+      .limit(1);
     return rows[0] ?? null;
   }
 
@@ -1604,7 +1608,11 @@ export class GraflareAPI extends WorkerEntrypoint<Bindings> {
       throw new Error('Failed to update notification policy', { cause: error });
     }
 
-    const rows = await this.db.select().from(notificationPolicies).where(eq(notificationPolicies.id, id)).limit(1);
+    const rows = await this.db
+      .select()
+      .from(notificationPolicies)
+      .where(and(eq(notificationPolicies.id, id), eq(notificationPolicies.orgId, orgId)))
+      .limit(1);
     return rows[0] ?? null;
   }
 
