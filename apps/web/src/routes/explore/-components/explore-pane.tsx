@@ -2,33 +2,26 @@ import type { QueryEditorMode } from '../../-root/query-editor-shell';
 import type { QueryHistoryEntry } from './query-history-store';
 import type { DatasourceDialect } from '@graflare/shared/schemas/datasource';
 import type { SqlResponse } from '@graflare/shared/schemas/sql';
-import type { SqlBuilderState } from '@graflare/shared/sql/builder';
 import type { Options as UPlotOptions } from 'uplot';
 
-import { generatePromQL } from '@graflare/shared/promql/generate';
 import { sqlRowsToSeries } from '@graflare/shared/sql/adapters';
-import { buildSql } from '@graflare/shared/sql/builder';
 import { computeStep, resolveTime } from '@graflare/shared/time/resolve';
 import { Button } from '@graflare/ui/components/button';
-import { Dialog, DialogClose, DialogContent, DialogDescription, DialogFooter, DialogTitle } from '@graflare/ui/components/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@graflare/ui/components/select';
 import { Skeleton } from '@graflare/ui/components/skeleton';
 import { useQuery, useSuspenseQuery } from '@tanstack/react-query';
 import { BarChart3, History, Play, Table2 } from 'lucide-react';
-import { Suspense, useCallback, useMemo, useReducer, useState } from 'react';
+import { Suspense, useCallback, useMemo, useState } from 'react';
 
 import { databaseSchemaQueryOptions } from '../../-root/introspection-queries';
-import { QueryEditorShell } from '../../-root/query-editor-shell';
 import { QueryResultTable, formatPrometheusToTable } from '../../-root/query-result-table';
 import { UPlotChart } from '../../-root/uplot-chart';
 import { proxyQuery } from '../../../lib/proxy';
 import { sqlQuery } from '../../../lib/sql-proxy';
 import { datasourcesQueryOptions } from '../../datasources/-queries';
 
-import { PromqlBuilder, initialPromqlBuilderState, promqlBuilderReducer } from './promql-builder';
-import { QueryCodeEditor } from './query-code-editor';
+import { ExploreQueryRow } from './explore-query-row';
 import { QueryHistoryDrawer } from './query-history-drawer';
-import { SqlBuilder } from './sql-builder';
 import { useQueryHistory } from './use-query-history';
 
 interface TimeRange {
@@ -41,17 +34,6 @@ const SQL_FORMAT_OPTIONS = [
   { value: 'table', label: 'Table' },
 ] as const;
 
-const EMPTY_SQL_STATE: SqlBuilderState = {
-  table: '',
-  columns: [],
-  where: [],
-  groupBy: [],
-  orderBy: [],
-  limit: undefined,
-  timeColumn: '',
-  timeGroupInterval: '',
-};
-
 interface ExplorePaneProps {
   timeRange: TimeRange;
   label: string;
@@ -63,23 +45,38 @@ const VALID_DIALECTS = new Set<string>(['postgres', 'sqlite']);
 
 const isValidDialect = (value: string | null | undefined): value is DatasourceDialect => typeof value === 'string' && VALID_DIALECTS.has(value);
 
+interface PrometheusSeries {
+  metric: Record<string, string>;
+  values?: [number, string][];
+  value?: [number, string];
+}
+
+interface QueryRowEntry {
+  /** Stable identity, also the React key + the row's `onChange` id. */
+  id: string;
+  /** The latest effective query reported up by this row. */
+  query: string;
+  /** Seed consumed once on (re)mount; a history re-run mints a new id with a seed. */
+  seedDraft?: string;
+  seedMode?: QueryEditorMode;
+}
+
+/** Positional label for a row: A, B, C, … by index. */
+const refIdFor = (index: number): string => String.fromCodePoint(65 + index);
+
+const newRow = (seed?: { draft: string; mode: QueryEditorMode }): QueryRowEntry =>
+  seed === undefined ? { id: crypto.randomUUID(), query: '' } : { id: crypto.randomUUID(), query: '', seedDraft: seed.draft, seedMode: seed.mode };
+
 export const ExplorePane = ({ timeRange, label }: ExplorePaneProps) => {
   const { data: datasources } = useSuspenseQuery(datasourcesQueryOptions());
   const dsItems = useMemo(() => datasources.map(ds => ({ value: ds.id, label: ds.name })), [datasources]);
 
   const [datasourceId, setDatasourceId] = useState<string>(datasources[0]?.id ?? '');
-  const [mode, setMode] = useState<QueryEditorMode>('builder');
-  const [codeDraft, setCodeDraft] = useState('');
-  const [sqlBuilderState, setSqlBuilderState] = useState<SqlBuilderState>(EMPTY_SQL_STATE);
-  const [promqlBuilderState, promqlDispatch] = useReducer(promqlBuilderReducer, initialPromqlBuilderState);
-  const [confirmReset, setConfirmReset] = useState(false);
+  const [rows, setRows] = useState<QueryRowEntry[]>(() => [newRow()]);
 
   const [resultView, setResultView] = useState<ResultView>('graph');
   const [sqlFormat, setSqlFormat] = useState<'time_series' | 'table'>('time_series');
-  const [queryResult, setQueryResult] = useState<{
-    resultType: string;
-    result: { metric: Record<string, string>; values?: [number, string][]; value?: [number, string] }[];
-  } | null>(null);
+  const [queryResult, setQueryResult] = useState<{ resultType: string; result: PrometheusSeries[] } | null>(null);
   const [sqlTableResult, setSqlTableResult] = useState<SqlResponse | null>(null);
   const [loading, setLoading] = useState(false);
   const [queryError, setQueryError] = useState<string | null>(null);
@@ -93,10 +90,6 @@ export const ExplorePane = ({ timeRange, label }: ExplorePaneProps) => {
   const selectedDs = datasources.find(d => d.id === datasourceId);
   const isSql = selectedDs?.type === 'sql';
 
-  const generatedQuery = useMemo(() => (isSql ? buildSql(sqlBuilderState) : generatePromQL(promqlBuilderState)), [isSql, sqlBuilderState, promqlBuilderState]);
-
-  const effectiveQuery = mode === 'builder' ? generatedQuery : codeDraft;
-
   const dbSchemaQuery = useQuery(databaseSchemaQueryOptions(isSql ? datasourceId : ''));
   const codeEditorSchema = useMemo(() => {
     if (!isSql || dbSchemaQuery.data === undefined) return;
@@ -108,32 +101,18 @@ export const ExplorePane = ({ timeRange, label }: ExplorePaneProps) => {
     return isValidDialect(d) ? d : undefined;
   }, [selectedDs?.dialect]);
 
-  const handleModeChange = useCallback(
-    (newMode: QueryEditorMode) => {
-      if (newMode === 'code' && mode === 'builder') {
-        setCodeDraft(generatedQuery);
-        setMode('code');
-      } else if (newMode === 'builder' && mode === 'code') {
-        if (codeDraft !== generatedQuery && codeDraft !== '') {
-          setConfirmReset(true);
-        } else {
-          setMode('builder');
-        }
-      }
-    },
-    [mode, codeDraft, generatedQuery],
-  );
-
-  const confirmModeReset = useCallback(() => {
-    setConfirmReset(false);
-    setMode('builder');
+  // A row reports its effective query here; we store it on the matching row by id. Functional
+  // update keeps this callback dependency-free so it never churns (react-perf) and the rows
+  // array identity stays stable across rows.
+  const handleRowChange = useCallback((id: string, query: string) => {
+    setRows(prev => prev.map(r => (r.id === id ? { ...r, query } : r)));
   }, []);
 
   // Core runner: takes the datasource/query/dialect explicitly so a history re-run can run a
   // restored query without waiting for the state it just set (setState is async, so reading
-  // `effectiveQuery`/`isSql` back in the same tick would be stale). History is recorded only on
-  // a successful run, tracked by a local `ok` flag — `queryError` is set inside this async
-  // closure and can't be read synchronously after it.
+  // back in the same tick would be stale). History is recorded only on a successful run, tracked
+  // by a local `ok` flag — `queryError` is set inside this async closure and can't be read
+  // synchronously after it.
   const runQuery = useCallback(
     (args: { datasourceId: string; query: string; isSql: boolean }) => {
       const { datasourceId: dsId, query, isSql: runIsSql } = args;
@@ -170,7 +149,7 @@ export const ExplorePane = ({ timeRange, label }: ExplorePaneProps) => {
               if (adapted.status === 'error') {
                 setQueryError(adapted.error ?? 'Failed to convert to series');
               } else if (adapted.data !== undefined && 'result' in adapted.data && Array.isArray(adapted.data.result)) {
-                const parsed: { metric: Record<string, string>; values?: [number, string][]; value?: [number, string] }[] = [];
+                const parsed: PrometheusSeries[] = [];
                 for (const item of adapted.data.result) {
                   if (typeof item === 'object' && item !== null && 'metric' in item) {
                     parsed.push(item);
@@ -198,7 +177,7 @@ export const ExplorePane = ({ timeRange, label }: ExplorePaneProps) => {
             if (result.status === 'error') {
               setQueryError(result.error ?? 'Query failed');
             } else if (result.data !== undefined && 'resultType' in result.data && Array.isArray(result.data.result)) {
-              const parsed: { metric: Record<string, string>; values?: [number, string][]; value?: [number, string] }[] = [];
+              const parsed: PrometheusSeries[] = [];
               for (const item of result.data.result) {
                 if (typeof item === 'object' && item !== null && 'metric' in item) {
                   parsed.push(item);
@@ -224,18 +203,20 @@ export const ExplorePane = ({ timeRange, label }: ExplorePaneProps) => {
   );
 
   const handleRun = useCallback(() => {
-    runQuery({ datasourceId, query: effectiveQuery, isSql });
-  }, [runQuery, datasourceId, effectiveQuery, isSql]);
+    const [firstRow] = rows;
+    if (firstRow === undefined) return;
+    runQuery({ datasourceId, query: firstRow.query, isSql });
+  }, [runQuery, datasourceId, rows, isSql]);
 
   const handleHistoryRun = useCallback(
     (entry: QueryHistoryEntry) => {
       const entryIsSql = entry.datasourceType === 'sql';
       // Restore the editor UI for display only; the run uses the entry's own values directly.
+      // Collapse to a single row remounted (fresh id) with the entry seeded into code mode.
       if (datasources.some(d => d.id === entry.datasourceId)) {
         setDatasourceId(entry.datasourceId);
       }
-      setMode('code');
-      setCodeDraft(entry.query);
+      setRows([newRow({ draft: entry.query, mode: 'code' })]);
       setHistoryOpen(false);
       runQuery({ datasourceId: entry.datasourceId, query: entry.query, isSql: entryIsSql });
     },
@@ -250,9 +231,8 @@ export const ExplorePane = ({ timeRange, label }: ExplorePaneProps) => {
   const handleDatasourceChange = useCallback((id: string | null) => {
     if (id === null) return;
     setDatasourceId(id);
-    setSqlBuilderState(EMPTY_SQL_STATE);
-    promqlDispatch({ type: 'RESET' });
-    setCodeDraft('');
+    // New data source means a new query language; reset to a single fresh row.
+    setRows([newRow()]);
   }, []);
 
   const handleSqlFormatChange = useCallback((v: string | null) => {
@@ -305,7 +285,7 @@ export const ExplorePane = ({ timeRange, label }: ExplorePaneProps) => {
     [queryResult],
   );
 
-  const builderPreview = mode === 'builder' ? generatedQuery : '';
+  const [onlyRow] = rows;
 
   return (
     <div className='space-y-3' aria-label={label}>
@@ -348,36 +328,21 @@ export const ExplorePane = ({ timeRange, label }: ExplorePaneProps) => {
         </Button>
       </div>
 
-      <QueryEditorShell mode={mode} onModeChange={handleModeChange} preview={builderPreview === '' ? undefined : builderPreview}>
-        {mode === 'builder' ? (
-          isSql ? (
-            <SqlBuilder datasourceId={datasourceId} state={sqlBuilderState} onStateChange={setSqlBuilderState} />
-          ) : (
-            <PromqlBuilder datasourceId={datasourceId} state={promqlBuilderState} dispatch={promqlDispatch} />
-          )
-        ) : (
-          <QueryCodeEditor
-            datasourceType={isSql ? 'sql' : 'prometheus'}
-            {...(selectedDialect === undefined ? {} : { dialect: selectedDialect })}
-            {...(codeEditorSchema === undefined ? {} : { schema: codeEditorSchema })}
-            value={codeDraft}
-            onChange={setCodeDraft}
-            onRun={handleRun}
-            placeholder={isSql ? 'Enter a SQL query...' : 'Enter a PromQL query...'}
-          />
-        )}
-      </QueryEditorShell>
-
-      <Dialog open={confirmReset} onOpenChange={setConfirmReset}>
-        <DialogContent>
-          <DialogTitle>Switch to Builder?</DialogTitle>
-          <DialogDescription>Your Code mode edits will be lost. The builder will reset to its current state.</DialogDescription>
-          <DialogFooter>
-            <DialogClose>Cancel</DialogClose>
-            <Button onClick={confirmModeReset}>Switch to Builder</Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      {onlyRow !== undefined && (
+        <ExploreQueryRow
+          key={onlyRow.id}
+          id={onlyRow.id}
+          refId={refIdFor(0)}
+          datasourceId={datasourceId}
+          isSql={isSql}
+          dialect={selectedDialect}
+          schema={codeEditorSchema}
+          initialDraft={onlyRow.seedDraft}
+          initialMode={onlyRow.seedMode}
+          onChange={handleRowChange}
+          onRun={handleRun}
+        />
+      )}
 
       <QueryHistoryDrawer
         open={historyOpen}
