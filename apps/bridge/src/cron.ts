@@ -24,7 +24,14 @@ import { checkTokenPermissions } from './lib/token-check';
 import { isRecord } from './lib/typed-access';
 
 const RETENTION_SECONDS = 31 * 24 * 3600;
-const INSERT_CHUNK_SIZE = 100;
+// D1 caps a single statement at 100 bound parameters. A multi-row INSERT binds
+// (rows × columns) params, so the per-statement row count must stay under that
+// ceiling or D1 rejects the whole statement ("too many SQL variables") and zero
+// rows land. Derive the row limit from the actual column count so adding a metrics
+// column can't silently push us back over the limit.
+const D1_MAX_BOUND_PARAMS = 100;
+const METRIC_INSERT_COLUMNS = 9;
+const INSERT_CHUNK_SIZE = Math.floor(D1_MAX_BOUND_PARAMS / METRIC_INSERT_COLUMNS);
 export const BATCH_CHUNK_SIZE = 15;
 const BACKOFF_BASE_S = 300;
 const BACKOFF_CAP_S = 14400;
@@ -74,28 +81,38 @@ const insertMetricRows = async (db: ReturnType<typeof drizzle>, rows: MetricRow[
     dimsHash: r.dimsHash,
   }));
 
+  const [firstValue] = values;
+  if (firstValue !== undefined && Object.keys(firstValue).length !== METRIC_INSERT_COLUMNS) {
+    // The row shape drifted from METRIC_INSERT_COLUMNS; the chunk size is no longer
+    // guaranteed under D1's bound-parameter ceiling. Fail loudly rather than risk
+    // silently re-introducing the "every insert rejects, zero rows land" regression.
+    const actual = Object.keys(firstValue).length;
+    throw new Error(`metric row has ${String(actual)} columns, expected ${String(METRIC_INSERT_COLUMNS)} (chunk size assumption broken)`);
+  }
+
   const chunks: (typeof values)[] = [];
   for (let i = 0; i < values.length; i += INSERT_CHUNK_SIZE) {
     chunks.push(values.slice(i, i + INSERT_CHUNK_SIZE));
   }
 
-  const results = await Promise.allSettled(
-    chunks.map(chunk =>
-      db
-        .insert(metrics)
-        .values(chunk)
-        .onConflictDoUpdate({
-          target: [metrics.ts, metrics.dataset, metrics.scope, metrics.scopeId, metrics.resource, metrics.metricName, metrics.dimsHash],
-          set: {
-            value: sql`excluded.value`,
-            dims: sql`excluded.dims`,
-          },
-        }),
-    ),
-  );
-  const failed = results.filter(r => r.status === 'rejected');
-  if (failed.length > 0) {
-    console.error(JSON.stringify({ level: 'warn', event: 'metric_insert_partial_failure', failedChunks: failed.length, totalChunks: chunks.length }));
+  // Insert chunks sequentially and let the first failure throw. Each chunk is an idempotent
+  // upsert on metrics_pk, and insertMetricRows runs before updateSyncState in every caller,
+  // so a throw here leaves sync_state un-advanced and the time window is retried on the next
+  // cron — no silent loss. Sequential (not Promise.all) keeps the D1 subrequest count bounded
+  // for large backlogs, where a single 24h window can produce hundreds of chunks.
+  // (Was Promise.allSettled, which swallowed every rejection while callers still reported
+  // success and advanced sync_state, turning a failed write into "cron succeeded, zero rows".)
+  for (const chunk of chunks) {
+    await db
+      .insert(metrics)
+      .values(chunk)
+      .onConflictDoUpdate({
+        target: [metrics.ts, metrics.dataset, metrics.scope, metrics.scopeId, metrics.resource, metrics.metricName, metrics.dimsHash],
+        set: {
+          value: sql`excluded.value`,
+          dims: sql`excluded.dims`,
+        },
+      });
   }
 };
 

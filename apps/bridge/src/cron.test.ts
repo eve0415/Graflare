@@ -160,6 +160,42 @@ describe('collectMetrics orchestrator', () => {
     expect(result?.count).toBeGreaterThan(0);
   });
 
+  // Regression for the "cron runs but saves zero metrics" bug. A multi-row INSERT binds
+  // (rows × 9 columns) parameters; D1 caps a statement at 100 bound parameters. With the
+  // old 100-row chunk size a single chunk bound 900 params, so D1 rejected the whole
+  // statement and zero rows landed — while Promise.allSettled swallowed the rejection and
+  // the cron still reported success. This payload yields 60 rows (10 distinct minutes ×
+  // 6 metrics on the `workers` collector), well over D1's 11-rows-per-statement ceiling,
+  // so it spans multiple chunks. The pre-fix single-chunk insert binds 540 params and
+  // persists 0 rows; the fix must persist all 60.
+  it('persists every row when a collector emits more than one chunk worth of rows', async () => {
+    const WORKERS_METRICS_PER_ITEM = 6;
+    const ITEM_COUNT = 10;
+    const workers = Array.from({ length: ITEM_COUNT }, (_, i) => {
+      const minute = new Date(SCHEDULED_TIME - (i + 1) * 60_000).toISOString();
+      return {
+        dimensions: { scriptName: 'my-worker', datetimeMinute: minute },
+        sum: { requests: 100 + i, errors: 0, subrequests: 10, wallTime: 500 },
+        quantiles: { cpuTimeP50: 5, cpuTimeP99: 50 },
+      };
+    });
+
+    mockSmartFetch({
+      accountResponse: {
+        data: { viewer: { accounts: [{ workers }] } },
+      },
+    });
+
+    await collectMetrics(testEnv, SCHEDULED_TIME);
+
+    const result = await env.DB.prepare('SELECT COUNT(*) as count FROM metrics WHERE dataset = ?').bind('workers').first<{ count: number }>();
+    expect(result?.count).toBe(ITEM_COUNT * WORKERS_METRICS_PER_ITEM);
+
+    // Non-silent contract: sync_state only advances when the rows actually persisted.
+    const sync = await env.DB.prepare('SELECT last_sync_at FROM sync_state WHERE dataset = ?').bind('workers').first<{ last_sync_at: number }>();
+    expect(sync?.last_sync_at).toBe(Math.floor(SCHEDULED_TIME / 1000));
+  });
+
   it('updates sync state after collection', async () => {
     mockSmartFetch();
 
