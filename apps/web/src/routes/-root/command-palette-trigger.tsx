@@ -2,17 +2,16 @@ import { Button } from '@graflare/ui/components/button';
 import { SearchIcon } from 'lucide-react';
 import { useSyncExternalStore } from 'react';
 
+import { isMacPlatform } from './platform';
+
 export interface CommandPaletteTriggerProps {
   readonly onOpen: () => void;
 }
 
 // Platform is a client-only value. `useSyncExternalStore` reads "Ctrl" on the server and
-// during hydration, then the client snapshot resolves "⌘" on macOS — no hydration mismatch,
-// and no setState-in-effect.
+// during hydration (server snapshot), then the client snapshot (`isMacPlatform`) resolves "⌘"
+// on macOS — no hydration mismatch, and no setState-in-effect.
 const subscribeNoop = (): (() => void) => () => {};
-// Mirror the hotkey library's detectPlatform (checks platform AND userAgent) so the displayed
-// glyph can't drift from the actual Mod binding.
-const getIsMacClient = (): boolean => /mac/i.test(navigator.platform) || /mac/i.test(navigator.userAgent);
 const getIsMacServer = (): boolean => false;
 
 /**
@@ -20,7 +19,7 @@ const getIsMacServer = (): boolean => false;
  * focus-restore target when the palette is dismissed via the keyboard shortcut.
  */
 export const CommandPaletteTrigger = ({ onOpen }: CommandPaletteTriggerProps) => {
-  const isMac = useSyncExternalStore(subscribeNoop, getIsMacClient, getIsMacServer);
+  const isMac = useSyncExternalStore(subscribeNoop, isMacPlatform, getIsMacServer);
 
   return (
     <Button variant='outline' size='sm' onClick={onOpen} className='text-muted-foreground h-8 gap-2 px-2.5 font-normal' aria-label='Open command palette'>

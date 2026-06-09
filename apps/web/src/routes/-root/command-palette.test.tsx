@@ -6,6 +6,7 @@ import { useCallback, useState } from 'react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { CommandPalette } from './command-palette';
+import { isMacPlatform } from './platform';
 
 // The search field is queried by its accessible name; narrow to HTMLInputElement once,
 // here, so the tests stay free of inline type guards.
@@ -53,7 +54,7 @@ const typeInto = (input: HTMLInputElement, value: string) => {
 // TanStack Hotkeys binds `Mod+K` on `document` and matches modifiers exactly; `Mod` is ⌘ on
 // macOS and Ctrl elsewhere. Fire the platform-correct combo on document to drive the real
 // binding. Computed once at module scope so the test body stays conditional-free.
-const IS_MAC = /mac/i.test(navigator.platform) || /mac/i.test(navigator.userAgent);
+const IS_MAC = isMacPlatform();
 const fireModK = () => fireEvent.keyDown(document, { key: 'k', ctrlKey: !IS_MAC, metaKey: IS_MAC });
 
 const Harness = ({ onOpenChange }: { onOpenChange: (open: boolean) => void }) => {
