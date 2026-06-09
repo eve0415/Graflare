@@ -1,11 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import {
-  createServiceTokenSchema,
-  serviceTokenListSchema,
-  serviceTokenSchema,
-  serviceTokenWithSecretSchema,
-} from './service-token';
+import { createServiceTokenSchema, serviceTokenListSchema, serviceTokenSchema, serviceTokenWithSecretSchema } from './service-token';
 
 describe('createServiceTokenSchema', () => {
   it('accepts a name with no duration', () => {
@@ -21,16 +16,16 @@ describe('createServiceTokenSchema', () => {
   });
 
   it('rejects an empty name', () => {
-    expect(() => createServiceTokenSchema.parse({ name: '' })).toThrow();
+    expect(createServiceTokenSchema.safeParse({ name: '' }).success).toBe(false);
   });
 
   it('rejects an over-long name', () => {
-    expect(() => createServiceTokenSchema.parse({ name: 'x'.repeat(256) })).toThrow();
+    expect(createServiceTokenSchema.safeParse({ name: 'x'.repeat(256) }).success).toBe(false);
   });
 
   it('rejects a malformed duration', () => {
-    expect(() => createServiceTokenSchema.parse({ name: 't', duration: 'forever' })).toThrow();
-    expect(() => createServiceTokenSchema.parse({ name: 't', duration: '10 days' })).toThrow();
+    expect(createServiceTokenSchema.safeParse({ name: 't', duration: 'forever' }).success).toBe(false);
+    expect(createServiceTokenSchema.safeParse({ name: 't', duration: '10 days' }).success).toBe(false);
   });
 });
 
@@ -61,11 +56,11 @@ describe('serviceTokenWithSecretSchema (create response)', () => {
 
   it('rejects a response missing the secret', () => {
     const { client_secret: _s, ...rest } = valid;
-    expect(() => serviceTokenWithSecretSchema.parse(rest)).toThrow();
+    expect(serviceTokenWithSecretSchema.safeParse(rest).success).toBe(false);
   });
 
   it('rejects an empty client_id', () => {
-    expect(() => serviceTokenWithSecretSchema.parse({ ...valid, client_id: '' })).toThrow();
+    expect(serviceTokenWithSecretSchema.safeParse({ ...valid, client_id: '' }).success).toBe(false);
   });
 });
 
