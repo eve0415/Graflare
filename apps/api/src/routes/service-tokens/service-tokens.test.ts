@@ -85,6 +85,16 @@ const hasOwn =
   (item: unknown): boolean =>
     typeof item === 'object' && item !== null && key in item;
 
+// Narrows an (unknown) list item to the metadata wire shape, asserting the
+// timestamp fields are epoch-ms numbers (the contract both paths must honor).
+const readMetaItem = (item: unknown): { createdAt: number; expiresAt: number | null } => {
+  if (typeof item !== 'object' || item === null || !('createdAt' in item) || typeof item.createdAt !== 'number') {
+    throw new Error('expected createdAt as a number');
+  }
+  const expiresAt = 'expiresAt' in item && typeof item.expiresAt === 'number' ? item.expiresAt : null;
+  return { createdAt: item.createdAt, expiresAt };
+};
+
 afterEach(() => {
   vi.restoreAllMocks();
   cfCalls.length = 0;
@@ -143,6 +153,23 @@ describe('service-token routes', () => {
     expect(JSON.stringify(items)).not.toContain('the-secret');
     expect(items.some(item => hasOwn('clientSecret')(item))).toBe(false);
     expect(items.some(item => hasOwn('cfTokenId')(item))).toBe(false);
+  });
+
+  it('list returns timestamps as epoch-ms numbers (HTTP matches the RPC contract)', async () => {
+    mockCf();
+    await createApp(ORG_A).request(
+      req('/', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name: 'ci' }) }),
+      {},
+      testBindings,
+    );
+
+    const res = await createApp(ORG_A).request(req('/'), {}, testBindings);
+    const items = await readArray(res);
+    expect(items).toHaveLength(1);
+    const item = readMetaItem(items[0]);
+    expect(typeof item.createdAt).toBe('number');
+    // expires_at was provided by CF, so it must serialize as a number too (not an ISO string).
+    expect(typeof item.expiresAt).toBe('number');
   });
 
   it('rejects an empty name with 400', async () => {

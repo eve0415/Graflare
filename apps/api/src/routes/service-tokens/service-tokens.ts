@@ -33,7 +33,17 @@ app.get('/', async c => {
     .from(accessServiceTokens)
     .where(eq(accessServiceTokens.orgId, orgId));
 
-  return c.json(rows);
+  // timestamp_ms columns come back as Date; the metadata contract is epoch ms,
+  // matching the RPC listServiceTokens so the two paths don't drift.
+  return c.json(
+    rows.map(row => ({
+      id: row.id,
+      clientId: row.clientId,
+      name: row.name,
+      createdAt: row.createdAt.getTime(),
+      expiresAt: row.expiresAt === null ? null : row.expiresAt.getTime(),
+    })),
+  );
 });
 
 app.post('/', sValidator('json', createServiceTokenSchema, onValidationError), async c => {
