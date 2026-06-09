@@ -1,7 +1,7 @@
 import path from 'node:path';
 
 import { cloudflareTest, readD1Migrations } from '@cloudflare/vitest-pool-workers';
-import { defineConfig, defineProject } from 'vitest/config';
+import { configDefaults, defineConfig, defineProject } from 'vitest/config';
 
 export default defineConfig(async () => {
   const migrationsPath = path.join(__dirname, 'drizzle');
@@ -26,6 +26,10 @@ export default defineConfig(async () => {
     ],
     test: {
       setupFiles: ['./tests/setup.ts'],
+      // vitest 4's default exclude is only node_modules + .git, so gitignored build-output
+      // dirs (which can hold stale compiled *.test.js from a prior build) must be excluded
+      // explicitly — otherwise vitest discovers and double-counts them.
+      exclude: [...configDefaults.exclude, '**/dist/**', '**/.output/**', '**/.vinxi/**', '**/.wrangler/**'],
     },
   });
 });
