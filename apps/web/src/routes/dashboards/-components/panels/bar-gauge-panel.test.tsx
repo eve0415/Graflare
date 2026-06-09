@@ -30,6 +30,19 @@ const barGaugePanel = (unit: string, mappings: ValueMapping[] = [], min?: number
   fieldConfig: fieldConfig(unit, mappings, min, max),
 });
 
+// Same panel but with a full field config so a test can supply per-field overrides.
+const barGaugePanelWithConfig = (config: FieldConfig): Panel => ({
+  id: 'p1',
+  type: 'bargauge',
+  title: 'Per-instance',
+  description: '',
+  queries: [{ refId: 'A', expr: 'mem', legendFormat: '', format: 'time_series' }],
+  gridPos: { x: 0, y: 0, w: 12, h: 8 },
+  thresholds: [],
+  displayOptions: {},
+  fieldConfig: config,
+});
+
 const vector = (samples: { metric: Record<string, string>; value: number }[]): PanelDataResult[] => [
   {
     status: 'success',
@@ -100,6 +113,74 @@ describe('bar-gauge panel', () => {
 
     expect(screen.getByText('HIGH')).toBeDefined();
     expect(screen.queryByText('1.5 KiB')).toBeNull();
+  });
+
+  it('applies a byName unit + max override to its matched bar only', () => {
+    // `mem` gets the bytes unit and a 0..4096 range via override (1536 -> "1.5 KiB",
+    // meter max 4096); `cpu` keeps the empty-unit default and the implicit [0,100] range.
+    const config: FieldConfig = {
+      defaults: { unit: '', mappings: [] },
+      overrides: [
+        {
+          matcher: { id: 'byName', options: 'mem' },
+          properties: [
+            { id: 'unit', value: 'bytes' },
+            { id: 'max', value: 4096 },
+          ],
+        },
+      ],
+    };
+    mockUsePanelData.mockReturnValue({
+      data: vector([
+        { metric: { __name__: 'mem' }, value: 1536 },
+        { metric: { __name__: 'cpu' }, value: 50 },
+      ]),
+      isLoading: false,
+      error: null,
+      refetch: vi.fn<() => void>(),
+    });
+    render(<BarGaugePanel panel={barGaugePanelWithConfig(config)} timeRange={timeRange} refetchInterval={false} />);
+
+    const meters = screen.getAllByRole('meter');
+    // The matched bar carries the override's unit (formatted value) and range (meter max).
+    expect(screen.getByText('1.5 KiB')).toBeDefined();
+    expect(meters[0]?.getAttribute('max')).toBe('4096');
+    // The unmatched bar stays the raw value with the default range — unchanged.
+    expect(screen.getByText('50')).toBeDefined();
+    expect(meters[1]?.getAttribute('max')).toBe('100');
+  });
+
+  it('recolors only the bar matched by a byName mappings override', () => {
+    // `mem` has a byName mappings override coloring its value via the fill; `cpu` is
+    // unmatched (no thresholds) so it falls back to the default bar color. Proves the
+    // per-series mappings reach the BarGaugeRow fill path, not just the value text.
+    const config: FieldConfig = {
+      defaults: { unit: '', mappings: [] },
+      overrides: [
+        {
+          matcher: { id: 'byName', options: 'mem' },
+          properties: [{ id: 'mappings', value: [{ type: 'range', from: 1000, to: 2000, result: { text: 'HIGH', color: '#00ff00' } }] }],
+        },
+      ],
+    };
+    mockUsePanelData.mockReturnValue({
+      data: vector([
+        { metric: { __name__: 'mem' }, value: 1536 },
+        { metric: { __name__: 'cpu' }, value: 50 },
+      ]),
+      isLoading: false,
+      error: null,
+      refetch: vi.fn<() => void>(),
+    });
+    const { container } = render(<BarGaugePanel panel={barGaugePanelWithConfig(config)} timeRange={timeRange} refetchInterval={false} />);
+
+    // The matched bar shows the mapping text; the fill span carries the mapping color.
+    expect(screen.getByText('HIGH')).toBeDefined();
+    // The fill colors land in the rendered inline styles. Assert on the serialized HTML
+    // so no element-narrowing conditional/cast is needed. jsdom serializes #00ff00 as
+    // rgb(0, 255, 0); the unmatched bar keeps the default green #4ade80 -> rgb(74, 222, 128).
+    expect(container.innerHTML).toContain('background-color: rgb(0, 255, 0)');
+    expect(container.innerHTML).toContain('background-color: rgb(74, 222, 128)');
   });
 
   it('shows a no-data message when there are no series', () => {

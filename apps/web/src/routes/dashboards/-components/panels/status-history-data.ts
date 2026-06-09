@@ -1,6 +1,7 @@
 import type { PanelDataResult } from './use-panel-data';
-import type { FieldConfigDefaults } from '@graflare/shared/schemas/field-config';
+import type { FieldConfig, FieldConfigDefaults } from '@graflare/shared/schemas/field-config';
 
+import { resolveFieldConfig } from '@graflare/shared/format/resolve-field-config';
 import { formatValue } from '@graflare/shared/format/value-format';
 
 import { extractResultSeries } from './panel-data-extract';
@@ -14,12 +15,15 @@ export interface StatusCell {
   displayValue: string;
 }
 
-// One horizontal lane of the status history: a labelled series and its per-sample cells,
-// in time order. A series with no finite samples still emits a lane (empty cells) so the
-// renderer can show its label.
+// One horizontal lane of the status history: a labelled series, its per-sample cells in
+// time order, and the effective field config resolved for that series. The lane's
+// `config` drives BOTH its cells' formatted values and the renderer's value→colour
+// mapping, so a per-field override changes only the matched lane. A series with no finite
+// samples still emits a lane (empty cells) so the renderer can show its label.
 export interface StatusHistoryLane {
   label: string;
   cells: StatusCell[];
+  config: FieldConfigDefaults;
 }
 
 // Derive a human label for a series: the metric name wins, else the first other label
@@ -40,24 +44,27 @@ const seriesLabel = (metric: Record<string, string>, index: number): string => {
  *
  * Each series' `values` (`[time, val][]`) are walked in order; non-finite values are
  * dropped, and every remaining sample becomes its own cell (so a run of equal values
- * stays a row of distinct boxes, the defining difference from the state-timeline). The
- * numeric value is formatted to `displayValue` through the panel's field config so the
- * renderer respects the configured unit/decimals.
+ * stays a row of distinct boxes, the defining difference from the state-timeline). Each
+ * series resolves its own effective config against the panel overrides (keyed on the lane
+ * label), so the numeric value is formatted to `displayValue` through THAT config and the
+ * lane carries it for the renderer's value→colour mapping. With no matching override the
+ * lane resolves to the defaults reference (byte-identical to before overrides).
  */
-export const statusHistoryCells = (data: PanelDataResult[] | null | undefined, defaults: FieldConfigDefaults): StatusHistoryLane[] => {
+export const statusHistoryCells = (data: PanelDataResult[] | null | undefined, fieldConfig: FieldConfig): StatusHistoryLane[] => {
   const lanes: StatusHistoryLane[] = [];
 
   for (const [index, series] of extractResultSeries(data).entries()) {
     const label = seriesLabel(series.metric, index);
+    const config = resolveFieldConfig({ name: label }, fieldConfig);
     const cells: StatusCell[] = [];
 
     for (const [time, token] of series.values ?? []) {
       const value = Number(token);
       if (!Number.isFinite(value)) continue;
-      cells.push({ time, value, displayValue: formatValue(value, defaults) });
+      cells.push({ time, value, displayValue: formatValue(value, config) });
     }
 
-    lanes.push({ label, cells });
+    lanes.push({ label, cells, config });
   }
 
   return lanes;

@@ -1,5 +1,4 @@
 import type { StatusHistoryLane } from './status-history-data';
-import type { ValueMapping } from '@graflare/shared/schemas/field-config';
 import type { Panel } from '@graflare/shared/schemas/panel';
 import type { Threshold } from '@graflare/shared/schemas/threshold';
 
@@ -69,13 +68,12 @@ interface StatusHistorySvgProps {
   lanes: StatusHistoryLane[];
   layout: Layout;
   thresholds: readonly Threshold[];
-  mappings: readonly ValueMapping[];
   rowHeight: number;
   colWidth: number;
   label: string;
 }
 
-const StatusHistorySvg = ({ lanes, layout, thresholds, mappings, rowHeight, colWidth, label }: StatusHistorySvgProps) => {
+const StatusHistorySvg = ({ lanes, layout, thresholds, rowHeight, colWidth, label }: StatusHistorySvgProps) => {
   const plotW = VIEW_W - MARGIN.left - MARGIN.right;
   const plotH = VIEW_H - MARGIN.top - MARGIN.bottom;
   const laneH = plotH / Math.max(1, lanes.length);
@@ -108,7 +106,9 @@ const StatusHistorySvg = ({ lanes, layout, thresholds, mappings, rowHeight, colW
           <g key={lane.label}>
             {lane.cells.map(cell => {
               const cx = xPos(cell.time);
-              const fill = stateColor(String(cell.value), thresholds, mappings, FALLBACK_COLOR);
+              // The lane's own resolved mappings drive the colour, so a per-field
+              // mappings override recolours only the matched lane.
+              const fill = stateColor(String(cell.value), thresholds, lane.config.mappings, FALLBACK_COLOR);
               return (
                 <rect
                   key={`${lane.label}-${String(cell.time)}`}
@@ -147,8 +147,11 @@ export const StatusHistoryPanel = ({ panel, timeRange, refetchInterval }: Status
   const rowHeight = display?.rowHeight ?? DEFAULT_ROW_HEIGHT;
   const colWidth = display?.colWidth ?? DEFAULT_COL_WIDTH;
 
-  const { defaults } = panel.fieldConfig;
-  const lanes = useMemo(() => statusHistoryCells(data, defaults), [data, defaults]);
+  // Each lane resolves its own config (per-field overrides) keyed on its label, inside
+  // the helper. With no overrides every lane resolves to the panel defaults reference —
+  // byte-identical formatting and colour to before.
+  const { fieldConfig } = panel;
+  const lanes = useMemo(() => statusHistoryCells(data, fieldConfig), [data, fieldConfig]);
   const layout = useMemo(() => layoutOf(lanes), [lanes]);
 
   // Accessible name for the grid-as-image: series count, so screen-reader users get a
@@ -160,15 +163,7 @@ export const StatusHistoryPanel = ({ panel, timeRange, refetchInterval }: Status
       {layout === null ? (
         <p className='text-muted-foreground text-sm'>No data</p>
       ) : (
-        <StatusHistorySvg
-          lanes={lanes}
-          layout={layout}
-          thresholds={panel.thresholds}
-          mappings={defaults.mappings}
-          rowHeight={rowHeight}
-          colWidth={colWidth}
-          label={label}
-        />
+        <StatusHistorySvg lanes={lanes} layout={layout} thresholds={panel.thresholds} rowHeight={rowHeight} colWidth={colWidth} label={label} />
       )}
     </PanelFrame>
   );

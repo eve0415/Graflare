@@ -1,5 +1,4 @@
 import type { StateTimelineLane } from './state-timeline-data';
-import type { ValueMapping } from '@graflare/shared/schemas/field-config';
 import type { Panel } from '@graflare/shared/schemas/panel';
 import type { Threshold } from '@graflare/shared/schemas/threshold';
 
@@ -63,13 +62,12 @@ interface StateTimelineSvgProps {
   lanes: StateTimelineLane[];
   domain: { lo: number; hi: number };
   thresholds: readonly Threshold[];
-  mappings: readonly ValueMapping[];
   rowHeight: number;
   showValue: 'auto' | 'always' | 'never';
   label: string;
 }
 
-const StateTimelineSvg = ({ lanes, domain, thresholds, mappings, rowHeight, showValue, label }: StateTimelineSvgProps) => {
+const StateTimelineSvg = ({ lanes, domain, thresholds, rowHeight, showValue, label }: StateTimelineSvgProps) => {
   const plotW = VIEW_W - MARGIN.left - MARGIN.right;
   const plotH = VIEW_H - MARGIN.top - MARGIN.bottom;
   const laneH = plotH / Math.max(1, lanes.length);
@@ -101,7 +99,9 @@ const StateTimelineSvg = ({ lanes, domain, thresholds, mappings, rowHeight, show
             {lane.segments.map(seg => {
               const x = xPos(seg.startTime);
               const w = Math.max(MIN_SEG_W, xPos(seg.endTime) - x);
-              const fill = stateColor(String(seg.value), thresholds, mappings, FALLBACK_COLOR);
+              // The lane's own resolved mappings drive the colour, so a per-field
+              // mappings override recolours only the matched lane.
+              const fill = stateColor(String(seg.value), thresholds, lane.config.mappings, FALLBACK_COLOR);
               const fits = showLabel && w >= seg.displayValue.length * APPROX_CHAR_W;
               return (
                 <g key={`${lane.label}-${String(seg.startTime)}`}>
@@ -139,8 +139,11 @@ export const StateTimelinePanel = ({ panel, timeRange, refetchInterval }: StateT
   const rowHeight = display?.rowHeight ?? DEFAULT_ROW_HEIGHT;
   const showValue = display?.showValue ?? DEFAULT_SHOW_VALUE;
 
-  const { defaults } = panel.fieldConfig;
-  const lanes = useMemo(() => stateTimelineLanes(data, defaults), [data, defaults]);
+  // Each lane resolves its own config (per-field overrides) keyed on its label, inside
+  // the helper. With no overrides every lane resolves to the panel defaults reference —
+  // byte-identical formatting and colour to before.
+  const { fieldConfig } = panel;
+  const lanes = useMemo(() => stateTimelineLanes(data, fieldConfig), [data, fieldConfig]);
   const domain = useMemo(() => timeDomain(lanes), [lanes]);
 
   // Accessible name for the timeline-as-image: series count, so screen-reader users get
@@ -152,15 +155,7 @@ export const StateTimelinePanel = ({ panel, timeRange, refetchInterval }: StateT
       {domain === null ? (
         <p className='text-muted-foreground text-sm'>No data</p>
       ) : (
-        <StateTimelineSvg
-          lanes={lanes}
-          domain={domain}
-          thresholds={panel.thresholds}
-          mappings={defaults.mappings}
-          rowHeight={rowHeight}
-          showValue={showValue}
-          label={label}
-        />
+        <StateTimelineSvg lanes={lanes} domain={domain} thresholds={panel.thresholds} rowHeight={rowHeight} showValue={showValue} label={label} />
       )}
     </PanelFrame>
   );

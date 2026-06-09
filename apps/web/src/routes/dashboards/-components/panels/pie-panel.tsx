@@ -1,5 +1,4 @@
 import type { PieSlice } from './pie-data';
-import type { FieldConfigDefaults } from '@graflare/shared/schemas/field-config';
 import type { Panel } from '@graflare/shared/schemas/panel';
 
 import { formatValue } from '@graflare/shared/format/value-format';
@@ -48,9 +47,11 @@ interface DisplaySlice extends PieSlice {
   percentText: string;
 }
 
-const toDisplaySlice = (slice: PieSlice, defaults: FieldConfigDefaults): DisplaySlice => {
-  const mapping = applyValueMappings(slice.value, defaults.mappings);
-  const displayText = mapping?.text ?? formatValue(slice.value, defaults);
+const toDisplaySlice = (slice: PieSlice): DisplaySlice => {
+  // Each slice carries its own resolved config (per-field overrides resolved by
+  // `pieSlices`), so the value label respects a byName unit/decimals/mappings override.
+  const mapping = applyValueMappings(slice.value, slice.config.mappings);
+  const displayText = mapping?.text ?? formatValue(slice.value, slice.config);
   const percentText = `${String(Math.round(slice.fraction * 100))}%`;
   return { ...slice, displayText, percentText };
 };
@@ -94,11 +95,14 @@ const PieLegendItem = ({ slice }: PieLegendItemProps) => {
 export const PiePanel = ({ panel, timeRange, refetchInterval }: PiePanelProps) => {
   const { data, isLoading, error, handleRetry } = usePanelQuery(panel, timeRange, refetchInterval);
 
-  const { defaults } = panel.fieldConfig;
+  const { fieldConfig } = panel;
   const isDonut = panel.displayOptions.pie?.display === 'donut';
   const legend = panel.displayOptions.pie?.legend ?? 'right';
 
-  const slices = useMemo(() => pieSlices(data, SLICE_PALETTE).map(slice => toDisplaySlice(slice, defaults)), [data, defaults]);
+  // `pieSlices` resolves each series' effective config (per-field overrides) keyed on its
+  // label; `toDisplaySlice` formats from that. With no overrides each slice's config is
+  // the panel defaults reference — byte-identical to before.
+  const slices = useMemo(() => pieSlices(data, SLICE_PALETTE, fieldConfig).map(slice => toDisplaySlice(slice)), [data, fieldConfig]);
 
   // A single full-circle slice can't be drawn as a wedge (start === end renders
   // nothing), so it becomes a plain circle.

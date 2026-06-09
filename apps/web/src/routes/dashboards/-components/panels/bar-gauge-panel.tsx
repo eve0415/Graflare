@@ -1,5 +1,4 @@
 import type { BarGaugeSegment } from './bar-gauge-data';
-import type { FieldConfigDefaults } from '@graflare/shared/schemas/field-config';
 import type { Panel } from '@graflare/shared/schemas/panel';
 
 import { formatValue } from '@graflare/shared/format/value-format';
@@ -18,21 +17,27 @@ interface BarGaugePanelProps {
 }
 
 const DEFAULT_BAR_COLOR = '#4ade80';
+const DEFAULT_MIN = 0;
+const DEFAULT_MAX = 100;
 
 interface BarGaugeRowProps {
   segment: BarGaugeSegment;
-  min: number;
-  max: number;
-  defaults: FieldConfigDefaults;
   thresholds: { value: number; color: string }[];
   vertical: boolean;
 }
 
-const BarGaugeRow = ({ segment, min, max, defaults, thresholds, vertical }: BarGaugeRowProps) => {
+const BarGaugeRow = ({ segment, thresholds, vertical }: BarGaugeRowProps) => {
+  // The series' own resolved config drives its unit/decimals/mappings and meter range,
+  // so a per-field override changes only the matched bar. With no override this is the
+  // panel defaults reference (byte-identical to before).
+  const { config } = segment;
+  const min = config.min ?? DEFAULT_MIN;
+  const max = config.max ?? DEFAULT_MAX;
+
   // Mapping text/colour wins over the formatted value and threshold colour,
   // matching the stat panel's precedence.
-  const mapping = useMemo(() => applyValueMappings(segment.value, defaults.mappings), [segment.value, defaults.mappings]);
-  const displayText = mapping?.text ?? formatValue(segment.value, defaults);
+  const mapping = useMemo(() => applyValueMappings(segment.value, config.mappings), [segment.value, config.mappings]);
+  const displayText = mapping?.text ?? formatValue(segment.value, config);
   const fillColor = mapping?.color ?? (thresholds.length > 0 ? getThresholdColor(segment.value, thresholds, DEFAULT_BAR_COLOR) : DEFAULT_BAR_COLOR);
 
   // The coloured fill is layered over a `<meter>` whose own bar is made
@@ -68,28 +73,20 @@ const BarGaugeRow = ({ segment, min, max, defaults, thresholds, vertical }: BarG
 export const BarGaugePanel = ({ panel, timeRange, refetchInterval }: BarGaugePanelProps) => {
   const { data, isLoading, error, handleRetry } = usePanelQuery(panel, timeRange, refetchInterval);
 
-  // Field config is the single home for the range, mirroring the gauge panel.
-  const { defaults } = panel.fieldConfig;
-  const min = defaults.min ?? 0;
-  const max = defaults.max ?? 100;
+  // Each bar resolves its own range/unit/mappings inside the helper (keyed on the series
+  // label it derives), so per-field overrides apply per bar. With no overrides every
+  // series resolves to the panel defaults — byte-identical to before.
+  const { fieldConfig } = panel;
   const vertical = panel.displayOptions.bargauge?.orientation === 'vertical';
 
-  const segments = useMemo(() => barGaugeSegments(data, min, max), [data, min, max]);
+  const segments = useMemo(() => barGaugeSegments(data, fieldConfig), [data, fieldConfig]);
 
   return (
     <PanelFrame title={panel.title} panelId={panel.id} loading={isLoading} error={error instanceof Error ? error.message : null} onRetry={handleRetry}>
       {segments.length > 0 ? (
         <div className={vertical ? 'flex h-full items-end justify-around gap-3 p-2' : 'flex h-full flex-col justify-center gap-2 p-1'}>
           {segments.map((segment, i) => (
-            <BarGaugeRow
-              key={`${segment.label}-${String(i)}`}
-              segment={segment}
-              min={min}
-              max={max}
-              defaults={defaults}
-              thresholds={panel.thresholds}
-              vertical={vertical}
-            />
+            <BarGaugeRow key={`${segment.label}-${String(i)}`} segment={segment} thresholds={panel.thresholds} vertical={vertical} />
           ))}
         </div>
       ) : (

@@ -28,6 +28,19 @@ const piePanel = (unit: string, mappings: ValueMapping[] = [], pie?: PieDisplay)
   fieldConfig: fieldConfig(unit, mappings),
 });
 
+// Same panel but with a full field config, so a test can supply per-field overrides.
+const piePanelWithConfig = (config: FieldConfig): Panel => ({
+  id: 'p1',
+  type: 'pie',
+  title: 'Share',
+  description: '',
+  queries: [{ refId: 'A', expr: 'up', legendFormat: '', format: 'time_series' }],
+  gridPos: { x: 0, y: 0, w: 12, h: 8 },
+  thresholds: [],
+  displayOptions: {},
+  fieldConfig: config,
+});
+
 const vector = (samples: { metric: Record<string, string>; value: number }[]): PanelDataResult[] => [
   {
     status: 'success',
@@ -149,6 +162,49 @@ describe('pie panel', () => {
     render(<PiePanel panel={piePanel('short')} timeRange={timeRange} refetchInterval={false} />);
 
     expect(screen.getAllByRole('listitem')).toHaveLength(2);
+  });
+
+  it('applies a byName unit override to its matched slice only', () => {
+    // `a` gets the bytes unit via override (1536 -> "1.5 KiB"); `b` keeps the empty
+    // default (512 shows raw). The override formats only the matched legend row.
+    const config: FieldConfig = {
+      defaults: { unit: '', mappings: [] },
+      overrides: [{ matcher: { id: 'byName', options: 'a' }, properties: [{ id: 'unit', value: 'bytes' }] }],
+    };
+    mockUsePanelData.mockReturnValue({
+      data: vector([
+        { metric: { __name__: 'a' }, value: 1536 },
+        { metric: { __name__: 'b' }, value: 512 },
+      ]),
+      isLoading: false,
+      error: null,
+      refetch: vi.fn<() => void>(),
+    });
+    render(<PiePanel panel={piePanelWithConfig(config)} timeRange={timeRange} refetchInterval={false} />);
+
+    expect(screen.getByText('1.5 KiB')).toBeDefined();
+    // `b` is unmatched: it stays the raw value, never the bytes-formatted string.
+    expect(screen.getByText('512')).toBeDefined();
+    expect(screen.queryByText('0.5 KiB')).toBeNull();
+  });
+
+  it('does not apply a byName override to a non-matching slice (regression: unchanged from defaults)', () => {
+    // The override targets a series that isn't present; both slices keep the empty
+    // default, so the values render raw exactly as a defaults-only panel did.
+    const config: FieldConfig = {
+      defaults: { unit: '', mappings: [] },
+      overrides: [{ matcher: { id: 'byName', options: 'missing' }, properties: [{ id: 'unit', value: 'bytes' }] }],
+    };
+    mockUsePanelData.mockReturnValue({
+      data: vector([{ metric: { __name__: 'a' }, value: 1536 }]),
+      isLoading: false,
+      error: null,
+      refetch: vi.fn<() => void>(),
+    });
+    render(<PiePanel panel={piePanelWithConfig(config)} timeRange={timeRange} refetchInterval={false} />);
+
+    expect(screen.getByText('1536')).toBeDefined();
+    expect(screen.queryByText('1.5 KiB')).toBeNull();
   });
 
   it('shows a no-data message when there are no series', () => {
