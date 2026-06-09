@@ -7,6 +7,7 @@ import { beforeEach, describe, expect, it } from 'vitest';
 
 import { createDb } from './db';
 import { folders, notificationPolicies, organizations } from './db/schema';
+
 import { GraflareAPI } from './index';
 
 // Cross-tenant isolation regression for the GraflareAPI RPC methods. The update
@@ -48,7 +49,9 @@ describe('cross-tenant isolation: RPC update read-backs are org-scoped', () => {
   it('updateFolder does not return another org folder (no-op update, null read-back)', async () => {
     const folderId = crypto.randomUUID();
     const now = new Date();
-    await createDb(env.DB).insert(folders).values({ id: folderId, orgId: VICTIM_ORG, parentId: null, title: 'victim-folder', slug: 'victim-folder', createdAt: now, updatedAt: now });
+    await createDb(env.DB)
+      .insert(folders)
+      .values({ id: folderId, orgId: VICTIM_ORG, parentId: null, title: 'victim-folder', slug: 'victim-folder', createdAt: now, updatedAt: now });
 
     const attacker = makeApi(ATTACKER_EMAIL);
     const result = await attacker.updateFolder('jwt', folderId, { title: 'pwned' });
@@ -61,21 +64,23 @@ describe('cross-tenant isolation: RPC update read-backs are org-scoped', () => {
   it('updateNotificationPolicy does not return another org policy (no-op update, null read-back)', async () => {
     const policyId = crypto.randomUUID();
     const now = new Date();
-    await createDb(env.DB).insert(notificationPolicies).values({
-      id: policyId,
-      orgId: VICTIM_ORG,
-      parentId: null,
-      contactPointId: null,
-      groupBy: ['alertname'],
-      matchers: [],
-      muteTimingIds: [],
-      groupWaitS: 30,
-      groupIntervalS: 300,
-      repeatIntervalS: 14400,
-      continueMatching: false,
-      createdAt: now,
-      updatedAt: now,
-    });
+    await createDb(env.DB)
+      .insert(notificationPolicies)
+      .values({
+        id: policyId,
+        orgId: VICTIM_ORG,
+        parentId: null,
+        contactPointId: null,
+        groupBy: ['alertname'],
+        matchers: [],
+        muteTimingIds: [],
+        groupWaitS: 30,
+        groupIntervalS: 300,
+        repeatIntervalS: 14400,
+        continueMatching: false,
+        createdAt: now,
+        updatedAt: now,
+      });
 
     const attacker = makeApi(ATTACKER_EMAIL);
     const result = await attacker.updateNotificationPolicy('jwt', policyId, { groupWaitS: 999 });
