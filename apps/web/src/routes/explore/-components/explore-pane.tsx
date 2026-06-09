@@ -1,5 +1,5 @@
 import type { QueryEditorMode } from '../../-root/query-editor-shell';
-import type { MergeInput, MergedChartData } from './explore-series-merge';
+import type { MergeInput, MergeSeries, MergedChartData } from './explore-series-merge';
 import type { QueryHistoryEntry } from './query-history-store';
 import type { DatasourceDialect } from '@graflare/shared/schemas/datasource';
 import type { PrometheusData } from '@graflare/shared/schemas/prometheus';
@@ -50,13 +50,6 @@ const VALID_DIALECTS = new Set<string>(['postgres', 'sqlite']);
 
 const isValidDialect = (value: string | null | undefined): value is DatasourceDialect => typeof value === 'string' && VALID_DIALECTS.has(value);
 
-/** Full parsed Prometheus matrix/vector series — carries `values` (range) and `value` (instant). */
-interface PrometheusSeries {
-  metric: Record<string, string>;
-  values?: [number, string][];
-  value?: [number, string];
-}
-
 interface QueryRowEntry {
   /** Stable identity, also the React key + the row's `onChange` id. */
   id: string;
@@ -69,7 +62,7 @@ interface QueryRowEntry {
 
 /** One row's run outcome, discriminated so the post-run partition narrows without casts. */
 type RunOutcome =
-  | { kind: 'series'; refId: string; series: PrometheusSeries[] }
+  | { kind: 'series'; refId: string; series: MergeSeries[] }
   | { kind: 'table'; refId: string; result: SqlResponse }
   | { kind: 'error'; refId: string; error: string };
 
@@ -107,9 +100,9 @@ const StackedSqlTable = ({ refId, result, showLabel }: { refId: string; result: 
 };
 
 /** Pull the typed metric+sample series out of a Prometheus query-range/SQL-adapted response. */
-const parsePrometheusSeries = (data: PrometheusData | undefined): PrometheusSeries[] => {
+const parsePrometheusSeries = (data: PrometheusData | undefined): MergeSeries[] => {
   if (data === undefined || !('resultType' in data) || !Array.isArray(data.result)) return [];
-  const parsed: PrometheusSeries[] = [];
+  const parsed: MergeSeries[] = [];
   for (const item of data.result) {
     // `result` may be a bare scalar sample tuple ([number, string]); skip those — only metric
     // series have a `metric`. matrix items carry `values`; vector items carry `value`.
@@ -132,8 +125,10 @@ export const ExplorePane = ({ timeRange, label }: ExplorePaneProps) => {
 
   const [resultView, setResultView] = useState<ResultView>('graph');
   const [sqlFormat, setSqlFormat] = useState<SqlFormat>('time_series');
-  // Combined series across all run rows (graph + the prometheus-style table both derive from it).
-  const [seriesResult, setSeriesResult] = useState<PrometheusSeries[] | null>(null);
+  // Successful series grouped by ref id, one entry per run row (graph + the prometheus-style table
+  // both derive from this). Stored already-grouped so neither path re-groups — `mergeSeries` takes
+  // `MergeInput[]` directly, and the table reads each group's ref id.
+  const [seriesResult, setSeriesResult] = useState<MergeInput[] | null>(null);
   // SQL `table`-format results, one per run row (stacked in the table view).
   const [tableResults, setTableResults] = useState<TableResult[] | null>(null);
   const [loading, setLoading] = useState(false);
@@ -232,7 +227,7 @@ export const ExplorePane = ({ timeRange, label }: ExplorePaneProps) => {
         try {
           const outcomes = await Promise.all(runnable.map(q => runOne(q.refId, dsId, q.query, runIsSql, runSqlFormat)));
 
-          const combinedSeries: PrometheusSeries[] = [];
+          const combinedSeries: MergeInput[] = [];
           const tables: TableResult[] = [];
           const failures: { refId: string; error: string }[] = [];
           let successCount = 0;
@@ -240,9 +235,9 @@ export const ExplorePane = ({ timeRange, label }: ExplorePaneProps) => {
           for (const outcome of outcomes) {
             switch (outcome.kind) {
               case 'series':
-                // Tag each series with its ref id (reserved metric key) so the merge can group
-                // and label per query; the table strips it and only surfaces it when >1 query ran.
-                for (const s of outcome.series) combinedSeries.push({ ...s, metric: { __refId__: outcome.refId, ...s.metric } });
+                // Keep the row's series grouped under its ref id — the merge groups/labels per
+                // query and the table reads the ref id directly (no reserved metric key needed).
+                combinedSeries.push({ refId: outcome.refId, series: outcome.series });
                 successCount++;
                 break;
               case 'table':
@@ -338,31 +333,13 @@ export const ExplorePane = ({ timeRange, label }: ExplorePaneProps) => {
   }, []);
 
   // Graph data + labels come from ONE merge pass so the stroke-series count can't drift from the
-  // value-array count. SQL-table results never reach here (they render as stacked tables).
-  const mergeInputs = useMemo((): MergeInput[] => {
-    if (seriesResult === null) return [];
-    // Group the flat combined series back by their ref id (carried on a reserved metric key).
-    const byRef = new Map<string, MergeInput>();
-    const order: string[] = [];
-    for (const s of seriesResult) {
-      const refId = s.metric.__refId__ ?? '';
-      let entry = byRef.get(refId);
-      if (entry === undefined) {
-        entry = { refId, series: [] };
-        byRef.set(refId, entry);
-        order.push(refId);
-      }
-      entry.series.push({ metric: s.metric, values: s.values });
-    }
-    return order.map(r => {
-      const entry = byRef.get(r);
-      return entry ?? { refId: r, series: [] };
-    });
-  }, [seriesResult]);
+  // value-array count. `seriesResult` is already grouped by ref id, so it feeds the merge directly.
+  // SQL-table results never reach here (they render as stacked tables).
+  const merged = useMemo(() => mergeSeries(seriesResult ?? []), [seriesResult]);
 
-  const merged = useMemo(() => mergeSeries(mergeInputs), [mergeInputs]);
-
-  const chartData = useMemo((): MergedChartData => merged.data, [merged]);
+  // A plain field read off the already-memoized `merged` — stable without its own memo (and a
+  // member access, so react-perf's no-new-array-as-prop rule doesn't fire at the chart call site).
+  const chartData: MergedChartData = merged.data;
 
   const chartFallback = useMemo(() => <Skeleton className='h-72 w-full' />, []);
 
@@ -380,21 +357,20 @@ export const ExplorePane = ({ timeRange, label }: ExplorePaneProps) => {
   // one query contributed, so a single query's table is byte-identical to the old behavior.
   const seriesTableData = useMemo(() => {
     if (seriesResult === null) return { columns: [], rows: [] };
-    const refIds = new Set<string>();
-    for (const s of seriesResult) refIds.add(s.metric.__refId__ ?? '');
-    const multi = refIds.size > 1;
-    // Strip the reserved key; only surface a `Query` column when >1 query contributed.
-    const forTable: PrometheusSeries[] = seriesResult.map(s => {
-      const metric: Record<string, string> = {};
-      if (multi) metric.Query = s.metric.__refId__ ?? '';
-      for (const [k, v] of Object.entries(s.metric)) {
-        if (k !== '__refId__') metric[k] = v;
+    // Only count groups that actually produced series, so a `Query` column appears exactly when
+    // more than one query contributed rows — a single contributing query's table is unchanged.
+    const multi = seriesResult.filter(g => g.series.length > 0).length > 1;
+    const forTable: MergeSeries[] = [];
+    for (const group of seriesResult) {
+      for (const s of group.series) {
+        // A real metric label would win the (practically impossible) clash with the `Query` column.
+        const metric: Record<string, string> = multi ? { Query: group.refId, ...s.metric } : { ...s.metric };
+        const out: MergeSeries = { metric };
+        if (s.values !== undefined) out.values = s.values;
+        if (s.value !== undefined) out.value = s.value;
+        forTable.push(out);
       }
-      const out: PrometheusSeries = { metric };
-      if (s.values !== undefined) out.values = s.values;
-      if (s.value !== undefined) out.value = s.value;
-      return out;
-    });
+    }
     return formatPrometheusToTable(forTable);
   }, [seriesResult]);
 
@@ -405,7 +381,10 @@ export const ExplorePane = ({ timeRange, label }: ExplorePaneProps) => {
       for (const t of tableResults) total += t.result.rows.length;
       return total;
     }
-    return seriesResult?.length ?? 0;
+    if (seriesResult === null) return 0;
+    let total = 0;
+    for (const g of seriesResult) total += g.series.length;
+    return total;
   }, [seriesResult, tableResults]);
 
   const canRemove = rows.length > 1;

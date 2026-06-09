@@ -14,10 +14,16 @@
  * them as-is; only the table formatter multiplies by 1000 for display.
  */
 
-/** A single series: a metric label set plus its [unixSeconds, valueString] samples. */
+/**
+ * A single series a query row contributes: a metric label set plus its samples. A matrix carries
+ * `values` (the range samples the graph merge projects); a vector carries an instant `value`. Both
+ * are optional and carried through so the same shape feeds the graph (uses `values`) and the table
+ * (uses either). This is the one canonical Explore series shape — the pane stores it directly.
+ */
 export interface MergeSeries {
   metric: Record<string, string>;
-  values?: [number, string][] | undefined;
+  values?: [number, string][];
+  value?: [number, string];
 }
 
 /** One query row's contribution: its positional ref id (A, B, C, …) and the series it returned. */
