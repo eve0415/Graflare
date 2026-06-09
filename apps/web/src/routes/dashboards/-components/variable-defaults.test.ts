@@ -3,7 +3,7 @@ import type { Variable } from '@graflare/shared/schemas/variable';
 
 import { describe, expect, it } from 'vitest';
 
-import { buildEffectiveValues, computeVariableDefault, filterDatasourceItems } from './variable-defaults';
+import { buildEffectiveValues, computeVariableDefault, filterDatasourceItems, resolveAdhocVariables } from './variable-defaults';
 
 const baseVariable: Variable = {
   name: 'v',
@@ -16,6 +16,7 @@ const baseVariable: Variable = {
   includeAll: false,
   current: '',
   options: [],
+  filters: [],
 };
 
 const makeVariable = (overrides: Partial<Variable>): Variable => ({ ...baseVariable, ...overrides });
@@ -152,5 +153,39 @@ describe('buildEffectiveValues', () => {
     const variables = [makeVariable({ name: 'text', type: 'textbox', current: 'hello' })];
     const result = buildEffectiveValues(variables, new Map([['text', '']]), datasources);
     expect(result.get('text')).toBe('');
+  });
+});
+
+describe('computeVariableDefault — adhoc', () => {
+  it('returns empty (adhoc carries no scalar value)', () => {
+    expect(computeVariableDefault(makeVariable({ type: 'adhoc', filters: [{ key: 'env', operator: '=', value: 'prod' }] }), datasources)).toBe('');
+  });
+});
+
+describe('resolveAdhocVariables', () => {
+  const PROM = '11111111-1111-4111-8111-111111111111';
+
+  it('keeps only adhoc variables and uses their saved filters when no override exists', () => {
+    const variables = [
+      makeVariable({ name: 'q', type: 'query' }),
+      makeVariable({ name: 'f', type: 'adhoc', datasourceId: PROM, filters: [{ key: 'env', operator: '=', value: 'prod' }] }),
+    ];
+    const result = resolveAdhocVariables(variables, new Map());
+    expect(result).toHaveLength(1);
+    expect(result[0]?.name).toBe('f');
+    expect(result[0]?.filters).toEqual([{ key: 'env', operator: '=', value: 'prod' }]);
+  });
+
+  it('replaces the saved filters with a live override', () => {
+    const variables = [makeVariable({ name: 'f', type: 'adhoc', datasourceId: PROM, filters: [{ key: 'env', operator: '=', value: 'prod' }] })];
+    const overrides = new Map([['f', [{ key: 'region', operator: '=~' as const, value: 'us.*' }]]]);
+    const result = resolveAdhocVariables(variables, overrides);
+    expect(result[0]?.filters).toEqual([{ key: 'region', operator: '=~', value: 'us.*' }]);
+  });
+
+  it('an override to an empty array clears the filters (distinct from "no override")', () => {
+    const variables = [makeVariable({ name: 'f', type: 'adhoc', datasourceId: PROM, filters: [{ key: 'env', operator: '=', value: 'prod' }] })];
+    const result = resolveAdhocVariables(variables, new Map([['f', []]]));
+    expect(result[0]?.filters).toEqual([]);
   });
 });

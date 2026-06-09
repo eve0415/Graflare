@@ -1,5 +1,5 @@
 import type { DatasourceItem } from './variable-defaults';
-import type { Variable } from '@graflare/shared/schemas/variable';
+import type { AdhocFilter, Variable } from '@graflare/shared/schemas/variable';
 import type { FocusEvent, KeyboardEvent, ReactNode } from 'react';
 
 import { Input } from '@graflare/ui/components/input';
@@ -9,22 +9,34 @@ import { useCallback, useId, useMemo } from 'react';
 
 import { datasourcesQueryOptions } from '../../datasources/-queries';
 
+import { AdhocFilterRow } from './variable-adhoc-bar';
 import { filterDatasourceItems } from './variable-defaults';
 
 interface VariableBarProps {
   variables: Variable[];
   values: Map<string, string>;
   onChange: (name: string, value: string) => void;
+  /** Adhoc variables with their LIVE filters folded in (the bar renders/edits these). */
+  adhocVariables: readonly Variable[];
+  onAdhocFiltersChange: (name: string, filters: AdhocFilter[]) => void;
 }
 
-export const VariableBar = ({ variables, values, onChange }: VariableBarProps) => {
+export const VariableBar = ({ variables, values, onChange, adhocVariables, onAdhocFiltersChange }: VariableBarProps) => {
+  // Resolve each adhoc variable to its live-filter version so a bar edit shows immediately; the
+  // base `variables` list carries the saved (stale) filters, so adhoc controls read from here.
+  const adhocByName = useMemo(() => new Map(adhocVariables.map(v => [v.name, v])), [adhocVariables]);
+
   if (variables.length === 0) return null;
 
   return (
     <div className='flex flex-wrap items-center gap-2 border-b px-4 py-2' role='toolbar' aria-label='Template variables'>
-      {variables.map(v => (
-        <VariableControl key={v.name} variable={v} value={values.get(v.name) ?? v.current} onChange={onChange} />
-      ))}
+      {variables.map(v =>
+        v.type === 'adhoc' ? (
+          <AdhocFilterRow key={v.name} variable={adhocByName.get(v.name) ?? v} onFiltersChange={onAdhocFiltersChange} />
+        ) : (
+          <VariableControl key={v.name} variable={v} value={values.get(v.name) ?? v.current} onChange={onChange} />
+        ),
+      )}
     </div>
   );
 };
@@ -36,8 +48,9 @@ interface VariableControlProps {
 }
 
 // One control per variable, picked by type. `constant` shows static text; `textbox` is a free
-// text input; `datasource` resolves its options from the live datasource list; everything else
-// (`query`/`custom`/`interval`) is a dropdown driven by the variable's `options`.
+// text input; `datasource` resolves its options from the live datasource list; `query`/`custom`/
+// `interval` are a dropdown driven by the variable's `options`. (`adhoc` is handled upstream by
+// the bar, which renders an AdhocFilterRow instead — so it never reaches this switch.)
 const VariableControl = ({ variable, value, onChange }: VariableControlProps) => {
   switch (variable.type) {
     case 'constant':
@@ -50,6 +63,10 @@ const VariableControl = ({ variable, value, onChange }: VariableControlProps) =>
     case 'custom':
     case 'interval':
       return <VariableOptionsSelect variable={variable} value={value} onChange={onChange} />;
+    case 'adhoc':
+      // Unreachable: the bar routes adhoc variables to AdhocFilterRow before this switch. Return
+      // null defensively so the union stays exhaustive without a non-null assertion or cast.
+      return null;
   }
 };
 

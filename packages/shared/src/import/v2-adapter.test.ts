@@ -514,14 +514,19 @@ describe('importV2', () => {
       expect(result.dashboard.variables[0]?.type).toBe('datasource');
     });
 
-    it('maps an unsupported type (adhoc) to custom and warns', () => {
+    it('maps an adhoc variable as a real adhoc variable, carrying its supported filters', () => {
       const result = importV2({
         ...validV2Dashboard,
-        spec: { ...validV2Dashboard.spec, variables: [{ name: 'filters', type: 'adhoc', query: '' }] },
+        spec: {
+          ...validV2Dashboard.spec,
+          variables: [{ name: 'filters', type: 'adhoc', query: '', filters: [{ key: 'env', operator: '=', value: 'prod' }] }],
+        },
       });
 
-      expect(result.dashboard.variables[0]?.type).toBe('custom');
-      expect(result.warnings.some(w => w.includes('adhoc'))).toBe(true);
+      const [variable] = result.dashboard.variables;
+      expect(variable?.type).toBe('adhoc');
+      expect(variable?.filters).toEqual([{ key: 'env', operator: '=', value: 'prod' }]);
+      expect(result.warnings.some(w => w.includes('unsupported type'))).toBe(false);
     });
 
     it('skips variables with empty name', () => {

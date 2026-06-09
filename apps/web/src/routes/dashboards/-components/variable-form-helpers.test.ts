@@ -51,6 +51,7 @@ const sample: Variable = {
   includeAll: true,
   current: 'node',
   options: ['node', 'api'],
+  filters: [],
 };
 
 describe('resetForType', () => {
@@ -67,6 +68,7 @@ describe('resetForType', () => {
       includeAll: false,
       current: '',
       options: [],
+      filters: [],
     });
   });
 

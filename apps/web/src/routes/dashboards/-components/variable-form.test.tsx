@@ -36,6 +36,7 @@ const baseVariable = (overrides: Partial<Variable>): Variable => ({
   includeAll: false,
   current: '',
   options: [],
+  filters: [],
   ...overrides,
 });
 

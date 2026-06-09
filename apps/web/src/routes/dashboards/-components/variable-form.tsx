@@ -18,6 +18,7 @@ const TYPE_OPTIONS = [
   { value: 'textbox', label: 'Text box' },
   { value: 'interval', label: 'Interval' },
   { value: 'datasource', label: 'Data source' },
+  { value: 'adhoc', label: 'Ad hoc filters' },
 ] as const;
 
 const SORT_OPTIONS = [
@@ -29,7 +30,7 @@ const SORT_OPTIONS = [
 ] as const;
 
 const isVariableType = (v: string | null): v is VariableType =>
-  v === 'query' || v === 'custom' || v === 'constant' || v === 'textbox' || v === 'interval' || v === 'datasource';
+  v === 'query' || v === 'custom' || v === 'constant' || v === 'textbox' || v === 'interval' || v === 'datasource' || v === 'adhoc';
 
 const isVariableSort = (v: string | null): v is VariableSort =>
   v === 'disabled' || v === 'alphabetical-asc' || v === 'alphabetical-desc' || v === 'numerical-asc' || v === 'numerical-desc';
@@ -336,6 +337,27 @@ export const VariableForm = ({ initial, existingNames, datasources, onSubmit, on
             </Label>
           </div>
         </>
+      )}
+
+      {draft.type === 'adhoc' && (
+        <div className='space-y-2'>
+          <Label htmlFor={`${nameId}-ds`}>Data source</Label>
+          <Select value={draft.datasourceId ?? ''} onValueChange={handleDatasourceChange} items={dsItems}>
+            <SelectTrigger id={`${nameId}-ds`} className='w-full' aria-label='Data source'>
+              <SelectValue placeholder='Select a data source' />
+            </SelectTrigger>
+            <SelectContent>
+              {dsItems.map(o => (
+                <SelectItem key={o.value} value={o.value}>
+                  {o.label}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          <p className='text-muted-foreground text-xs'>
+            Filters are added on the dashboard from the variable bar; they inject into every query against this data source.
+          </p>
+        </div>
       )}
 
       {formError !== null && (

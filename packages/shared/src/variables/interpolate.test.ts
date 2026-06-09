@@ -2,7 +2,7 @@ import type { PanelQuery } from '../schemas/panel';
 
 import { describe, expect, it } from 'vitest';
 
-import { interpolateQueries, interpolateVariables } from './interpolate';
+import { interpolateAndInjectQueries, interpolateQueries, interpolateVariables } from './interpolate';
 
 // Build "${name}" at runtime to avoid triggering no-template-curly-in-string.
 const braced = (name: string): string => ['$', '{', name, '}'].join('');
@@ -171,5 +171,35 @@ describe('interpolateQueries', () => {
     const vars = new Map<string, string | string[]>();
     const input = [query('up{job="prometheus"}')];
     expect(interpolateQueries(input, vars)).toEqual(input);
+  });
+});
+
+describe('interpolateAndInjectQueries', () => {
+  const noVars = new Map<string, string | string[]>();
+
+  it('is byte-identical to interpolateQueries when there are no adhoc filters', () => {
+    const vars = new Map<string, string | string[]>([['job', 'node']]);
+    const input = [query('up{job="$job"}'), query('rate(req[5m]) / total')];
+    expect(interpolateAndInjectQueries(input, vars, [])).toEqual(interpolateQueries(input, vars));
+  });
+
+  it('injects adhoc matchers into every selector after interpolation', () => {
+    const vars = new Map<string, string | string[]>([['job', 'node']]);
+    const result = interpolateAndInjectQueries([query('up{job="$job"}')], vars, [{ key: 'env', operator: '=', value: 'prod' }]);
+    expect(result[0]?.expr).toBe('up{job="node",env="prod"}');
+  });
+
+  it('injects into a $var that expands to a bare metric name', () => {
+    const vars = new Map<string, string | string[]>([['metric', 'http_requests_total']]);
+    const result = interpolateAndInjectQueries([query('$metric')], vars, [{ key: 'env', operator: '=~', value: 'prod|staging' }]);
+    expect(result[0]?.expr).toBe('http_requests_total{env=~"prod|staging"}');
+  });
+
+  it('preserves refId/legendFormat/format and leaves the input queries untouched', () => {
+    const input = [{ refId: 'B', expr: 'up', legendFormat: 'L', format: 'table' } as const];
+    const result = interpolateAndInjectQueries(input, noVars, [{ key: 'env', operator: '=', value: 'prod' }]);
+    expect(result[0]).toEqual({ refId: 'B', expr: 'up{env="prod"}', legendFormat: 'L', format: 'table' });
+    // The original query object is not mutated.
+    expect(input[0]?.expr).toBe('up');
   });
 });

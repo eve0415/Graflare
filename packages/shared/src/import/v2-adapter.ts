@@ -8,7 +8,7 @@ import { grafanaV2Schema } from '../schemas/grafana-v2';
 
 import { mapOverrides } from './override-mapping';
 import { mapTransformations } from './transformation-mapping';
-import { resolveVariableType, splitCsv } from './variable-mapping';
+import { mapAdhocFilters, resolveVariableType, splitCsv } from './variable-mapping';
 
 // Grafana V2 element kinds whose lowercased name differs from our internal panel
 // type. Identity is assumed for the rest (e.g. `barchart` → `barchart`), so only the
@@ -58,6 +58,10 @@ const mapV2Variable = (v: V2Variable, warnings: string[]): Variable | null => {
   // V2 variables carry no enumerated options, so interval steps come from the
   // comma-separated query.
   const options = type === 'interval' ? splitCsv(v.query) : [];
+  // Adhoc variables carry their matchers in `filters[]`; every other type has none. As with the
+  // classic adapter the datasource ref isn't mapped, so an imported adhoc variable is scoped from
+  // the editor before it injects.
+  const filters = type === 'adhoc' ? mapAdhocFilters(v.filters, v.name, warnings) : [];
 
   return {
     name: v.name,
@@ -70,6 +74,7 @@ const mapV2Variable = (v: V2Variable, warnings: string[]): Variable | null => {
     includeAll: v.includeAll,
     current: '',
     options,
+    filters,
   };
 };
 

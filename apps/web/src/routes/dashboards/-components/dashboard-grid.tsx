@@ -1,5 +1,6 @@
 import type { Annotation } from '@graflare/shared/schemas/annotation';
 import type { Panel } from '@graflare/shared/schemas/panel';
+import type { Variable } from '@graflare/shared/schemas/variable';
 import type { Layout } from 'react-grid-layout';
 
 import { useMemo } from 'react';
@@ -17,6 +18,7 @@ interface DashboardGridProps {
   editMode: boolean;
   onLayoutChange?: (panels: Panel[]) => void;
   variables: ReadonlyMap<string, string | string[]>;
+  adhocVariables: readonly Variable[];
   annotations: readonly Annotation[];
 }
 
@@ -33,7 +35,7 @@ const GRID_CONFIG = { cols: COLS, rowHeight: ROW_HEIGHT, margin: MARGIN };
 // allocate a fresh style object per panel per render.
 const PANEL_CELL_STYLE = { minWidth: 0 } as const;
 
-export const DashboardGrid = ({ panels, timeRange, refreshInterval, editMode, onLayoutChange, variables, annotations }: DashboardGridProps) => {
+export const DashboardGrid = ({ panels, timeRange, refreshInterval, editMode, onLayoutChange, variables, adhocVariables, annotations }: DashboardGridProps) => {
   // The fork's WidthProvider replacement: a ResizeObserver on `containerRef` that yields the
   // live container width (initialWidth 1280 until measured). `mounted` is false until the
   // first measurement — we gate the grid on it so the 1280 fallback is never painted at a
@@ -118,6 +120,7 @@ export const DashboardGrid = ({ panels, timeRange, refreshInterval, editMode, on
                   width={size?.width ?? panel.gridPos.w * (ROW_HEIGHT + MARGIN[0])}
                   height={size?.height ?? panel.gridPos.h * ROW_HEIGHT}
                   variables={variables}
+                  adhocVariables={adhocVariables}
                   annotations={annotations}
                 />
               </div>

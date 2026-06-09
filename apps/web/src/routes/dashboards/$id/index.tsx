@@ -1,7 +1,7 @@
 import type { DatasourceRow } from '../../datasources/-api';
 import type { Annotation } from '@graflare/shared/schemas/annotation';
 import type { Panel } from '@graflare/shared/schemas/panel';
-import type { Variable } from '@graflare/shared/schemas/variable';
+import type { AdhocFilter, Variable } from '@graflare/shared/schemas/variable';
 
 import { panelSchema } from '@graflare/shared/schemas/panel';
 import { variableSchema } from '@graflare/shared/schemas/variable';
@@ -22,7 +22,7 @@ import { initialRefresh, initialTimeRange, intervalToMs } from '../-components/d
 import { PanelEditor } from '../-components/panel-editor';
 import { PanelActionsProvider } from '../-components/panels/panel-actions-context';
 import { VariableBar } from '../-components/variable-bar';
-import { buildEffectiveValues } from '../-components/variable-defaults';
+import { buildEffectiveValues, resolveAdhocVariables } from '../-components/variable-defaults';
 import { annotationsQueryOptions, dashboardQueryOptions } from '../-queries';
 import { useRecentDashboards } from '../../-root/use-recent-dashboards';
 import { datasourcesQueryOptions } from '../../datasources/-queries';
@@ -76,6 +76,10 @@ const DashboardViewPage = () => {
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [annotationsOpen, setAnnotationsOpen] = useState(false);
   const [variableValues, setVariableValues] = useState<Map<string, string>>(new Map());
+  // Live adhoc-filter edits, keyed by variable name. Runtime-only: seeded from each adhoc
+  // variable's saved `filters` (when absent here) and never written back through updateDashboard —
+  // the bar owns the live filters; the editor only sets the variable's type + datasource.
+  const [adhocFilterValues, setAdhocFilterValues] = useState<Map<string, AdhocFilter[]>>(new Map());
 
   const dashboardPanels = useMemo(() => {
     if (dashboard === null) return [];
@@ -101,6 +105,10 @@ const DashboardViewPage = () => {
     () => buildEffectiveValues(dashboardVariables, variableValues, datasources ?? []),
     [dashboardVariables, variableValues, datasources],
   );
+
+  // Adhoc variables with their live filters folded in (saved filters under any bar edit). The grid
+  // scopes these per-panel by datasource and injects them; the bar renders/edits them.
+  const dashboardAdhocVariables = useMemo(() => resolveAdhocVariables(dashboardVariables, adhocFilterValues), [dashboardVariables, adhocFilterValues]);
 
   // Resolve the visible window to epoch MS once per range change (not every render,
   // or `now` would drift the query key and refetch constantly). One fetch per
@@ -222,6 +230,14 @@ const DashboardViewPage = () => {
     });
   }, []);
 
+  const handleAdhocFiltersChange = useCallback((name: string, filters: AdhocFilter[]) => {
+    setAdhocFilterValues(prev => {
+      const next = new Map(prev);
+      next.set(name, filters);
+      return next;
+    });
+  }, []);
+
   // Record this dashboard as recently-viewed once it (and its title) have loaded. Writing
   // through the external recents store — not React state — so this is a side effect, not a
   // set-state-in-effect. `dashboard` keeps a stable react-query identity until a refetch, so
@@ -253,7 +269,13 @@ const DashboardViewPage = () => {
         saving={saving}
       />
 
-      <VariableBar variables={dashboardVariables} values={effectiveValues} onChange={handleVariableChange} />
+      <VariableBar
+        variables={dashboardVariables}
+        values={effectiveValues}
+        onChange={handleVariableChange}
+        adhocVariables={dashboardAdhocVariables}
+        onAdhocFiltersChange={handleAdhocFiltersChange}
+      />
 
       <div className='flex-1 p-4'>
         {editMode && (
@@ -279,6 +301,7 @@ const DashboardViewPage = () => {
               editMode={editMode}
               onLayoutChange={handleLayoutChange}
               variables={effectiveValues}
+              adhocVariables={dashboardAdhocVariables}
               annotations={dashboardAnnotations}
             />
           </PanelActionsProvider>

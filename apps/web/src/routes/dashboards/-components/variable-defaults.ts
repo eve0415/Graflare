@@ -1,5 +1,5 @@
 import type { DatasourceRow } from '../../datasources/-api';
-import type { Variable } from '@graflare/shared/schemas/variable';
+import type { AdhocFilter, Variable } from '@graflare/shared/schemas/variable';
 
 export interface DatasourceItem {
   value: string;
@@ -31,6 +31,7 @@ export const filterDatasourceItems = (datasources: readonly DatasourceRow[], typ
  * - `datasource`: `current` if it still resolves to a datasource that passes the type filter,
  *   else the first matching datasource id, else empty.
  * - `query`/`custom`: the saved `current`, else the first available option.
+ * - `adhoc`: no scalar value (its state is the `filters` array, carried separately), so `''`.
  */
 export const computeVariableDefault = (variable: Variable, datasources: readonly DatasourceRow[]): string => {
   switch (variable.type) {
@@ -48,7 +49,25 @@ export const computeVariableDefault = (variable: Variable, datasources: readonly
       }
       return items[0]?.value ?? '';
     }
+    case 'adhoc':
+      return '';
   }
+};
+
+/**
+ * Resolve the adhoc variables with their LIVE filters folded in: each adhoc variable's saved
+ * `filters` are the seed, replaced by any runtime override the user has applied via the bar. The
+ * result is what the grid scopes per-panel and injects, so an edit in the bar re-runs the affected
+ * panels without persisting back to the dashboard. Non-adhoc variables are dropped.
+ */
+export const resolveAdhocVariables = (variables: readonly Variable[], filterOverrides: ReadonlyMap<string, readonly AdhocFilter[]>): Variable[] => {
+  const result: Variable[] = [];
+  for (const variable of variables) {
+    if (variable.type !== 'adhoc') continue;
+    const override = filterOverrides.get(variable.name);
+    result.push(override === undefined ? variable : { ...variable, filters: [...override] });
+  }
+  return result;
 };
 
 /**

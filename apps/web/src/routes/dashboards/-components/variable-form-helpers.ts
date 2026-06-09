@@ -44,7 +44,7 @@ export const resetForType = (variable: Variable, type: VariableType): Variable =
   name: variable.name,
   label: variable.label,
   type,
-  // datasourceId is intentionally dropped on type change — only `query`-type variables use it,
+  // datasourceId is intentionally dropped on type change — only `query`/`adhoc` variables use it,
   // and it is re-selected from the per-type form.
   query: '',
   regex: '',
@@ -53,6 +53,8 @@ export const resetForType = (variable: Variable, type: VariableType): Variable =
   includeAll: false,
   current: '',
   options: [],
+  // Filters reset with the type; an adhoc variable's live filters are managed by the bar, not here.
+  filters: [],
 });
 
 /**
@@ -69,6 +71,7 @@ export const blankVariable = (): Variable => ({
   includeAll: false,
   current: '',
   options: [],
+  filters: [],
 });
 
 // A blocked save is either a name problem (which `variableSchema` can't express) or some other

@@ -639,14 +639,46 @@ describe('importClassic', () => {
       expect(v?.query).toBe('prometheus');
     });
 
-    it('maps an unsupported type (adhoc) to custom and warns', () => {
+    it('maps an adhoc variable as a real adhoc variable, carrying its supported filters', () => {
       const result = importClassic({
         ...minimalDashboard,
-        templating: { list: [{ name: 'filters', type: 'adhoc', query: '', current: { value: '' }, options: [] }] },
+        templating: {
+          list: [
+            {
+              name: 'filters',
+              type: 'adhoc',
+              query: '',
+              current: { value: '' },
+              options: [],
+              filters: [
+                { key: 'env', operator: '=', value: 'prod' },
+                { key: 'region', operator: '=~', value: 'us.*' },
+              ],
+            },
+          ],
+        },
       });
 
-      expect(result.dashboard.variables[0]?.type).toBe('custom');
-      expect(result.warnings.some(w => w.includes('adhoc'))).toBe(true);
+      const [variable] = result.dashboard.variables;
+      expect(variable?.type).toBe('adhoc');
+      expect(variable?.filters).toEqual([
+        { key: 'env', operator: '=', value: 'prod' },
+        { key: 'region', operator: '=~', value: 'us.*' },
+      ]);
+      // A real adhoc import is not a downgrade, so no "unsupported type" warning.
+      expect(result.warnings.some(w => w.includes('unsupported type'))).toBe(false);
+    });
+
+    it('drops an adhoc filter with an unsupported operator and warns', () => {
+      const result = importClassic({
+        ...minimalDashboard,
+        templating: {
+          list: [{ name: 'filters', type: 'adhoc', query: '', current: { value: '' }, options: [], filters: [{ key: 'cpu', operator: '>', value: '5' }] }],
+        },
+      });
+
+      expect(result.dashboard.variables[0]?.filters).toEqual([]);
+      expect(result.warnings.some(w => w.includes('unsupported operator'))).toBe(true);
     });
 
     it('skips variables with empty name', () => {

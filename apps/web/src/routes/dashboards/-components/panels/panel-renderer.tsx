@@ -1,7 +1,9 @@
 import type { Annotation } from '@graflare/shared/schemas/annotation';
 import type { Panel } from '@graflare/shared/schemas/panel';
+import type { Variable } from '@graflare/shared/schemas/variable';
 
-import { interpolateQueries } from '@graflare/shared/variables/interpolate';
+import { resolveAdhocFilters } from '@graflare/shared/variables/adhoc';
+import { interpolateAndInjectQueries } from '@graflare/shared/variables/interpolate';
 import { useMemo } from 'react';
 
 import { BarChartPanel } from './bar-chart-panel';
@@ -25,14 +27,21 @@ interface PanelRendererProps {
   width: number;
   height: number;
   variables: ReadonlyMap<string, string | string[]>;
+  /** Adhoc variables with their live filters; scoped to this panel's datasource at render. */
+  adhocVariables: readonly Variable[];
   annotations: readonly Annotation[];
 }
 
-export const PanelRenderer = ({ panel, timeRange, refetchInterval, width, height, variables, annotations }: PanelRendererProps) => {
-  // Interpolate dashboard variables into the queries at render time. The panel's
-  // own queries keep their raw `$var` form (editing/saving is unaffected); only
-  // the copy handed to the data hook is templated.
-  const resolvedPanel = useMemo(() => ({ ...panel, queries: interpolateQueries(panel.queries, variables) }), [panel, variables]);
+export const PanelRenderer = ({ panel, timeRange, refetchInterval, width, height, variables, adhocVariables, annotations }: PanelRendererProps) => {
+  // Interpolate dashboard variables into the queries at render time, then inject any adhoc filters
+  // scoped to this panel's datasource. The panel's own queries keep their raw `$var` form
+  // (editing/saving is unaffected); only the copy handed to the data hook is transformed. When no
+  // adhoc filter targets this datasource the injection step is skipped, so the queries are
+  // byte-identical to the interpolation-only result.
+  const resolvedPanel = useMemo(() => {
+    const adhocFilters = resolveAdhocFilters(adhocVariables, panel.datasourceId);
+    return { ...panel, queries: interpolateAndInjectQueries(panel.queries, variables, adhocFilters) };
+  }, [panel, variables, adhocVariables]);
 
   // Only the time-based chart panels overlay annotations; other panel types ignore them.
   switch (resolvedPanel.type) {

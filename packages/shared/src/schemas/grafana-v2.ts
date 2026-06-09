@@ -61,6 +61,16 @@ const v2LayoutSchema = z.object({
   items: z._default(z.array(v2LayoutItemSchema), []),
 });
 
+// Grafana v2 (`AdhocVariableSpec`) keeps adhoc matchers in `filters[]` as `AdHocFilterWithLabels`;
+// only the `{ key, operator, value }` subset is imported (operator narrowed to the supported four
+// later, multi-value `values[]`/deprecated `condition` ignored). Absent (→ []) on every non-adhoc
+// type, so this stays backward-compatible with v2 dashboards that predate adhoc.
+const v2AdhocFilterSchema = z.object({
+  key: z._default(z.string(), ''),
+  operator: z._default(z.string(), '='),
+  value: z._default(z.string(), ''),
+});
+
 const v2VariableSchema = z.object({
   name: z._default(z.string(), ''),
   type: z._default(z.string(), 'custom'),
@@ -68,6 +78,7 @@ const v2VariableSchema = z.object({
   query: z._default(z.string(), ''),
   multi: z._default(z.boolean(), false),
   includeAll: z._default(z.boolean(), false),
+  filters: z._default(z.array(v2AdhocFilterSchema), []),
 });
 
 export type V2Variable = z.infer<typeof v2VariableSchema>;

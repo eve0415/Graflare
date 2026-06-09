@@ -1,4 +1,7 @@
 import type { PanelQuery } from '../schemas/panel';
+import type { AdhocFilter } from '../schemas/variable';
+
+import { injectAdhocFilters } from './inject-adhoc';
 
 /**
  * Replace template variables (`$var`, `${var}`, legacy `[[var]]`) in a PromQL expression.
@@ -118,3 +121,22 @@ export const interpolateVariables = (expr: string, variables: ReadonlyMap<string
  */
 export const interpolateQueries = (queries: readonly PanelQuery[], variables: ReadonlyMap<string, string | string[]>): PanelQuery[] =>
   queries.map(q => ({ ...q, expr: interpolateVariables(q.expr, variables) }));
+
+/**
+ * Interpolate template variables AND inject adhoc label filters into a panel's queries, in that
+ * order (so a `$var` that expands to a metric name still receives the adhoc matchers).
+ *
+ * When `adhocFilters` is empty this is byte-identical to {@link interpolateQueries}: the injection
+ * step is skipped entirely (not just a no-op call), so a dashboard with no adhoc variable produces
+ * exactly the same queries it did before adhoc existed. The original panel queries are never
+ * mutated — only the templated copy handed to the data hook is transformed.
+ */
+export const interpolateAndInjectQueries = (
+  queries: readonly PanelQuery[],
+  variables: ReadonlyMap<string, string | string[]>,
+  adhocFilters: readonly AdhocFilter[],
+): PanelQuery[] => {
+  const interpolated = interpolateQueries(queries, variables);
+  if (adhocFilters.length === 0) return interpolated;
+  return interpolated.map(q => ({ ...q, expr: injectAdhocFilters(q.expr, adhocFilters) }));
+};

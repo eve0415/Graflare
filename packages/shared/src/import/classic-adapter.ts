@@ -8,7 +8,7 @@ import { grafanaClassicSchema } from '../schemas/grafana-classic';
 
 import { mapOverrides } from './override-mapping';
 import { mapTransformations } from './transformation-mapping';
-import { resolveVariableType, splitCsv } from './variable-mapping';
+import { mapAdhocFilters, resolveVariableType, splitCsv } from './variable-mapping';
 
 const PANEL_TYPE_MAP: Record<string, string> = {
   graph: 'timeseries',
@@ -80,6 +80,10 @@ const mapVariable = (v: GrafanaVariable, warnings: string[]): Variable | null =>
   // Grafana interval variables list their steps in the comma-separated `query`;
   // fall back to that when `options` isn't enumerated so the choices survive import.
   const options = type === 'interval' && enumerated.length === 0 ? splitCsv(query) : enumerated;
+  // Adhoc variables carry their label matchers in `filters[]`; every other type has none. The
+  // datasource isn't mapped here (Grafana's classic datasource ref doesn't resolve to a Graflare
+  // datasource id), so an imported adhoc variable is scoped from the editor before it injects.
+  const filters = type === 'adhoc' ? mapAdhocFilters(v.filters, v.name, warnings) : [];
 
   return {
     name: v.name,
@@ -92,6 +96,7 @@ const mapVariable = (v: GrafanaVariable, warnings: string[]): Variable | null =>
     includeAll: v.includeAll,
     current: currentValue,
     options,
+    filters,
   };
 };
 

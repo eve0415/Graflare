@@ -102,6 +102,18 @@ const grafanaCurrentSchema = z.object({
   value: z._default(z.union([z.string(), z.array(z.string())]), ''),
 });
 
+// Grafana's adhoc variable carries its label matchers in `filters[]`. The operator is a free
+// string here (Grafana allows operators Graflare doesn't model); it's narrowed to the supported
+// four during import. `value` defaults to '' so a sparse filter still parses. (Grafana's
+// deprecated `condition` and its multi-value `values[]` are not modeled — only the single value.)
+const grafanaAdhocFilterSchema = z.object({
+  key: z._default(z.string(), ''),
+  operator: z._default(z.string(), '='),
+  value: z._default(z.string(), ''),
+});
+
+export type GrafanaAdhocFilter = z.infer<typeof grafanaAdhocFilterSchema>;
+
 const grafanaVariableSchema = z.object({
   name: z._default(z.string(), ''),
   type: z._default(z.string(), 'custom'),
@@ -112,6 +124,8 @@ const grafanaVariableSchema = z.object({
   includeAll: z._default(z.boolean(), false),
   current: z._default(grafanaCurrentSchema, { value: '' }),
   options: z._default(z.array(z.object({ value: z._default(z.string(), '') })), []),
+  // Adhoc variables only; absent (→ []) on every other type.
+  filters: z._default(z.array(grafanaAdhocFilterSchema), []),
 });
 
 export type GrafanaVariable = z.infer<typeof grafanaVariableSchema>;
