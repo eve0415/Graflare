@@ -1,3 +1,4 @@
+import type { DatasourceRow } from '../../datasources/-api';
 import type { Annotation } from '@graflare/shared/schemas/annotation';
 import type { Panel } from '@graflare/shared/schemas/panel';
 import type { Variable } from '@graflare/shared/schemas/variable';
@@ -29,6 +30,10 @@ const MS_PER_SECOND = 1000;
 // Stable empty fallback so the `annotations` prop keeps a constant identity while
 // the query is still loading (a fresh `[]` each render would churn the grid).
 const EMPTY_ANNOTATIONS: readonly Annotation[] = [];
+
+// Stable empty fallback for the datasource list passed to the settings dialog, so the prop keeps
+// a constant identity while the datasource query is still loading.
+const EMPTY_DATASOURCES: readonly DatasourceRow[] = [];
 
 type RefreshInterval = '5s' | '10s' | '30s' | '1m' | '5m' | '15m' | '30m' | '1h' | 'off';
 
@@ -201,7 +206,7 @@ const DashboardViewPage = () => {
   }, []);
 
   const handleSettingsSave = useCallback(
-    (data: { title: string; description: string; tags: string[] }) => {
+    (data: { title: string; description: string; tags: string[]; variables: Variable[] }) => {
       const run = async () => {
         await updateDashboard({ data: { id, data: { ...data, message: 'Settings updated' } } });
         await queryClient.invalidateQueries({ queryKey: ['dashboard', id] });
@@ -286,6 +291,8 @@ const DashboardViewPage = () => {
         title={dashboard.title}
         description={dashboard.description}
         tags={dashboard.tags}
+        variables={dashboardVariables}
+        datasources={datasources ?? EMPTY_DATASOURCES}
         onSave={handleSettingsSave}
         onRestore={handleRestore}
       />

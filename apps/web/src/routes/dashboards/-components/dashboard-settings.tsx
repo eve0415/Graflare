@@ -1,16 +1,20 @@
+import type { DatasourceRow } from '../../datasources/-api';
+import type { Variable } from '@graflare/shared/schemas/variable';
+
 import { Button } from '@graflare/ui/components/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@graflare/ui/components/dialog';
 import { Input } from '@graflare/ui/components/input';
 import { Label } from '@graflare/ui/components/label';
 import { Separator } from '@graflare/ui/components/separator';
 import { useSuspenseQuery } from '@tanstack/react-query';
-import { History, RotateCcw } from 'lucide-react';
+import { History, RotateCcw, Variable as VariableIcon } from 'lucide-react';
 import { useCallback, useState } from 'react';
 
 import { restoreDashboardVersion } from '../-api';
 import { dashboardVersionsQueryOptions } from '../-queries';
 import { QueryBoundary } from '../../-root/query-boundary';
 
+import { VariableEditor } from './variable-editor';
 import { VersionHistorySkeleton } from './version-history-skeleton';
 
 const versionHistoryFallback = <VersionHistorySkeleton />;
@@ -22,17 +26,31 @@ interface DashboardSettingsProps {
   title: string;
   description: string;
   tags: string[];
-  onSave: (data: { title: string; description: string; tags: string[] }) => void;
+  variables: Variable[];
+  datasources: readonly DatasourceRow[];
+  onSave: (data: { title: string; description: string; tags: string[]; variables: Variable[] }) => void;
   onRestore?: () => void;
 }
 
-type Tab = 'general' | 'versions';
+type Tab = 'general' | 'variables' | 'versions';
 
-export const DashboardSettings = ({ open, onClose, dashboardId, title, description, tags, onSave, onRestore }: DashboardSettingsProps) => {
+export const DashboardSettings = ({
+  open,
+  onClose,
+  dashboardId,
+  title,
+  description,
+  tags,
+  variables,
+  datasources,
+  onSave,
+  onRestore,
+}: DashboardSettingsProps) => {
   const [tab, setTab] = useState<Tab>('general');
   const [draftTitle, setDraftTitle] = useState(title);
   const [draftDescription, setDraftDescription] = useState(description);
   const [draftTags, setDraftTags] = useState(tags.join(', '));
+  const [draftVariables, setDraftVariables] = useState<Variable[]>(variables);
 
   const handleSave = useCallback(() => {
     onSave({
@@ -42,9 +60,10 @@ export const DashboardSettings = ({ open, onClose, dashboardId, title, descripti
         .split(',')
         .map(t => t.trim())
         .filter(Boolean),
+      variables: draftVariables,
     });
     onClose();
-  }, [draftTitle, draftDescription, draftTags, onSave, onClose]);
+  }, [draftTitle, draftDescription, draftTags, draftVariables, onSave, onClose]);
 
   const handleTitleChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
     setDraftTitle(e.target.value);
@@ -68,6 +87,9 @@ export const DashboardSettings = ({ open, onClose, dashboardId, title, descripti
   const showGeneral = useCallback(() => {
     setTab('general');
   }, []);
+  const showVariables = useCallback(() => {
+    setTab('variables');
+  }, []);
   const showVersions = useCallback(() => {
     setTab('versions');
   }, []);
@@ -82,6 +104,10 @@ export const DashboardSettings = ({ open, onClose, dashboardId, title, descripti
         <div className='flex gap-2 border-b pb-2'>
           <Button variant={tab === 'general' ? 'secondary' : 'ghost'} size='sm' onClick={showGeneral}>
             General
+          </Button>
+          <Button variant={tab === 'variables' ? 'secondary' : 'ghost'} size='sm' onClick={showVariables}>
+            <VariableIcon className='mr-1 h-3.5 w-3.5' />
+            Variables
           </Button>
           <Button variant={tab === 'versions' ? 'secondary' : 'ghost'} size='sm' onClick={showVersions}>
             <History className='mr-1 h-3.5 w-3.5' />
@@ -112,6 +138,21 @@ export const DashboardSettings = ({ open, onClose, dashboardId, title, descripti
               <Label htmlFor='settings-tags'>Tags (comma-separated)</Label>
               <Input id='settings-tags' value={draftTags} onChange={handleTagsChange} placeholder='tag1, tag2, tag3' />
             </div>
+
+            <Separator />
+
+            <div className='flex justify-end gap-2'>
+              <Button variant='outline' onClick={onClose}>
+                Cancel
+              </Button>
+              <Button onClick={handleSave}>Save</Button>
+            </div>
+          </div>
+        )}
+
+        {tab === 'variables' && (
+          <div className='space-y-4'>
+            <VariableEditor variables={draftVariables} datasources={datasources} onChange={setDraftVariables} />
 
             <Separator />
 
