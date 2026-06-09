@@ -9,6 +9,7 @@ import { Input } from '@graflare/ui/components/input';
 import { Label } from '@graflare/ui/components/label';
 import { Select, SelectContent, SelectGroup, SelectItem, SelectLabel, SelectTrigger, SelectValue } from '@graflare/ui/components/select';
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@graflare/ui/components/sheet';
+import { Textarea } from '@graflare/ui/components/textarea';
 import { useQuery } from '@tanstack/react-query';
 import { Plus, Trash2, X } from 'lucide-react';
 import { useCallback, useState } from 'react';
@@ -303,14 +304,14 @@ export const PanelEditor = ({ panel, open, onClose, onSave }: PanelEditorProps) 
                 </Select>
               </div>
 
-              <textarea
+              <Textarea
                 id='panel-text-content'
                 aria-label='Panel content'
                 value={draft.displayOptions.text?.content ?? ''}
                 onChange={handleTextContentChange}
                 rows={10}
                 placeholder={draft.displayOptions.text?.mode === 'html' ? 'HTML…' : 'Markdown…'}
-                className='border-input bg-background ring-offset-background placeholder:text-muted-foreground focus-visible:ring-ring flex w-full rounded-md border px-3 py-2 font-mono text-sm focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:outline-none'
+                className='font-mono'
               />
             </div>
           )}

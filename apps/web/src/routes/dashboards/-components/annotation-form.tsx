@@ -3,6 +3,7 @@ import type { CreateAnnotation } from '@graflare/shared/schemas/annotation';
 import { Button } from '@graflare/ui/components/button';
 import { Input } from '@graflare/ui/components/input';
 import { Label } from '@graflare/ui/components/label';
+import { Textarea } from '@graflare/ui/components/textarea';
 import { Plus } from 'lucide-react';
 import { useCallback, useMemo, useState } from 'react';
 
@@ -85,15 +86,7 @@ export const AnnotationForm = ({ dashboardId, onSubmit, submitting }: Annotation
 
       <div className='space-y-2'>
         <Label htmlFor='annotation-text'>Description</Label>
-        <textarea
-          id='annotation-text'
-          aria-label='Description'
-          className='border-border bg-background w-full rounded-md border p-2 text-sm'
-          rows={2}
-          value={text}
-          onChange={handleTextChange}
-          placeholder='What happened?'
-        />
+        <Textarea id='annotation-text' aria-label='Description' rows={2} value={text} onChange={handleTextChange} placeholder='What happened?' />
       </div>
 
       <div className='space-y-2'>

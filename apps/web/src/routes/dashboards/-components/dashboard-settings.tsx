@@ -6,6 +6,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@graflare/ui/c
 import { Input } from '@graflare/ui/components/input';
 import { Label } from '@graflare/ui/components/label';
 import { Separator } from '@graflare/ui/components/separator';
+import { Textarea } from '@graflare/ui/components/textarea';
 import { useSuspenseQuery } from '@tanstack/react-query';
 import { History, RotateCcw, Variable as VariableIcon } from 'lucide-react';
 import { useCallback, useState } from 'react';
@@ -124,14 +125,7 @@ export const DashboardSettings = ({
 
             <div className='space-y-2'>
               <Label htmlFor='settings-description'>Description</Label>
-              <textarea
-                id='settings-description'
-                aria-label='Dashboard description'
-                className='border-border bg-background w-full rounded-md border p-2 text-sm'
-                rows={3}
-                value={draftDescription}
-                onChange={handleDescChange}
-              />
+              <Textarea id='settings-description' aria-label='Dashboard description' rows={3} value={draftDescription} onChange={handleDescChange} />
             </div>
 
             <div className='space-y-2'>

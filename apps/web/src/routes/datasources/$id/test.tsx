@@ -4,6 +4,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@graflare/ui/component
 import { Input } from '@graflare/ui/components/input';
 import { Label } from '@graflare/ui/components/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@graflare/ui/components/select';
+import { Textarea } from '@graflare/ui/components/textarea';
 import { createFileRoute } from '@tanstack/react-router';
 import { useCallback, useState } from 'react';
 
@@ -103,15 +104,7 @@ const QueryTestPage = () => {
           <CardContent className='space-y-4'>
             <div className='space-y-2'>
               <Label htmlFor='query'>Query</Label>
-              <textarea
-                id='query'
-                aria-label='Query'
-                value={query}
-                onChange={handleQueryChange}
-                className='border-input bg-background ring-offset-background focus-visible:ring-ring flex min-h-[80px] w-full rounded-lg border px-3 py-2 text-sm focus-visible:ring-2 focus-visible:outline-none'
-                style={monoFontStyle}
-                placeholder='up'
-              />
+              <Textarea id='query' aria-label='Query' value={query} onChange={handleQueryChange} className='min-h-20' style={monoFontStyle} placeholder='up' />
             </div>
 
             <div className='space-y-2'>

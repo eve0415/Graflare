@@ -1,6 +1,7 @@
 import { Alert } from '@graflare/ui/components/alert';
 import { Badge } from '@graflare/ui/components/badge';
 import { Button } from '@graflare/ui/components/button';
+import { Textarea } from '@graflare/ui/components/textarea';
 import { createFileRoute, useNavigate } from '@tanstack/react-router';
 import { FileUp, Upload } from 'lucide-react';
 import { useCallback, useRef, useState } from 'react';
@@ -169,10 +170,10 @@ const ImportPage = () => {
         <label htmlFor='json-input' className='text-sm font-medium'>
           Or paste JSON
         </label>
-        <textarea
+        <Textarea
           id='json-input'
           aria-label='Dashboard JSON'
-          className='border-border bg-background h-48 w-full rounded-md border p-3 font-mono text-sm'
+          className='h-48 p-3 font-mono'
           value={jsonText}
           onChange={handleTextChange}
           placeholder='Paste Grafana dashboard JSON here...'
