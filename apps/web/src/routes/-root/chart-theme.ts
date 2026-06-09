@@ -42,13 +42,34 @@ const CHART_THEME: Record<ResolvedTheme, ChartThemeColors> = {
 export const chartThemeColors = (resolved: ResolvedTheme): ChartThemeColors => CHART_THEME[resolved];
 
 /**
- * A uPlot axis pre-filled with the theme palette. Spread into an axis config and
- * override per-axis bits (e.g. `values`) as needed:
- * `{ ...themedAxis(colors) }` or `{ ...themedAxis(colors), values: fmt }`.
- * Keeps the four chart builders from each repeating the stroke/grid/ticks wiring.
+ * A single uPlot axis pre-filled with the theme palette. For the common `[x, y]` pair reach for
+ * `themedAxes`; use this directly only when one axis needs a non-standard arrangement (e.g. the
+ * histogram, whose formatter sits on the x-axis): `{ ...themedAxis(colors), values: fmt }`.
+ * Keeps the chart builders from each repeating the stroke/grid/ticks wiring.
  */
 export const themedAxis = (colors: ChartThemeColors): uPlot.Axis => ({
   stroke: colors.axis,
   grid: { stroke: colors.grid, width: 1 },
   ticks: { stroke: colors.ticks, width: 1 },
 });
+
+/**
+ * The `[x, y]` axis pair every time-domain chart uses: both themed, with an optional unit
+ * formatter on the y-axis. `themedAxis` already returns fresh objects, so this needs no extra
+ * spread — it just assembles the pair the time-series, bar-chart, and explore charts each built
+ * inline. Pass `yValues` to format the y splits (`buildBarChartOptions`, the time-series panel);
+ * omit it for a default-formatted y (explore). The x-axis keeps uPlot's default time formatting.
+ */
+export const themedAxes = (colors: ChartThemeColors, yValues?: uPlot.Axis.DynamicValues): [uPlot.Axis, uPlot.Axis] => [
+  themedAxis(colors),
+  yValues === undefined ? themedAxis(colors) : { ...themedAxis(colors), values: yValues },
+];
+
+/**
+ * The x-scale every time-domain chart pins: a temporal axis whose range is fixed to the resolved
+ * `[from, to]` query window (epoch seconds). Pinning the range stops uPlot's data-driven auto-range
+ * from ballooning the x domain across years when a series carries a stray out-of-window sample (the
+ * audit saw a multi-year axis). Returns just the `Scale` so the caller owns `scales: { x: … }` and
+ * a future `y` scale can sit alongside it.
+ */
+export const timeScaleX = (from: number, to: number): uPlot.Scale => ({ time: true, range: [from, to] });

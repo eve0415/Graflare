@@ -16,7 +16,7 @@ import { BarChart3, History, Play, Plus, Table2 } from 'lucide-react';
 import { Suspense, useCallback, useMemo, useState } from 'react';
 import { useContainerWidth } from 'react-grid-layout';
 
-import { chartThemeColors, themedAxis } from '../../-root/chart-theme';
+import { chartThemeColors, themedAxes, timeScaleX } from '../../-root/chart-theme';
 import { databaseSchemaQueryOptions } from '../../-root/introspection-queries';
 import { QueryResultTable, formatPrometheusToTable } from '../../-root/query-result-table';
 import { useTheme } from '../../-root/theme-provider';
@@ -373,12 +373,11 @@ export const ExplorePane = ({ timeRange, label }: ExplorePaneProps) => {
     // rather than uPlot's data-driven auto-range (which balloons on a stray out-of-window
     // sample). `from`/`to` already snap with Grafana's start/end rounding convention.
     const { from: fromSec, to: toSec } = resolveRange(timeRange.from, timeRange.to);
-    const xRange = (): [number, number] => [fromSec, toSec];
     return {
       width: explorePaneChartWidth(chartContainerWidth),
       height: CHART_HEIGHT,
-      scales: { x: { time: true, range: xRange } },
-      axes: [{ ...themedAxis(colors) }, { ...themedAxis(colors) }],
+      scales: { x: timeScaleX(fromSec, toSec) },
+      axes: themedAxes(colors),
       series: [{}, ...merged.labels.map((labelText, i) => ({ label: labelText, stroke: `hsl(${String(i * 60)}, 70%, 50%)` }))],
     };
   }, [merged, resolved, timeRange.from, timeRange.to, chartContainerWidth]);

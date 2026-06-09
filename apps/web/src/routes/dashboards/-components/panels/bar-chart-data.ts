@@ -7,7 +7,7 @@ import type uPlotNs from 'uplot';
 import { formatValue } from '@graflare/shared/format/value-format';
 import uPlot from 'uplot';
 
-import { themedAxis } from '../../../-root/chart-theme';
+import { themedAxes, timeScaleX } from '../../../-root/chart-theme';
 
 import { extractResultSeries } from './panel-data-extract';
 
@@ -83,17 +83,16 @@ export const buildBarChartOptions = ({ series, labels, defaults, width, height, 
   // Index 0 = x/bucket axis (default formatting). Index 1 = y, formatted via unit.
   const formatYTicks: uPlotNs.Axis.DynamicValues = (_u, splits) => formatBarChartTicks(splits, defaults);
 
-  // Pin the x domain to the resolved query window (epoch seconds) as a static [min, max] range.
-  // `time: true` is uPlot's default for x, so it changes nothing about bar geometry — it just
-  // states intent; the explicit `range` is what stops uPlot's auto-range from ballooning the axis
-  // when a stray sample sits outside the window (the audit saw a multi-year x-axis).
+  // Pin the x domain to the resolved query window (epoch seconds). `time: true` is uPlot's default
+  // for x so it doesn't change bar geometry; the explicit range is what stops auto-range from
+  // ballooning the axis on a stray out-of-window sample (see `timeScaleX`).
   const [fromSec, toSec] = range;
 
   return {
     width: Math.max(100, width - 16),
     height: Math.max(80, height - 60),
-    scales: { x: { time: true, range: [fromSec, toSec] } },
-    axes: [{ ...themedAxis(colors) }, { ...themedAxis(colors), values: formatYTicks }],
+    scales: { x: timeScaleX(fromSec, toSec) },
+    axes: themedAxes(colors, formatYTicks),
     series: [
       {},
       ...series.map((_s, i): uPlotNs.Series => {

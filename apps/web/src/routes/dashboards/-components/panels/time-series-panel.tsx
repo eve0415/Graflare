@@ -7,7 +7,7 @@ import { seriesLabel } from '@graflare/shared/legend/resolve';
 import { resolveRange } from '@graflare/shared/time/resolve';
 import { useMemo } from 'react';
 
-import { chartThemeColors, themedAxis } from '../../../-root/chart-theme';
+import { chartThemeColors, themedAxes, timeScaleX } from '../../../-root/chart-theme';
 import { QueryResultTable, formatPrometheusToTable } from '../../../-root/query-result-table';
 import { useTheme } from '../../../-root/theme-provider';
 
@@ -69,17 +69,15 @@ export const TimeSeriesPanel = ({ panel, timeRange, refetchInterval, width, heig
     // are intentionally left alone. Index 0 = x/time axis (default), index 1 = y.
     const formatYTicks: uPlot.Axis.DynamicValues = (_u, splits) => splits.map(v => formatValue(v, defaults));
 
-    // Pin the x domain to the selected query window so the axis tracks the chosen
-    // range rather than uPlot's data-driven auto-range (which balloons when a series
-    // carries a stray out-of-window sample — the audit saw a multi-year x-axis).
     const { from: fromSec, to: toSec } = resolveRange(timeRange.from, timeRange.to);
-    const xRange = (): [number, number] => [fromSec, toSec];
 
     return {
       width: Math.max(100, width - 16),
       height: Math.max(80, height - 60),
-      scales: { x: { time: true, range: xRange } },
-      axes: [{ ...themedAxis(colors) }, { ...themedAxis(colors), values: formatYTicks }],
+      // Pin the x domain to the selected query window so the axis tracks the chosen range rather
+      // than uPlot's auto-range (which balloons on a stray out-of-window sample — see `timeScaleX`).
+      scales: { x: timeScaleX(fromSec, toSec) },
+      axes: themedAxes(colors, formatYTicks),
       series: [
         {},
         ...chartResult.map((_r, i) => ({
