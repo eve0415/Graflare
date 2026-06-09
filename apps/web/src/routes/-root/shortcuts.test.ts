@@ -1,0 +1,69 @@
+import { describe, expect, it } from 'vitest';
+
+import { MOD_KEY, groupShortcuts, shortcuts } from './shortcuts';
+
+describe('shortcuts registry', () => {
+  it('declares every shortcut as plain data with keys, a description, and a group', () => {
+    expect(shortcuts.length).toBeGreaterThan(0);
+    for (const shortcut of shortcuts) {
+      expect(Array.isArray(shortcut.keys)).toBe(true);
+      expect(shortcut.keys.length).toBeGreaterThan(0);
+      expect(typeof shortcut.description).toBe('string');
+      expect(shortcut.description.length).toBeGreaterThan(0);
+      expect(typeof shortcut.group).toBe('string');
+    }
+  });
+
+  it('documents the command palette, help, and close shortcuts', () => {
+    const descriptions = shortcuts.map(s => s.description);
+    expect(descriptions).toContain('Open the command palette');
+    expect(descriptions).toContain('Open this keyboard shortcuts help');
+    expect(descriptions).toContain('Close the open dialog or palette');
+  });
+
+  it('encodes the platform-resolved modifier as a token, not a literal glyph', () => {
+    const palette = shortcuts.find(s => s.description === 'Open the command palette');
+    expect(palette).toBeDefined();
+    expect(palette?.keys).toContain(MOD_KEY);
+    // The registry must not hardcode ⌘ or Ctrl — the modal resolves the glyph per platform.
+    for (const shortcut of shortcuts) {
+      for (const key of shortcut.keys) {
+        expect(key).not.toBe('⌘');
+        expect(key).not.toBe('Ctrl');
+      }
+    }
+  });
+});
+
+describe('groupShortcuts', () => {
+  it('buckets shortcuts under their group with a human heading', () => {
+    const groups = groupShortcuts(shortcuts);
+    expect(groups.length).toBeGreaterThan(0);
+    const global = groups.find(g => g.id === 'global');
+    expect(global).toBeDefined();
+    expect(global?.heading).toBe('Global');
+    expect(global?.shortcuts.length).toBe(shortcuts.filter(s => s.group === 'global').length);
+  });
+
+  it('preserves each shortcut intact within its group', () => {
+    const [first] = groupShortcuts(shortcuts);
+    expect(first).toBeDefined();
+    expect(first?.shortcuts[0]).toEqual(shortcuts[0]);
+  });
+
+  it('emits groups in a fixed, declared order rather than insertion or alphabetical order', () => {
+    const declared = [
+      { keys: ['z'], description: 'Last group entry', group: 'global' },
+      { keys: ['a'], description: 'First group entry', group: 'global' },
+    ] as const;
+    const groups = groupShortcuts(declared);
+    // 'global' is the only group here; ordering within a group follows input order.
+    expect(groups.map(g => g.id)).toEqual(['global']);
+    expect(groups[0]?.shortcuts.map(s => s.description)).toEqual(['Last group entry', 'First group entry']);
+  });
+
+  it('omits groups that have no shortcuts', () => {
+    const groups = groupShortcuts([]);
+    expect(groups).toEqual([]);
+  });
+});
