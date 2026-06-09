@@ -5,7 +5,7 @@ import type { Variable } from '@graflare/shared/schemas/variable';
 
 import { panelSchema } from '@graflare/shared/schemas/panel';
 import { variableSchema } from '@graflare/shared/schemas/variable';
-import { resolveTime } from '@graflare/shared/time/resolve';
+import { resolveRange } from '@graflare/shared/time/resolve';
 import { Button } from '@graflare/ui/components/button';
 import { useQuery, useQueryClient, useSuspenseQuery } from '@tanstack/react-query';
 import { createFileRoute } from '@tanstack/react-router';
@@ -114,10 +114,10 @@ const DashboardViewPage = () => {
   // Resolve the visible window to epoch MS once per range change (not every render,
   // or `now` would drift the query key and refetch constantly). One fetch per
   // dashboard view, threaded to the chart panels like `variables`.
-  const annotationWindow = useMemo(
-    () => ({ from: resolveTime(timeRange.from) * MS_PER_SECOND, to: resolveTime(timeRange.to) * MS_PER_SECOND }),
-    [timeRange.from, timeRange.to],
-  );
+  const annotationWindow = useMemo(() => {
+    const { from, to } = resolveRange(timeRange.from, timeRange.to);
+    return { from: from * MS_PER_SECOND, to: to * MS_PER_SECOND };
+  }, [timeRange.from, timeRange.to]);
   const { data: annotations } = useQuery(annotationsQueryOptions(id, annotationWindow.from, annotationWindow.to));
   const dashboardAnnotations = annotations ?? EMPTY_ANNOTATIONS;
 

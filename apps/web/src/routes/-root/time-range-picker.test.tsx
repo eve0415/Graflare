@@ -15,6 +15,7 @@ interface TimeRange {
 const PRESET_RANGE: TimeRange = { from: 'now-1h', to: 'now' };
 const RELATIVE_RANGE: TimeRange = { from: 'now-90m', to: 'now' };
 const EPOCH_RANGE: TimeRange = { from: '1700000000', to: '1700003600' };
+const TODAY_RANGE: TimeRange = { from: 'now/d', to: 'now/d' };
 
 // Open the popover and wait for its content to mount in the portal.
 const openPicker = async (value: TimeRange, onChange: (r: TimeRange) => void): Promise<void> => {
@@ -98,9 +99,40 @@ describe('time-range-picker', () => {
 
     expect(buttonByName('Apply relative range').disabled).toBe(false);
 
-    fireEvent.change(screen.getByLabelText('Relative from'), { target: { value: 'now/d' } });
+    fireEvent.change(screen.getByLabelText('Relative from'), { target: { value: 'tomorrow' } });
     expect(buttonByName('Apply relative range').disabled).toBe(true);
     expect(screen.getByText(/Use an expression like/)).toBeDefined();
+  });
+
+  it('accepts a /unit snapping expression and applies it raw', async () => {
+    const onChange = vi.fn<(r: TimeRange) => void>();
+    await openPicker(PRESET_RANGE, onChange);
+
+    fireEvent.change(screen.getByLabelText('Relative from'), { target: { value: 'now/d' } });
+    fireEvent.change(screen.getByLabelText('Relative to'), { target: { value: 'now/d' } });
+    expect(buttonByName('Apply relative range').disabled).toBe(false);
+    fireEvent.click(buttonByName('Apply relative range'));
+
+    expect(firstOnChangeArg(onChange)).toEqual({ from: 'now/d', to: 'now/d' });
+  });
+
+  it('renders the calendar quick ranges and applies one as raw expressions', async () => {
+    const onChange = vi.fn<(r: TimeRange) => void>();
+    await openPicker(PRESET_RANGE, onChange);
+
+    expect(screen.getByText('Today')).toBeDefined();
+    expect(screen.getByText('This year')).toBeDefined();
+
+    fireEvent.click(screen.getByText('Today'));
+    expect(onChange).toHaveBeenCalledTimes(1);
+    expect(firstOnChangeArg(onChange)).toEqual({ from: 'now/d', to: 'now/d' });
+  });
+
+  it('shows the calendar preset label on the trigger for its range', () => {
+    const onChange = vi.fn<(r: TimeRange) => void>();
+    render(<TimeRangePicker value={TODAY_RANGE} onChange={onChange} />);
+
+    expect(triggerText()).toContain('Today');
   });
 
   it('applies a valid relative range as the raw expression strings', async () => {

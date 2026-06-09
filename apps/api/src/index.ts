@@ -51,7 +51,7 @@ import { prometheusResponseSchema } from '@graflare/shared/schemas/prometheus';
 import { createServiceTokenSchema, serviceTokenIdParamSchema } from '@graflare/shared/schemas/service-token';
 import { createSilenceSchema, updateSilenceSchema } from '@graflare/shared/schemas/silence';
 import { expandSqlMacros } from '@graflare/shared/sql/macros';
-import { resolveTime } from '@graflare/shared/time/resolve';
+import { resolveRange } from '@graflare/shared/time/resolve';
 import { WorkerEntrypoint } from 'cloudflare:workers';
 import { and, desc, eq, gte, like, lte, sql } from 'drizzle-orm';
 import { Hono } from 'hono';
@@ -502,10 +502,9 @@ export class GraflareAPI extends WorkerEntrypoint<Bindings> {
 
     const dialect = ds.dialect === 'postgres' ? 'postgres' : 'sqlite';
 
-    const resolvedTimeRange = {
-      from: timeRange ? resolveTime(timeRange.from) : Math.floor(Date.now() / 1000) - 3600,
-      to: timeRange ? resolveTime(timeRange.to) : Math.floor(Date.now() / 1000),
-    };
+    const resolvedTimeRange = timeRange
+      ? resolveRange(timeRange.from, timeRange.to)
+      : { from: Math.floor(Date.now() / 1000) - 3600, to: Math.floor(Date.now() / 1000) };
 
     const { sql: expandedSql, params } = expandSqlMacros(rawSql, dialect, resolvedTimeRange);
 

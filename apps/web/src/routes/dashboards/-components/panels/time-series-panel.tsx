@@ -3,7 +3,7 @@ import type { Panel } from '@graflare/shared/schemas/panel';
 import type uPlot from 'uplot';
 
 import { formatValue } from '@graflare/shared/format/value-format';
-import { resolveTime } from '@graflare/shared/time/resolve';
+import { resolveRange } from '@graflare/shared/time/resolve';
 import { useMemo } from 'react';
 
 import { QueryResultTable, formatPrometheusToTable } from '../../../-root/query-result-table';
@@ -27,10 +27,10 @@ export const TimeSeriesPanel = ({ panel, timeRange, refetchInterval, width, heig
 
   const chartResult = useMemo(() => extractResultSeries(data), [data]);
 
-  const markers = useMemo(
-    () => annotationMarkers(annotations, resolveTime(timeRange.from), resolveTime(timeRange.to)),
-    [annotations, timeRange.from, timeRange.to],
-  );
+  const markers = useMemo(() => {
+    const { from, to } = resolveRange(timeRange.from, timeRange.to);
+    return annotationMarkers(annotations, from, to);
+  }, [annotations, timeRange.from, timeRange.to]);
 
   const chartData = useMemo((): uPlot.AlignedData => {
     if (chartResult.length === 0) return [[]];

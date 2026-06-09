@@ -31,6 +31,19 @@ const presets = [
   { label: 'Last 30d', from: 'now-30d', to: 'now' },
 ] as const;
 
+// Calendar ranges use `/unit` snapping. resolveRange rounds `from` to the start of the unit and
+// `to` to the end, so "Today" (now/d–now/d) spans the whole day rather than collapsing to midnight.
+const calendarPresets = [
+  { label: 'Today', from: 'now/d', to: 'now/d' },
+  { label: 'Yesterday', from: 'now-1d/d', to: 'now-1d/d' },
+  { label: 'This week', from: 'now/w', to: 'now/w' },
+  { label: 'This month', from: 'now/M', to: 'now/M' },
+  { label: 'This year', from: 'now/y', to: 'now/y' },
+] as const;
+
+// One flat list for trigger-label + active-state lookup across both quick-range groups.
+const allPresets: readonly { label: string; from: string; to: string }[] = [...presets, ...calendarPresets];
+
 // A stored absolute time is a bare epoch-second string (String(Math.floor(...))).
 // Relative expressions ("now-2h") and "now" never match, so this is the exact
 // discriminator for "was this picked as an absolute time?".
@@ -67,7 +80,7 @@ const localInputToEpoch = (value: string): string | null => {
 };
 
 const displayRange = (range: TimeRange): string => {
-  const preset = presets.find(p => p.from === range.from && p.to === range.to);
+  const preset = allPresets.find(p => p.from === range.from && p.to === range.to);
   if (preset !== undefined) return preset.label;
   if (isEpoch(range.from) && isEpoch(range.to)) return `${formatEpoch(range.from)} — ${formatEpoch(range.to)}`;
   return `${range.from} to ${range.to}`;
@@ -158,6 +171,13 @@ export const TimeRangePicker = ({ value, onChange }: TimeRangePickerProps) => {
           ))}
         </div>
 
+        <div className='text-muted-foreground mt-2 mb-2 px-2 text-xs font-medium'>Calendar</div>
+        <div className='grid gap-0.5'>
+          {calendarPresets.map(p => (
+            <PresetButton key={p.label} label={p.label} from={p.from} to={p.to} active={p.from === value.from && p.to === value.to} onSelect={handlePreset} />
+          ))}
+        </div>
+
         <Separator className='my-2' />
 
         <div className='text-muted-foreground mb-2 px-2 text-xs font-medium'>Absolute range</div>
@@ -211,7 +231,7 @@ export const TimeRangePicker = ({ value, onChange }: TimeRangePickerProps) => {
               onChange={handleRelToChange}
             />
           </div>
-          {!relValid && <div className='text-destructive px-0.5 text-xs'>Use an expression like now-2h, now, or now+30m.</div>}
+          {!relValid && <div className='text-destructive px-0.5 text-xs'>Use an expression like now-2h, now/d, or now+30m.</div>}
           <Button variant='secondary' size='sm' aria-label='Apply relative range' disabled={!relValid} onClick={handleApplyRelative}>
             Apply
           </Button>

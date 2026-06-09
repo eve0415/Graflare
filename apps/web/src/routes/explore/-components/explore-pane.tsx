@@ -7,7 +7,7 @@ import type { SqlResponse } from '@graflare/shared/schemas/sql';
 import type { Options as UPlotOptions } from 'uplot';
 
 import { sqlRowsToSeries } from '@graflare/shared/sql/adapters';
-import { computeStep, resolveTime } from '@graflare/shared/time/resolve';
+import { computeStep, resolveRange } from '@graflare/shared/time/resolve';
 import { Button } from '@graflare/ui/components/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@graflare/ui/components/select';
 import { Skeleton } from '@graflare/ui/components/skeleton';
@@ -173,6 +173,8 @@ export const ExplorePane = ({ timeRange, label }: ExplorePaneProps) => {
   /** Run one row's query, returning a tagged outcome (never throws; errors are tagged). */
   const runOne = useCallback(
     async (refId: string, dsId: string, query: string, runIsSql: boolean, runSqlFormat: SqlFormat): Promise<RunOutcome> => {
+      // from snaps to the start of its unit, to to the end — so a `now/d` range spans the day.
+      const { from, to } = resolveRange(timeRange.from, timeRange.to);
       try {
         if (runIsSql) {
           const result = await sqlQuery({
@@ -180,7 +182,7 @@ export const ExplorePane = ({ timeRange, label }: ExplorePaneProps) => {
               datasourceId: dsId,
               rawSql: query,
               format: runSqlFormat,
-              timeRange: { from: String(resolveTime(timeRange.from)), to: String(resolveTime(timeRange.to)) },
+              timeRange: { from: String(from), to: String(to) },
             },
           });
           if (result.error !== undefined) return { kind: 'error', refId, error: result.error };
@@ -196,7 +198,7 @@ export const ExplorePane = ({ timeRange, label }: ExplorePaneProps) => {
           data: {
             datasourceId: dsId,
             endpoint: '/api/v1/query_range',
-            params: { query, start: String(resolveTime(timeRange.from)), end: String(resolveTime(timeRange.to)), step },
+            params: { query, start: String(from), end: String(to), step },
           },
         });
         if (result.status === 'error') return { kind: 'error', refId, error: result.error ?? 'Query failed' };

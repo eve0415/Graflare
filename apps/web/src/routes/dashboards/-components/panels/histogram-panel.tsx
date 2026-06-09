@@ -1,7 +1,7 @@
 import type { Annotation } from '@graflare/shared/schemas/annotation';
 import type { Panel } from '@graflare/shared/schemas/panel';
 
-import { resolveTime } from '@graflare/shared/time/resolve';
+import { resolveRange } from '@graflare/shared/time/resolve';
 import { useMemo } from 'react';
 
 import { annotationMarkers } from './annotations-plugin';
@@ -42,10 +42,10 @@ export const HistogramPanel = ({ panel, timeRange, refetchInterval, width, heigh
   // The histogram x-axis is bucket-value, not time, so epoch-second markers fall
   // outside the scale and the plugin's bbox clip makes them a no-op. Threaded for
   // consistency with the other chart panels; effectively inert here.
-  const markers = useMemo(
-    () => annotationMarkers(annotations, resolveTime(timeRange.from), resolveTime(timeRange.to)),
-    [annotations, timeRange.from, timeRange.to],
-  );
+  const markers = useMemo(() => {
+    const { from, to } = resolveRange(timeRange.from, timeRange.to);
+    return annotationMarkers(annotations, from, to);
+  }, [annotations, timeRange.from, timeRange.to]);
 
   return (
     <UPlotPanel panel={panel} data={chartData} options={chartOptions} isLoading={isLoading} error={error} onRetry={handleRetry} annotationMarkers={markers} />

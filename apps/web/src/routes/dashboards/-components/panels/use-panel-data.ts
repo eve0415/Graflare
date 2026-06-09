@@ -3,7 +3,7 @@ import type { PrometheusResponse } from '@graflare/shared/schemas/prometheus';
 import type { SqlResponse } from '@graflare/shared/schemas/sql';
 
 import { sqlRowsToSeries } from '@graflare/shared/sql/adapters';
-import { computeStep, resolveTime } from '@graflare/shared/time/resolve';
+import { computeStep, resolveRange } from '@graflare/shared/time/resolve';
 import { useQuery } from '@tanstack/react-query';
 
 import { proxyQuery } from '../../../../lib/proxy';
@@ -17,6 +17,7 @@ interface TimeRange {
 
 const executePrometheusQueries = async (datasourceId: string, queries: PanelQuery[], timeRange: TimeRange): Promise<PrometheusResponse[]> => {
   const step = computeStep(timeRange.from, timeRange.to);
+  const { from, to } = resolveRange(timeRange.from, timeRange.to);
   return Promise.all(
     queries.map(q =>
       proxyQuery({
@@ -25,8 +26,8 @@ const executePrometheusQueries = async (datasourceId: string, queries: PanelQuer
           endpoint: '/api/v1/query_range',
           params: {
             query: q.expr,
-            start: String(resolveTime(timeRange.from)),
-            end: String(resolveTime(timeRange.to)),
+            start: String(from),
+            end: String(to),
             step,
           },
         },
@@ -35,8 +36,9 @@ const executePrometheusQueries = async (datasourceId: string, queries: PanelQuer
   );
 };
 
-const executeSqlQueries = async (datasourceId: string, queries: PanelQuery[], timeRange: TimeRange): Promise<(PrometheusResponse | SqlResponse)[]> =>
-  Promise.all(
+const executeSqlQueries = async (datasourceId: string, queries: PanelQuery[], timeRange: TimeRange): Promise<(PrometheusResponse | SqlResponse)[]> => {
+  const { from, to } = resolveRange(timeRange.from, timeRange.to);
+  return Promise.all(
     queries.map(async q => {
       const result = await sqlQuery({
         data: {
@@ -44,8 +46,8 @@ const executeSqlQueries = async (datasourceId: string, queries: PanelQuery[], ti
           rawSql: q.expr,
           format: q.format,
           timeRange: {
-            from: String(resolveTime(timeRange.from)),
-            to: String(resolveTime(timeRange.to)),
+            from: String(from),
+            to: String(to),
           },
         },
       });
@@ -56,6 +58,7 @@ const executeSqlQueries = async (datasourceId: string, queries: PanelQuery[], ti
       return result;
     }),
   );
+};
 
 export type PanelDataResult = PrometheusResponse | SqlResponse;
 
