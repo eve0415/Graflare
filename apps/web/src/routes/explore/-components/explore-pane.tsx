@@ -1,4 +1,5 @@
 import type { QueryEditorMode } from '../../-root/query-editor-shell';
+import type { QueryHistoryEntry } from './query-history-store';
 import type { DatasourceDialect } from '@graflare/shared/schemas/datasource';
 import type { SqlResponse } from '@graflare/shared/schemas/sql';
 import type { SqlBuilderState } from '@graflare/shared/sql/builder';
@@ -13,7 +14,7 @@ import { Dialog, DialogClose, DialogContent, DialogDescription, DialogFooter, Di
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@graflare/ui/components/select';
 import { Skeleton } from '@graflare/ui/components/skeleton';
 import { useQuery, useSuspenseQuery } from '@tanstack/react-query';
-import { BarChart3, Play, Table2 } from 'lucide-react';
+import { BarChart3, History, Play, Table2 } from 'lucide-react';
 import { Suspense, useCallback, useMemo, useReducer, useState } from 'react';
 
 import { databaseSchemaQueryOptions } from '../../-root/introspection-queries';
@@ -26,7 +27,9 @@ import { datasourcesQueryOptions } from '../../datasources/-queries';
 
 import { PromqlBuilder, initialPromqlBuilderState, promqlBuilderReducer } from './promql-builder';
 import { QueryCodeEditor } from './query-code-editor';
+import { QueryHistoryDrawer } from './query-history-drawer';
 import { SqlBuilder } from './sql-builder';
+import { useQueryHistory } from './use-query-history';
 
 interface TimeRange {
   from: string;
@@ -80,6 +83,12 @@ export const ExplorePane = ({ timeRange, label }: ExplorePaneProps) => {
   const [sqlTableResult, setSqlTableResult] = useState<SqlResponse | null>(null);
   const [loading, setLoading] = useState(false);
   const [queryError, setQueryError] = useState<string | null>(null);
+  const [historyOpen, setHistoryOpen] = useState(false);
+  // Reference clock for the drawer's relative timestamps, re-seeded when the drawer opens (in the
+  // open handler — an event, so no render-phase clock read or setState-in-effect).
+  const [historyNow, setHistoryNow] = useState(() => Date.now());
+
+  const { entries: historyEntries, record, toggleStar, setComment, remove } = useQueryHistory();
 
   const selectedDs = datasources.find(d => d.id === datasourceId);
   const isSql = selectedDs?.type === 'sql';
@@ -120,82 +129,123 @@ export const ExplorePane = ({ timeRange, label }: ExplorePaneProps) => {
     setMode('builder');
   }, []);
 
-  const handleRun = useCallback(() => {
-    if (datasourceId === '' || effectiveQuery.trim() === '') return;
+  // Core runner: takes the datasource/query/dialect explicitly so a history re-run can run a
+  // restored query without waiting for the state it just set (setState is async, so reading
+  // `effectiveQuery`/`isSql` back in the same tick would be stale). History is recorded only on
+  // a successful run, tracked by a local `ok` flag — `queryError` is set inside this async
+  // closure and can't be read synchronously after it.
+  const runQuery = useCallback(
+    (args: { datasourceId: string; query: string; isSql: boolean }) => {
+      const { datasourceId: dsId, query, isSql: runIsSql } = args;
+      if (dsId === '' || query.trim() === '') return;
 
-    const run = async () => {
-      setLoading(true);
-      setQueryError(null);
-      setQueryResult(null);
-      setSqlTableResult(null);
+      const run = async () => {
+        setLoading(true);
+        setQueryError(null);
+        setQueryResult(null);
+        setSqlTableResult(null);
+        let ok = false;
 
-      try {
-        if (isSql) {
-          const result = await sqlQuery({
-            data: {
-              datasourceId,
-              rawSql: effectiveQuery,
-              format: sqlFormat,
-              timeRange: {
-                from: String(resolveTime(timeRange.from)),
-                to: String(resolveTime(timeRange.to)),
+        try {
+          if (runIsSql) {
+            const result = await sqlQuery({
+              data: {
+                datasourceId: dsId,
+                rawSql: query,
+                format: sqlFormat,
+                timeRange: {
+                  from: String(resolveTime(timeRange.from)),
+                  to: String(resolveTime(timeRange.to)),
+                },
               },
-            },
-          });
+            });
 
-          if (result.error !== undefined) {
-            setQueryError(result.error);
-          } else if (sqlFormat === 'table') {
-            setSqlTableResult(result);
+            if (result.error !== undefined) {
+              setQueryError(result.error);
+            } else if (sqlFormat === 'table') {
+              setSqlTableResult(result);
+              ok = true;
+            } else {
+              const adapted = sqlRowsToSeries(result);
+              if (adapted.status === 'error') {
+                setQueryError(adapted.error ?? 'Failed to convert to series');
+              } else if (adapted.data !== undefined && 'result' in adapted.data && Array.isArray(adapted.data.result)) {
+                const parsed: { metric: Record<string, string>; values?: [number, string][]; value?: [number, string] }[] = [];
+                for (const item of adapted.data.result) {
+                  if (typeof item === 'object' && item !== null && 'metric' in item) {
+                    parsed.push(item);
+                  }
+                }
+                setQueryResult({ resultType: adapted.data.resultType, result: parsed });
+                ok = true;
+              }
+            }
           } else {
-            const adapted = sqlRowsToSeries(result);
-            if (adapted.status === 'error') {
-              setQueryError(adapted.error ?? 'Failed to convert to series');
-            } else if (adapted.data !== undefined && 'result' in adapted.data && Array.isArray(adapted.data.result)) {
+            const step = computeStep(timeRange.from, timeRange.to);
+            const result = await proxyQuery({
+              data: {
+                datasourceId: dsId,
+                endpoint: '/api/v1/query_range',
+                params: {
+                  query,
+                  start: String(resolveTime(timeRange.from)),
+                  end: String(resolveTime(timeRange.to)),
+                  step,
+                },
+              },
+            });
+
+            if (result.status === 'error') {
+              setQueryError(result.error ?? 'Query failed');
+            } else if (result.data !== undefined && 'resultType' in result.data && Array.isArray(result.data.result)) {
               const parsed: { metric: Record<string, string>; values?: [number, string][]; value?: [number, string] }[] = [];
-              for (const item of adapted.data.result) {
+              for (const item of result.data.result) {
                 if (typeof item === 'object' && item !== null && 'metric' in item) {
                   parsed.push(item);
                 }
               }
-              setQueryResult({ resultType: adapted.data.resultType, result: parsed });
+              setQueryResult({ resultType: result.data.resultType, result: parsed });
+              ok = true;
             }
           }
-        } else {
-          const step = computeStep(timeRange.from, timeRange.to);
-          const result = await proxyQuery({
-            data: {
-              datasourceId,
-              endpoint: '/api/v1/query_range',
-              params: {
-                query: effectiveQuery,
-                start: String(resolveTime(timeRange.from)),
-                end: String(resolveTime(timeRange.to)),
-                step,
-              },
-            },
-          });
 
-          if (result.status === 'error') {
-            setQueryError(result.error ?? 'Query failed');
-          } else if (result.data !== undefined && 'resultType' in result.data && Array.isArray(result.data.result)) {
-            const parsed: { metric: Record<string, string>; values?: [number, string][]; value?: [number, string] }[] = [];
-            for (const item of result.data.result) {
-              if (typeof item === 'object' && item !== null && 'metric' in item) {
-                parsed.push(item);
-              }
-            }
-            setQueryResult({ resultType: result.data.resultType, result: parsed });
+          if (ok) {
+            record({ datasourceId: dsId, datasourceType: runIsSql ? 'sql' : 'prometheus', query });
           }
+        } catch (error) {
+          setQueryError(error instanceof Error ? error.message : 'Query failed');
+        } finally {
+          setLoading(false);
         }
-      } catch (error) {
-        setQueryError(error instanceof Error ? error.message : 'Query failed');
-      } finally {
-        setLoading(false);
+      };
+      void run();
+    },
+    [timeRange, sqlFormat, record],
+  );
+
+  const handleRun = useCallback(() => {
+    runQuery({ datasourceId, query: effectiveQuery, isSql });
+  }, [runQuery, datasourceId, effectiveQuery, isSql]);
+
+  const handleHistoryRun = useCallback(
+    (entry: QueryHistoryEntry) => {
+      const entryIsSql = entry.datasourceType === 'sql';
+      // Restore the editor UI for display only; the run uses the entry's own values directly.
+      if (datasources.some(d => d.id === entry.datasourceId)) {
+        setDatasourceId(entry.datasourceId);
       }
-    };
-    void run();
-  }, [datasourceId, effectiveQuery, timeRange, isSql, sqlFormat]);
+      setMode('code');
+      setCodeDraft(entry.query);
+      setHistoryOpen(false);
+      runQuery({ datasourceId: entry.datasourceId, query: entry.query, isSql: entryIsSql });
+    },
+    [runQuery, datasources],
+  );
+
+  const openHistory = useCallback(() => {
+    setHistoryNow(Date.now());
+    setHistoryOpen(true);
+  }, []);
 
   const handleDatasourceChange = useCallback((id: string | null) => {
     if (id === null) return;
@@ -292,6 +342,10 @@ export const ExplorePane = ({ timeRange, label }: ExplorePaneProps) => {
           <Play className='mr-1 h-3.5 w-3.5' />
           Run
         </Button>
+
+        <Button variant='ghost' size='icon-sm' onClick={openHistory} aria-label='Query history'>
+          <History className='h-4 w-4' />
+        </Button>
       </div>
 
       <QueryEditorShell mode={mode} onModeChange={handleModeChange} preview={builderPreview === '' ? undefined : builderPreview}>
@@ -324,6 +378,18 @@ export const ExplorePane = ({ timeRange, label }: ExplorePaneProps) => {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <QueryHistoryDrawer
+        open={historyOpen}
+        onOpenChange={setHistoryOpen}
+        entries={historyEntries}
+        datasources={datasources}
+        now={historyNow}
+        onRun={handleHistoryRun}
+        onToggleStar={toggleStar}
+        onSetComment={setComment}
+        onRemove={remove}
+      />
 
       {queryError !== null && (
         <div className='bg-destructive/10 text-destructive rounded-md p-3 text-sm' role='alert'>
