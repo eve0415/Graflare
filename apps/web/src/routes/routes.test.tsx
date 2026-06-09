@@ -56,6 +56,20 @@ describe('routes', () => {
     });
   });
 
+  it('renders service tokens list at /service-tokens', async () => {
+    await renderWithRouter('/service-tokens');
+    await waitFor(() => {
+      expect(screen.getByRole('heading', { name: 'Service Tokens' })).toBeDefined();
+    });
+  });
+
+  it('renders the empty state when no service tokens exist', async () => {
+    await renderWithRouter('/service-tokens');
+    await waitFor(() => {
+      expect(screen.getByText('No service tokens yet')).toBeDefined();
+    });
+  });
+
   it('renders dashboard list at /dashboards', async () => {
     await renderWithRouter('/dashboards');
     await waitFor(() => {

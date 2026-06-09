@@ -1,6 +1,6 @@
 import type { LucideIcon } from 'lucide-react';
 
-import { Bell, Compass, Database, Import, LayoutDashboard } from 'lucide-react';
+import { Bell, Compass, Database, Import, KeyRound, LayoutDashboard } from 'lucide-react';
 
 /**
  * Top-level navigation targets, shared between the sidebar and the command palette so
@@ -15,6 +15,7 @@ export const navItems = [
   { to: '/explore', label: 'Explore', icon: Compass },
   { to: '/alerting', label: 'Alerting', icon: Bell },
   { to: '/datasources', label: 'Data Sources', icon: Database },
+  { to: '/service-tokens', label: 'Service Tokens', icon: KeyRound },
   { to: '/import', label: 'Import', icon: Import },
 ] as const satisfies readonly { to: string; label: string; icon: LucideIcon }[];
 

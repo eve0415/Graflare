@@ -96,6 +96,31 @@ vi.mock('../src/routes/datasources/-queries', () => ({
   datasourceQueryOptions: () => ({ queryKey: ['datasource'], queryFn: () => Promise.resolve(null) }),
 }));
 
+vi.mock('../src/routes/service-tokens/-api', () => ({
+  listServiceTokens: () => Promise.resolve([]),
+  // The create result is the ONLY place the secret exists; the mock must include it so the
+  // reveal panel has something to show.
+  createServiceToken: () =>
+    Promise.resolve({
+      id: '11111111-2222-4333-8444-555555555555',
+      clientId: 'test-client-id.access',
+      name: 'Test',
+      createdAt: 0,
+      expiresAt: null,
+      clientSecret: 'test-client-secret',
+    }),
+  // `vi.fn` (not a plain arrow) so tests can assert the revoke fn was called with the right id.
+  revokeServiceToken: vi.fn<(input: { data: { id: string } }) => Promise<void>>(() => Promise.resolve()),
+}));
+
+vi.mock('../src/routes/service-tokens/-queries', () => ({
+  // `vi.fn` so a test can override the token list for the revoke flow.
+  serviceTokensQueryOptions: vi.fn<() => { queryKey: readonly unknown[]; queryFn: () => Promise<unknown> }>(() => ({
+    queryKey: ['service-tokens'],
+    queryFn: () => Promise.resolve([]),
+  })),
+}));
+
 vi.mock('../src/routes/-root/introspection-queries', () => ({
   tablesQueryOptions: () => ({ queryKey: ['introspection', 'tables'], queryFn: () => Promise.resolve({ tables: [] }), enabled: false }),
   columnsQueryOptions: () => ({ queryKey: ['introspection', 'columns'], queryFn: () => Promise.resolve({ columns: [] }), enabled: false }),

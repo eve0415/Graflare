@@ -11,6 +11,7 @@
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as AlertingRouteRouteImport } from './routes/alerting/route'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as ServiceTokensIndexRouteImport } from './routes/service-tokens/index'
 import { Route as ImportIndexRouteImport } from './routes/import/index'
 import { Route as ExploreIndexRouteImport } from './routes/explore/index'
 import { Route as DatasourcesIndexRouteImport } from './routes/datasources/index'
@@ -47,6 +48,11 @@ const AlertingRouteRoute = AlertingRouteRouteImport.update({
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ServiceTokensIndexRoute = ServiceTokensIndexRouteImport.update({
+  id: '/service-tokens/',
+  path: '/service-tokens/',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ImportIndexRoute = ImportIndexRouteImport.update({
@@ -206,6 +212,7 @@ export interface FileRoutesByFullPath {
   '/datasources/': typeof DatasourcesIndexRoute
   '/explore/': typeof ExploreIndexRoute
   '/import/': typeof ImportIndexRoute
+  '/service-tokens/': typeof ServiceTokensIndexRoute
   '/alerting/mute-timings/new': typeof AlertingMuteTimingsNewRoute
   '/alerting/rules/$id': typeof AlertingRulesIdRoute
   '/alerting/rules/new': typeof AlertingRulesNewRoute
@@ -234,6 +241,7 @@ export interface FileRoutesByTo {
   '/datasources': typeof DatasourcesIndexRoute
   '/explore': typeof ExploreIndexRoute
   '/import': typeof ImportIndexRoute
+  '/service-tokens': typeof ServiceTokensIndexRoute
   '/alerting/mute-timings/new': typeof AlertingMuteTimingsNewRoute
   '/alerting/rules/$id': typeof AlertingRulesIdRoute
   '/alerting/rules/new': typeof AlertingRulesNewRoute
@@ -266,6 +274,7 @@ export interface FileRoutesById {
   '/datasources/': typeof DatasourcesIndexRoute
   '/explore/': typeof ExploreIndexRoute
   '/import/': typeof ImportIndexRoute
+  '/service-tokens/': typeof ServiceTokensIndexRoute
   '/alerting/mute-timings/new': typeof AlertingMuteTimingsNewRoute
   '/alerting/rules/$id': typeof AlertingRulesIdRoute
   '/alerting/rules/new': typeof AlertingRulesNewRoute
@@ -299,6 +308,7 @@ export interface FileRouteTypes {
     | '/datasources/'
     | '/explore/'
     | '/import/'
+    | '/service-tokens/'
     | '/alerting/mute-timings/new'
     | '/alerting/rules/$id'
     | '/alerting/rules/new'
@@ -327,6 +337,7 @@ export interface FileRouteTypes {
     | '/datasources'
     | '/explore'
     | '/import'
+    | '/service-tokens'
     | '/alerting/mute-timings/new'
     | '/alerting/rules/$id'
     | '/alerting/rules/new'
@@ -358,6 +369,7 @@ export interface FileRouteTypes {
     | '/datasources/'
     | '/explore/'
     | '/import/'
+    | '/service-tokens/'
     | '/alerting/mute-timings/new'
     | '/alerting/rules/$id'
     | '/alerting/rules/new'
@@ -388,6 +400,7 @@ export interface RootRouteChildren {
   DatasourcesIndexRoute: typeof DatasourcesIndexRoute
   ExploreIndexRoute: typeof ExploreIndexRoute
   ImportIndexRoute: typeof ImportIndexRoute
+  ServiceTokensIndexRoute: typeof ServiceTokensIndexRoute
   DashboardsIdIndexRoute: typeof DashboardsIdIndexRoute
 }
 
@@ -405,6 +418,13 @@ declare module '@tanstack/react-router' {
       path: '/'
       fullPath: '/'
       preLoaderRoute: typeof IndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/service-tokens/': {
+      id: '/service-tokens/'
+      path: '/service-tokens'
+      fullPath: '/service-tokens/'
+      preLoaderRoute: typeof ServiceTokensIndexRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/import/': {
@@ -684,6 +704,7 @@ const rootRouteChildren: RootRouteChildren = {
   DatasourcesIndexRoute: DatasourcesIndexRoute,
   ExploreIndexRoute: ExploreIndexRoute,
   ImportIndexRoute: ImportIndexRoute,
+  ServiceTokensIndexRoute: ServiceTokensIndexRoute,
   DashboardsIdIndexRoute: DashboardsIdIndexRoute,
 }
 export const routeTree = rootRouteImport
