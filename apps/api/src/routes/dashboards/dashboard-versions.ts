@@ -7,6 +7,7 @@ import { Hono } from 'hono';
 
 import { createDb } from '../../db';
 import { dashboardVersions, dashboards } from '../../db/schema';
+import { subjectLabel } from '../../middleware/access';
 import { onValidationError } from '../../middleware/validate';
 
 const app = new Hono<AppEnv>();
@@ -147,7 +148,7 @@ app.post('/:id/versions/:version/restore', sValidator('param', dashboardVersionP
     version: newVersion,
     data: JSON.stringify(updated[0]),
     message: `Restored from version ${versionNum}`,
-    createdBy: user.email,
+    createdBy: subjectLabel(user),
     createdAt: now,
   });
 

@@ -19,7 +19,7 @@ const createApp = () => {
   const app = new Hono<AppEnv>();
   app.use('/*', async (c, next) => {
     c.set('orgId', 'org-test-123');
-    c.set('user', { email: 'test@example.com', name: 'Test' });
+    c.set('user', { kind: 'user', email: 'test@example.com', name: 'Test' });
     await next();
   });
   app.route('/', datasourceTestRoutes);

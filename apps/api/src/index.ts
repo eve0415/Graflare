@@ -1,5 +1,6 @@
 import type { AlertRuleDO } from './alerting/alert-rule-do';
 import type { ServiceTokenClient } from './cloudflare/access-service-tokens';
+import type { AuthSubject } from './middleware/access';
 import type { AlertInstanceListQuery, UpsertAlertInstance } from '@graflare/shared/schemas/alert-instance';
 import type { CreateAlertRule, UpdateAlertRule } from '@graflare/shared/schemas/alert-rule';
 import type { CreateAlertRuleGroup, UpdateAlertRuleGroup } from '@graflare/shared/schemas/alert-rule-group';
@@ -73,11 +74,10 @@ import {
   folders,
   muteTimings,
   notificationPolicies,
-  organizations,
   silences,
 } from './db/schema';
-import { accessMiddleware, verifyJwt } from './middleware/access';
-import { emailToOrgId, orgMiddleware } from './middleware/org';
+import { accessMiddleware, subjectFromPayload, subjectLabel, verifyJwt } from './middleware/access';
+import { orgMiddleware, resolveOrgId } from './middleware/org';
 import { createPrometheusClient } from './prometheus/factory';
 import { alertInstanceRoutes } from './routes/alerting/alert-instances';
 import { alertRuleGroupRoutes } from './routes/alerting/alert-rule-groups';
@@ -119,7 +119,7 @@ interface Bindings {
 export interface AppEnv {
   Bindings: Bindings;
   Variables: {
-    user: { email: string; name: string };
+    user: AuthSubject;
     orgId: string;
   };
 }
@@ -173,16 +173,27 @@ export class GraflareAPI extends WorkerEntrypoint<Bindings> {
     return createServiceTokenClient({ apiToken: this.env.CF_API_TOKEN, accountId: this.env.CF_ACCOUNT_ID });
   }
 
-  private async resolveAuth(jwt: string): Promise<{ orgId: string; email: string }> {
-    let email: string;
+  private async resolveAuth(jwt: string): Promise<{ orgId: string; subject: AuthSubject }> {
+    let subject: AuthSubject;
     if (this.env.DEV_AUTH_EMAIL) {
-      email = this.env.DEV_AUTH_EMAIL;
+      subject = { kind: 'user', email: this.env.DEV_AUTH_EMAIL, name: this.env.DEV_AUTH_EMAIL };
     } else {
-      ({ email } = await verifyJwt(jwt, this.env.ACCESS_TEAM_DOMAIN, this.env.ACCESS_AUD));
+      const payload = await verifyJwt(jwt, this.env.ACCESS_TEAM_DOMAIN, this.env.ACCESS_AUD);
+      // Defense-in-depth: the web worker only ever forwards a browser USER's
+      // identity JWT over this binding, so this service-token branch is not the
+      // load-bearing enforcement point (that is accessMiddleware on the
+      // Access-guarded HTTP path) — we mirror it so the two cannot drift.
+      const resolved = subjectFromPayload(payload);
+      if (resolved === null) {
+        throw new Error('Access JWT has no usable subject');
+      }
+      subject = resolved;
     }
-    const orgId = await emailToOrgId(email);
-    await this.db.insert(organizations).values({ id: orgId, name: email, createdAt: new Date(), updatedAt: new Date() }).onConflictDoNothing();
-    return { orgId, email };
+    const orgId = await resolveOrgId(this.db, subject);
+    if (orgId === null) {
+      throw new Error('Unknown service token');
+    }
+    return { orgId, subject };
   }
 
   health(): Promise<{ status: string }> {
@@ -857,7 +868,7 @@ export class GraflareAPI extends WorkerEntrypoint<Bindings> {
     return this.getDashboardCore(orgId, id);
   }
 
-  private async createDashboardCore(orgId: string, input: CreateDashboard, email: string) {
+  private async createDashboardCore(orgId: string, input: CreateDashboard, createdBy: string) {
     const parsed = createDashboardSchema.parse(input);
     const id = crypto.randomUUID();
     const now = new Date();
@@ -887,7 +898,7 @@ export class GraflareAPI extends WorkerEntrypoint<Bindings> {
         version: 1,
         data: JSON.stringify({ ...parsed, id, orgId, slug, version: 1 }),
         message: 'Initial version',
-        createdBy: email,
+        createdBy,
         createdAt: now,
       });
     } catch (error) {
@@ -899,12 +910,12 @@ export class GraflareAPI extends WorkerEntrypoint<Bindings> {
   }
 
   async createDashboard(jwt: string, input: CreateDashboard) {
-    const { orgId, email } = await this.resolveAuth(jwt);
-    return this.createDashboardCore(orgId, input, email);
+    const { orgId, subject } = await this.resolveAuth(jwt);
+    return this.createDashboardCore(orgId, input, subjectLabel(subject));
   }
 
   async updateDashboard(jwt: string, id: string, input: UpdateDashboard) {
-    const { orgId, email } = await this.resolveAuth(jwt);
+    const { orgId, subject } = await this.resolveAuth(jwt);
     dashboardIdSchema.parse(id);
     const parsed = updateDashboardSchema.parse(input);
 
@@ -952,7 +963,7 @@ export class GraflareAPI extends WorkerEntrypoint<Bindings> {
         version: updated[0].version,
         data: JSON.stringify(updated[0]),
         message: message ?? '',
-        createdBy: email,
+        createdBy: subjectLabel(subject),
         createdAt: now,
       });
 
@@ -1022,7 +1033,7 @@ export class GraflareAPI extends WorkerEntrypoint<Bindings> {
   }
 
   async restoreDashboardVersion(jwt: string, dashboardId: string, version: number) {
-    const { orgId, email } = await this.resolveAuth(jwt);
+    const { orgId, subject } = await this.resolveAuth(jwt);
     dashboardIdSchema.parse(dashboardId);
 
     const existing = await this.db
@@ -1080,7 +1091,7 @@ export class GraflareAPI extends WorkerEntrypoint<Bindings> {
         version: updated[0].version,
         data: JSON.stringify(updated[0]),
         message: `Restored from version ${version}`,
-        createdBy: email,
+        createdBy: subjectLabel(subject),
         createdAt: now,
       });
 
@@ -1092,7 +1103,7 @@ export class GraflareAPI extends WorkerEntrypoint<Bindings> {
   }
 
   async importDashboard(jwt: string, input: ImportDashboard) {
-    const { orgId, email } = await this.resolveAuth(jwt);
+    const { orgId, subject } = await this.resolveAuth(jwt);
     const parsed = importDashboardSchema.parse(input);
 
     const format = parsed.format ?? detectFormat(parsed.json);
@@ -1109,7 +1120,7 @@ export class GraflareAPI extends WorkerEntrypoint<Bindings> {
         variables: imported.variables,
         timeRange: imported.timeRange,
       },
-      email,
+      subjectLabel(subject),
     );
 
     return { dashboard, warnings };

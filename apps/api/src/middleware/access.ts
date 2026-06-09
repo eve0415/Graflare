@@ -2,7 +2,11 @@ import type { AppEnv } from '../index';
 import type { Context, MiddlewareHandler } from 'hono';
 
 export interface AccessJwtPayload {
-  email: string;
+  // Identity claims are optional and mutually exclusive in practice: a user JWT
+  // carries `email`; a service-token JWT carries `common_name` (the client_id)
+  // and omits `email` (its `sub` is empty). subjectFromPayload applies policy.
+  email?: string;
+  common_name?: string;
   name?: string;
   sub: string;
   iss: string;
@@ -10,6 +14,29 @@ export interface AccessJwtPayload {
   exp: number;
   iat: number;
 }
+
+export type AuthSubject = { kind: 'user'; email: string; name: string } | { kind: 'service'; clientId: string; name: string };
+
+/** A short label for audit stamps (`createdBy`): the email or the client_id. */
+export const subjectLabel = (subject: AuthSubject): string => (subject.kind === 'user' ? subject.email : subject.clientId);
+
+/**
+ * Derive the authenticated principal from a VERIFIED Access JWT payload.
+ * Precedence: a non-empty `common_name` is a service token (Cloudflare sets it
+ * to the token's client_id and omits `email`); else a non-empty `email` is a
+ * user. Empty strings count as absent — an `email: ""` must NOT route to the
+ * user path (it would mint a phantom shared org → cross-tenant collision).
+ * Returns null when neither claim identifies a principal (caller → 401).
+ */
+export const subjectFromPayload = (payload: AccessJwtPayload): AuthSubject | null => {
+  if (payload.common_name) {
+    return { kind: 'service', clientId: payload.common_name, name: payload.common_name };
+  }
+  if (payload.email) {
+    return { kind: 'user', email: payload.email, name: payload.name ?? payload.email };
+  }
+  return null;
+};
 
 interface JwtHeader {
   kid: string;
@@ -59,12 +86,13 @@ const parseAccessJwtPayload = (raw: unknown): AccessJwtPayload => {
     throw new Error('Invalid JWT payload');
   }
   return {
-    email: requireString(raw.email, 'email'),
     sub: requireString(raw.sub, 'sub'),
     iss: requireString(raw.iss, 'iss'),
     aud: requireStringArray(raw.aud, 'aud'),
     exp: requireNumber(raw.exp, 'exp'),
     iat: requireNumber(raw.iat, 'iat'),
+    ...(typeof raw.email === 'string' && { email: raw.email }),
+    ...(typeof raw.common_name === 'string' && { common_name: raw.common_name }),
     ...(typeof raw.name === 'string' && { name: raw.name }),
   };
 };
@@ -189,10 +217,12 @@ export const accessMiddleware = (): MiddlewareHandler<AppEnv> => async (c: Conte
     return c.json({ error: 'Invalid Access JWT' }, 401);
   }
 
-  c.set('user', {
-    email: payload.email,
-    name: payload.name ?? payload.email,
-  });
+  const subject = subjectFromPayload(payload);
+  if (subject === null) {
+    return c.json({ error: 'Invalid Access JWT' }, 401);
+  }
+
+  c.set('user', subject);
 
   return next();
 };

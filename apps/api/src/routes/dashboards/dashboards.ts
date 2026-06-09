@@ -7,6 +7,7 @@ import { Hono } from 'hono';
 
 import { createDb } from '../../db';
 import { dashboardVersions, dashboards } from '../../db/schema';
+import { subjectLabel } from '../../middleware/access';
 import { onValidationError } from '../../middleware/validate';
 import { slugify } from '../../slugify';
 
@@ -103,7 +104,7 @@ app.post('/', sValidator('json', createDashboardSchema, onValidationError), asyn
     version: 1,
     data: JSON.stringify(dashboardData),
     message: 'Initial version',
-    createdBy: user.email,
+    createdBy: subjectLabel(user),
     createdAt: now,
   });
 
@@ -164,7 +165,7 @@ app.put('/:id', sValidator('param', dashboardIdParamSchema, onValidationError), 
     version: newVersion,
     data: JSON.stringify(updated[0]),
     message: message ?? '',
-    createdBy: user.email,
+    createdBy: subjectLabel(user),
     createdAt: now,
   });
 

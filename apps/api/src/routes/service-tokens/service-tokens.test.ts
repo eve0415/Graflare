@@ -79,7 +79,7 @@ const createApp = (orgId: string) => {
   const app = new Hono<AppEnv>();
   app.use('/*', async (c, next) => {
     c.set('orgId', orgId);
-    c.set('user', { email: 'test@example.com', name: 'Test' });
+    c.set('user', { kind: 'user', email: 'test@example.com', name: 'Test' });
     await next();
   });
   app.route('/', serviceTokenRoutes);

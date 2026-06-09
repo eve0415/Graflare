@@ -4,7 +4,7 @@ import { env } from 'cloudflare:workers';
 import { Hono } from 'hono';
 import { describe, expect, it } from 'vitest';
 
-import { accessMiddleware, verifyJwt } from './access';
+import { accessMiddleware, subjectFromPayload, verifyJwt } from './access';
 
 const createApp = () => {
   const app = new Hono<AppEnv>();
@@ -83,6 +83,56 @@ const makeFakeJwt = (overrides: Record<string, unknown> = {}) => {
   );
   return `${header}.${payload}.fake-signature`;
 };
+
+const basePayload = {
+  sub: 'sub',
+  iss: 'https://test-team.cloudflareaccess.com',
+  aud: ['test-aud'],
+  exp: 0,
+  iat: 0,
+};
+
+describe('subjectFromPayload (user vs service-token discriminator)', () => {
+  it('maps a user JWT (email, no common_name) to a user subject', () => {
+    expect(subjectFromPayload({ ...basePayload, email: 'u@example.com', name: 'U' })).toEqual({ kind: 'user', email: 'u@example.com', name: 'U' });
+  });
+
+  it('falls back the user name to the email when name is absent', () => {
+    expect(subjectFromPayload({ ...basePayload, email: 'u@example.com' })).toEqual({ kind: 'user', email: 'u@example.com', name: 'u@example.com' });
+  });
+
+  it('maps a service-token JWT (common_name, empty sub, no email) to a service subject', () => {
+    expect(subjectFromPayload({ ...basePayload, sub: '', common_name: 'client-abc.access' })).toEqual({
+      kind: 'service',
+      clientId: 'client-abc.access',
+      name: 'client-abc.access',
+    });
+  });
+
+  it('prefers common_name (service) when both claims are present', () => {
+    expect(subjectFromPayload({ ...basePayload, email: 'u@example.com', common_name: 'client-abc.access' })).toEqual({
+      kind: 'service',
+      clientId: 'client-abc.access',
+      name: 'client-abc.access',
+    });
+  });
+
+  it('rejects an empty-string email with no common_name (no phantom user org)', () => {
+    expect(subjectFromPayload({ ...basePayload, email: '' })).toBeNull();
+  });
+
+  it('treats an empty-string common_name as absent and falls back to the email', () => {
+    expect(subjectFromPayload({ ...basePayload, common_name: '', email: 'u@example.com' })).toEqual({
+      kind: 'user',
+      email: 'u@example.com',
+      name: 'u@example.com',
+    });
+  });
+
+  it('returns null when neither claim is present', () => {
+    expect(subjectFromPayload(basePayload)).toBeNull();
+  });
+});
 
 describe('verifyJwt issuer normalization', () => {
   it('accepts slug-only teamDomain', async () => {

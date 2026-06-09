@@ -8,6 +8,7 @@ import { Hono } from 'hono';
 
 import { createDb } from '../../db';
 import { dashboardVersions, dashboards } from '../../db/schema';
+import { subjectLabel } from '../../middleware/access';
 import { onValidationError } from '../../middleware/validate';
 import { slugify } from '../../slugify';
 
@@ -49,7 +50,7 @@ app.post('/', sValidator('json', importDashboardSchema, onValidationError), asyn
     version: 1,
     data: JSON.stringify({ ...imported, id, orgId, slug, version: 1 }),
     message: `Imported from ${format} format`,
-    createdBy: user.email,
+    createdBy: subjectLabel(user),
     createdAt: now,
   });
 
