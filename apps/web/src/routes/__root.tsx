@@ -45,11 +45,11 @@ const RootComponent = () => {
                   <CommandPaletteTrigger onOpen={openPalette} />
                 </div>
               </header>
-              <main className='flex-1 p-6'>
+              <div className='flex-1 p-6'>
                 <QueryBoundary pendingFallback={rootFallback}>
                   <Outlet />
                 </QueryBoundary>
-              </main>
+              </div>
             </SidebarInset>
           </SidebarProvider>
           <CommandPalette open={paletteOpen} onOpenChange={setPaletteOpen} />

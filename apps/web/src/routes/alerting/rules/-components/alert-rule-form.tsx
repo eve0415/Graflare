@@ -394,7 +394,7 @@ export const AlertRuleForm = ({ groups, initialForm, submitLabel, onSubmit }: Pr
 
           <div className='space-y-3'>
             <Label>Condition</Label>
-            <div className='grid grid-cols-4 gap-3'>
+            <div className='grid grid-cols-2 gap-3 sm:grid-cols-4'>
               <div className='space-y-1'>
                 <Label htmlFor='condRef' className='text-xs'>
                   Query
@@ -455,7 +455,7 @@ export const AlertRuleForm = ({ groups, initialForm, submitLabel, onSubmit }: Pr
             </div>
           </div>
 
-          <div className='grid grid-cols-3 gap-4'>
+          <div className='grid grid-cols-1 gap-4 sm:grid-cols-3'>
             <div className='space-y-2'>
               <Label htmlFor='forDuration'>Pending period (seconds)</Label>
               <Input id='forDuration' type='number' min={0} max={86400} value={form.forDurationS} onChange={handleForDurationChange} />

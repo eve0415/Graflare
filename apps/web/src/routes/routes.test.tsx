@@ -34,6 +34,17 @@ describe('routes', () => {
     });
   });
 
+  it('exposes exactly one main landmark (SidebarInset), not a nested duplicate', async () => {
+    // Regression: __root previously wrapped the Outlet in a second <main> inside
+    // SidebarInset (itself a <main>), tripping axe landmark-no-duplicate-main on
+    // every page. getAllByRole throws if there are zero; assert the count is 1.
+    await renderWithRouter('/datasources');
+    await waitFor(() => {
+      expect(screen.getByRole('heading', { name: 'Data Sources' })).toBeDefined();
+    });
+    expect(screen.getAllByRole('main')).toHaveLength(1);
+  });
+
   it('renders add data source form at /datasources/new', async () => {
     await renderWithRouter('/datasources/new');
     await waitFor(() => {
