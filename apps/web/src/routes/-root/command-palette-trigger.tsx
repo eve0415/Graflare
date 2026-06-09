@@ -1,4 +1,5 @@
 import { Button } from '@graflare/ui/components/button';
+import { Kbd } from '@graflare/ui/components/kbd';
 import { SearchIcon } from 'lucide-react';
 import { useSyncExternalStore } from 'react';
 
@@ -25,9 +26,7 @@ export const CommandPaletteTrigger = ({ onOpen }: CommandPaletteTriggerProps) =>
     <Button variant='outline' size='sm' onClick={onOpen} className='text-muted-foreground h-8 gap-2 px-2.5 font-normal' aria-label='Open command palette'>
       <SearchIcon className='size-4' />
       <span className='hidden sm:inline'>Search…</span>
-      <kbd className='bg-muted text-muted-foreground pointer-events-none ml-1 hidden h-5 items-center gap-0.5 rounded border px-1.5 font-mono text-[10px] font-medium select-none sm:inline-flex'>
-        {isMac ? '⌘' : 'Ctrl'}K
-      </kbd>
+      <Kbd className='ml-1 hidden text-[10px] sm:inline-flex'>{isMac ? '⌘' : 'Ctrl'}K</Kbd>
     </Button>
   );
 };

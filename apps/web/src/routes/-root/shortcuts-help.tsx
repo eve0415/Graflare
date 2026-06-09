@@ -1,6 +1,7 @@
 import type { Shortcut } from './shortcuts';
 
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from '@graflare/ui/components/dialog';
+import { Kbd } from '@graflare/ui/components/kbd';
 import { useHotkey } from '@tanstack/react-hotkeys';
 import { Fragment, useSyncExternalStore } from 'react';
 
@@ -68,12 +69,9 @@ const ShortcutRow = ({ shortcut, isMac }: ShortcutRowProps) => (
               +
             </span>
           )}
-          <kbd
-            aria-hidden
-            className='bg-muted text-foreground inline-flex h-6 min-w-6 items-center justify-center rounded border px-1.5 font-mono text-xs font-medium select-none'
-          >
+          <Kbd aria-hidden className='h-6 min-w-6'>
             {keyGlyph(key, isMac)}
-          </kbd>
+          </Kbd>
         </Fragment>
       ))}
     </dd>
