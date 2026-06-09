@@ -6,6 +6,7 @@ import { Button } from '@graflare/ui/components/button';
 import { Input } from '@graflare/ui/components/input';
 import { ScrollArea } from '@graflare/ui/components/scroll-area';
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from '@graflare/ui/components/sheet';
+import { Tabs, TabsList, TabsTrigger } from '@graflare/ui/components/tabs';
 import { ArrowDownNarrowWide, ArrowUpNarrowWide, Check, Copy, MessageSquarePlus, MessageSquareText, Play, Search, Star, Trash2, X } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
@@ -82,11 +83,8 @@ export const QueryHistoryDrawer = ({ open, onOpenChange, entries, datasources, n
     setSortOrder(o => (o === 'newest' ? 'oldest' : 'newest'));
   }, []);
 
-  const showHistory = useCallback(() => {
-    setTab('history');
-  }, []);
-  const showStarred = useCallback(() => {
-    setTab('starred');
+  const handleTabChange = useCallback((value: string | number | null) => {
+    if (value === 'history' || value === 'starred') setTab(value);
   }, []);
 
   const emptyMessage = tab === 'starred' ? 'No starred queries yet. Star a query to keep it here.' : 'No queries yet. Run a query to start building history.';
@@ -123,14 +121,12 @@ export const QueryHistoryDrawer = ({ open, onOpenChange, entries, datasources, n
             </Button>
           </div>
 
-          <fieldset className='bg-muted/50 m-0 inline-flex w-fit min-w-0 gap-1 rounded-2xl border-0 p-0.5' aria-label='Filter query history'>
-            <Button type='button' variant={tab === 'history' ? 'secondary' : 'ghost'} size='xs' aria-pressed={tab === 'history'} onClick={showHistory}>
-              History
-            </Button>
-            <Button type='button' variant={tab === 'starred' ? 'secondary' : 'ghost'} size='xs' aria-pressed={tab === 'starred'} onClick={showStarred}>
-              Starred
-            </Button>
-          </fieldset>
+          <Tabs value={tab} onValueChange={handleTabChange}>
+            <TabsList aria-label='Filter query history'>
+              <TabsTrigger value='history'>History</TabsTrigger>
+              <TabsTrigger value='starred'>Starred</TabsTrigger>
+            </TabsList>
+          </Tabs>
         </div>
 
         <ScrollArea className='mt-3 min-h-0 flex-1'>

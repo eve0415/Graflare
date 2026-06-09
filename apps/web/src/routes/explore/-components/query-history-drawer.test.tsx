@@ -139,7 +139,16 @@ describe('query-history-drawer', () => {
 
   it('shows only starred entries on the Starred tab', () => {
     renderDrawer();
-    fireEvent.click(screen.getByRole('button', { name: 'Starred' }));
+    const history = screen.getByRole('tab', { name: 'History' });
+    const starred = screen.getByRole('tab', { name: 'Starred' });
+    // History is the default-active filter tab.
+    expect(history.getAttribute('aria-selected')).toBe('true');
+    expect(starred.getAttribute('aria-selected')).toBe('false');
+
+    fireEvent.click(starred);
+    // Selection moves to Starred and the list filters to starred-only entries.
+    expect(starred.getAttribute('aria-selected')).toBe('true');
+    expect(history.getAttribute('aria-selected')).toBe('false');
     expect(screen.getByText('SELECT count(*) FROM events')).toBeDefined();
     expect(screen.queryByText('up')).toBeNull();
     expect(screen.queryByText('rate(http_requests_total[5m])')).toBeNull();
@@ -204,7 +213,7 @@ describe('query-history-drawer', () => {
   it('shows a distinct empty state on the Starred tab when nothing is starred', () => {
     const unstarred = ENTRIES.map(e => ({ ...e, starred: false }));
     renderDrawer({ entries: unstarred });
-    fireEvent.click(screen.getByRole('button', { name: 'Starred' }));
+    fireEvent.click(screen.getByRole('tab', { name: 'Starred' }));
     expect(screen.getByText(/No starred queries yet/)).toBeDefined();
   });
 

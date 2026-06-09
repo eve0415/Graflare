@@ -6,6 +6,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@graflare/ui/c
 import { Input } from '@graflare/ui/components/input';
 import { Label } from '@graflare/ui/components/label';
 import { Separator } from '@graflare/ui/components/separator';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@graflare/ui/components/tabs';
 import { Textarea } from '@graflare/ui/components/textarea';
 import { useSuspenseQuery } from '@tanstack/react-query';
 import { History, RotateCcw, Variable as VariableIcon } from 'lucide-react';
@@ -85,14 +86,8 @@ export const DashboardSettings = ({
     [onClose],
   );
 
-  const showGeneral = useCallback(() => {
-    setTab('general');
-  }, []);
-  const showVariables = useCallback(() => {
-    setTab('variables');
-  }, []);
-  const showVersions = useCallback(() => {
-    setTab('versions');
+  const handleTabChange = useCallback((value: string | number | null) => {
+    if (value === 'general' || value === 'variables' || value === 'versions') setTab(value);
   }, []);
 
   return (
@@ -102,68 +97,68 @@ export const DashboardSettings = ({
           <DialogTitle>Dashboard Settings</DialogTitle>
         </DialogHeader>
 
-        <div className='flex gap-2 border-b pb-2'>
-          <Button variant={tab === 'general' ? 'secondary' : 'ghost'} size='sm' onClick={showGeneral}>
-            General
-          </Button>
-          <Button variant={tab === 'variables' ? 'secondary' : 'ghost'} size='sm' onClick={showVariables}>
-            <VariableIcon className='mr-1 h-3.5 w-3.5' />
-            Variables
-          </Button>
-          <Button variant={tab === 'versions' ? 'secondary' : 'ghost'} size='sm' onClick={showVersions}>
-            <History className='mr-1 h-3.5 w-3.5' />
-            Version History
-          </Button>
-        </div>
+        <Tabs value={tab} onValueChange={handleTabChange}>
+          <TabsList>
+            <TabsTrigger value='general'>General</TabsTrigger>
+            <TabsTrigger value='variables'>
+              <VariableIcon className='mr-1 h-3.5 w-3.5' />
+              Variables
+            </TabsTrigger>
+            <TabsTrigger value='versions'>
+              <History className='mr-1 h-3.5 w-3.5' />
+              Version History
+            </TabsTrigger>
+          </TabsList>
 
-        {tab === 'general' && (
-          <div className='space-y-4'>
-            <div className='space-y-2'>
-              <Label htmlFor='settings-title'>Title</Label>
-              <Input id='settings-title' value={draftTitle} onChange={handleTitleChange} />
+          <TabsContent value='general'>
+            <div className='space-y-4'>
+              <div className='space-y-2'>
+                <Label htmlFor='settings-title'>Title</Label>
+                <Input id='settings-title' value={draftTitle} onChange={handleTitleChange} />
+              </div>
+
+              <div className='space-y-2'>
+                <Label htmlFor='settings-description'>Description</Label>
+                <Textarea id='settings-description' aria-label='Dashboard description' rows={3} value={draftDescription} onChange={handleDescChange} />
+              </div>
+
+              <div className='space-y-2'>
+                <Label htmlFor='settings-tags'>Tags (comma-separated)</Label>
+                <Input id='settings-tags' value={draftTags} onChange={handleTagsChange} placeholder='tag1, tag2, tag3' />
+              </div>
+
+              <Separator />
+
+              <div className='flex justify-end gap-2'>
+                <Button variant='outline' onClick={onClose}>
+                  Cancel
+                </Button>
+                <Button onClick={handleSave}>Save</Button>
+              </div>
             </div>
+          </TabsContent>
 
-            <div className='space-y-2'>
-              <Label htmlFor='settings-description'>Description</Label>
-              <Textarea id='settings-description' aria-label='Dashboard description' rows={3} value={draftDescription} onChange={handleDescChange} />
+          <TabsContent value='variables'>
+            <div className='space-y-4'>
+              <VariableEditor variables={draftVariables} datasources={datasources} onChange={setDraftVariables} />
+
+              <Separator />
+
+              <div className='flex justify-end gap-2'>
+                <Button variant='outline' onClick={onClose}>
+                  Cancel
+                </Button>
+                <Button onClick={handleSave}>Save</Button>
+              </div>
             </div>
+          </TabsContent>
 
-            <div className='space-y-2'>
-              <Label htmlFor='settings-tags'>Tags (comma-separated)</Label>
-              <Input id='settings-tags' value={draftTags} onChange={handleTagsChange} placeholder='tag1, tag2, tag3' />
-            </div>
-
-            <Separator />
-
-            <div className='flex justify-end gap-2'>
-              <Button variant='outline' onClick={onClose}>
-                Cancel
-              </Button>
-              <Button onClick={handleSave}>Save</Button>
-            </div>
-          </div>
-        )}
-
-        {tab === 'variables' && (
-          <div className='space-y-4'>
-            <VariableEditor variables={draftVariables} datasources={datasources} onChange={setDraftVariables} />
-
-            <Separator />
-
-            <div className='flex justify-end gap-2'>
-              <Button variant='outline' onClick={onClose}>
-                Cancel
-              </Button>
-              <Button onClick={handleSave}>Save</Button>
-            </div>
-          </div>
-        )}
-
-        {tab === 'versions' && (
-          <QueryBoundary pendingFallback={versionHistoryFallback}>
-            <VersionHistory dashboardId={dashboardId} onRestore={onRestore} onClose={onClose} />
-          </QueryBoundary>
-        )}
+          <TabsContent value='versions'>
+            <QueryBoundary pendingFallback={versionHistoryFallback}>
+              <VersionHistory dashboardId={dashboardId} onRestore={onRestore} onClose={onClose} />
+            </QueryBoundary>
+          </TabsContent>
+        </Tabs>
       </DialogContent>
     </Dialog>
   );

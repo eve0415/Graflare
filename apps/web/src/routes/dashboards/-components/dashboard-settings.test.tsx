@@ -56,7 +56,7 @@ const firstSaveArg = (onSave: ReturnType<typeof vi.fn<(data: SaveData) => void>>
 };
 
 const openVariablesTab = (): void => {
-  fireEvent.click(screen.getByRole('button', { name: 'Variables' }));
+  fireEvent.click(screen.getByRole('tab', { name: 'Variables' }));
 };
 
 afterEach(() => {
@@ -66,9 +66,20 @@ afterEach(() => {
 describe('dashboard-settings — variables tab', () => {
   it('exposes a Variables tab alongside General and Version History', () => {
     renderSettings(NO_VARIABLES);
-    expect(screen.getByRole('button', { name: 'General' })).toBeDefined();
-    expect(screen.getByRole('button', { name: 'Variables' })).toBeDefined();
-    expect(screen.getByRole('button', { name: 'Version History' })).toBeDefined();
+    expect(screen.getByRole('tablist')).toBeDefined();
+    const general = screen.getByRole('tab', { name: 'General' });
+    const variables = screen.getByRole('tab', { name: 'Variables' });
+    expect(screen.getByRole('tab', { name: 'Version History' })).toBeDefined();
+
+    // General is the default-active tab; its panel is the visible tabpanel.
+    expect(general.getAttribute('aria-selected')).toBe('true');
+    expect(variables.getAttribute('aria-selected')).toBe('false');
+    expect(screen.getByRole('tabpanel')).toBeDefined();
+
+    // Activating Variables moves selection (real arrow-key/tab semantics, not a div toggle).
+    fireEvent.click(variables);
+    expect(variables.getAttribute('aria-selected')).toBe('true');
+    expect(general.getAttribute('aria-selected')).toBe('false');
   });
 
   it('lists the seeded variables in the Variables tab', () => {
