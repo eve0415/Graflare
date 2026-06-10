@@ -93,9 +93,14 @@ export class AlertRuleDO extends DurableObject<Env> {
   constructor(ctx: DurableObjectState, env: Env) {
     super(ctx, env);
     this.db = drizzle(this.ctx.storage, { schema: doSchema, logger: false });
-    void this.ctx.blockConcurrencyWhile(async () => {
-      await migrate(this.db, migrations);
-    });
+    // drizzle v1's durable-sqlite migrator is synchronous, so no
+    // blockConcurrencyWhile gate is needed: the runtime delivers events only
+    // after the constructor returns. The failure response is only produced for
+    // `drizzle-kit pull --init` runs (init: true), but surface it honestly.
+    const failure = migrate(this.db, migrations);
+    if (failure) {
+      throw new Error(`AlertRuleDO migration failed: ${failure.exitCode}`);
+    }
   }
 
   async init(config: AlertRuleConfig): Promise<void> {
