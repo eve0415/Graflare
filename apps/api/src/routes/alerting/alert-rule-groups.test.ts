@@ -182,6 +182,28 @@ describe('alert-rule-group routes', () => {
     expect(getRes.status).toBe(404);
   });
 
+  // Regression: deleting a group cascade-deletes its member rules in D1, but
+  // their DOs used to keep their alarms — evaluating deleted rules forever.
+  it('stops member rule DOs when the group is deleted', async () => {
+    const app = createApp();
+    const createRes = await app.request(req('/', json({ name: 'doomed-group' })), {}, testBindings);
+    const groupId = readId(await createRes.json());
+    const ruleId = await seedMemberRule(groupId);
+
+    // Seed the member's DO config the way a running rule would have it.
+    await app.request(
+      req(`/${groupId}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ evalIntervalS: 120 }) }),
+      {},
+      testBindings,
+    );
+    expect(await readRuleDoConfig(ruleId)).not.toBeNull();
+
+    const res = await app.request(req(`/${groupId}`, { method: 'DELETE' }), {}, testBindings);
+    expect(res.status).toBe(204);
+
+    expect(await readRuleDoConfig(ruleId)).toBeNull();
+  });
+
   // Regression: the HTTP group update used to write D1 only — running member
   // DOs kept evaluating on the old interval until each rule was next touched.
   it('propagates an eval-interval change to member rule DOs', async () => {

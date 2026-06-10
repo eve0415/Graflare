@@ -210,10 +210,28 @@ export const updateRuleGroup = async (
   return group;
 };
 
-export const deleteRuleGroup = async ({ db }: RuleLifecycleDeps, orgId: string, id: string): Promise<void> => {
+export const deleteRuleGroup = async ({ db, alertRule }: RuleLifecycleDeps, orgId: string, id: string): Promise<boolean> => {
   alertRuleGroupIdSchema.parse(id);
+
+  const existing = await db
+    .select({ id: alertRuleGroups.id })
+    .from(alertRuleGroups)
+    .where(and(eq(alertRuleGroups.id, id), eq(alertRuleGroups.orgId, orgId)))
+    .limit(1);
+  if (existing.length === 0) return false;
+
+  // groupId is ON DELETE CASCADE — deleting the group deletes member rules, so
+  // their DOs must stop with them or their alarms evaluate forever. Capture the
+  // member ids before the cascade removes the rows.
+  const members = await db
+    .select({ id: alertRules.id })
+    .from(alertRules)
+    .where(and(eq(alertRules.groupId, id), eq(alertRules.orgId, orgId)));
+
   try {
     await db.delete(alertRuleGroups).where(and(eq(alertRuleGroups.id, id), eq(alertRuleGroups.orgId, orgId)));
+    await Promise.all(members.map(member => alertRule.getByName(member.id).stop()));
+    return true;
   } catch (error) {
     console.error('deleteAlertRuleGroup failed:', error);
     throw new Error('Failed to delete alert rule group', { cause: error });
