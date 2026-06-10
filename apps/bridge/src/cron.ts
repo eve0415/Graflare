@@ -3,6 +3,7 @@ import type { IntrospectedFields } from './cf-graphql/introspection';
 import type { GraphQLCollector, MetricRow, RESTCollector } from './collectors/types';
 import type { BridgeEnv } from './env';
 
+import { chunkRowsForD1 } from '@graflare/shared/db/chunk-rows';
 import { and, eq, lt, sql } from 'drizzle-orm';
 import { drizzle } from 'drizzle-orm/d1';
 
@@ -24,14 +25,10 @@ import { checkTokenPermissions } from './lib/token-check';
 import { isRecord } from './lib/typed-access';
 
 const RETENTION_SECONDS = 31 * 24 * 3600;
-// D1 caps a single statement at 100 bound parameters. A multi-row INSERT binds
-// (rows × columns) params, so the per-statement row count must stay under that
-// ceiling or D1 rejects the whole statement ("too many SQL variables") and zero
-// rows land. Derive the row limit from the actual column count so adding a metrics
-// column can't silently push us back over the limit.
-const D1_MAX_BOUND_PARAMS = 100;
+// The metrics multi-row INSERT is chunked under D1's 100-bound-parameter ceiling by the shared
+// chunkRowsForD1 — it derives the chunk size from this column count and drift-guards it against
+// the actual row shape, so adding a metrics column can't silently push a chunk back over the limit.
 const METRIC_INSERT_COLUMNS = 9;
-const INSERT_CHUNK_SIZE = Math.floor(D1_MAX_BOUND_PARAMS / METRIC_INSERT_COLUMNS);
 export const BATCH_CHUNK_SIZE = 15;
 const BACKOFF_BASE_S = 300;
 const BACKOFF_CAP_S = 14400;
@@ -81,19 +78,7 @@ const insertMetricRows = async (db: ReturnType<typeof drizzle>, rows: MetricRow[
     dimsHash: r.dimsHash,
   }));
 
-  const [firstValue] = values;
-  if (firstValue !== undefined && Object.keys(firstValue).length !== METRIC_INSERT_COLUMNS) {
-    // The row shape drifted from METRIC_INSERT_COLUMNS; the chunk size is no longer
-    // guaranteed under D1's bound-parameter ceiling. Fail loudly rather than risk
-    // silently re-introducing the "every insert rejects, zero rows land" regression.
-    const actual = Object.keys(firstValue).length;
-    throw new Error(`metric row has ${String(actual)} columns, expected ${String(METRIC_INSERT_COLUMNS)} (chunk size assumption broken)`);
-  }
-
-  const chunks: (typeof values)[] = [];
-  for (let i = 0; i < values.length; i += INSERT_CHUNK_SIZE) {
-    chunks.push(values.slice(i, i + INSERT_CHUNK_SIZE));
-  }
+  const chunks = chunkRowsForD1(values, METRIC_INSERT_COLUMNS);
 
   // Insert chunks sequentially and let the first failure throw. Each chunk is an idempotent
   // upsert on metrics_pk, and insertMetricRows runs before updateSyncState in every caller,
