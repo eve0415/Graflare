@@ -262,4 +262,34 @@ describe('cachedProxyQuery wrapper', () => {
     expect(result).toEqual(SUCCESS);
     expect(run).toHaveBeenCalledTimes(1);
   });
+
+  it('hands the cache write to `defer` instead of awaiting it inline', async () => {
+    const store = new FakeStore();
+    const run = vi.fn<RunFn>(() => Promise.resolve(SUCCESS));
+    const deferred: Promise<void>[] = [];
+
+    const result = await cachedProxyQuery(store, args, run, work => {
+      deferred.push(work);
+    });
+
+    expect(result).toEqual(SUCCESS);
+    expect(deferred).toHaveLength(1);
+    await Promise.all(deferred);
+    expect(store.putCalls).toBe(1);
+  });
+
+  it('a deferred write failure resolves (swallowed + logged), never rejects', async () => {
+    const store = new FakeStore();
+    store.match = () => Promise.resolve(undefined);
+    store.put = () => Promise.reject(new Error('cache put exploded'));
+    const run = vi.fn<RunFn>(() => Promise.resolve(SUCCESS));
+    const deferred: Promise<void>[] = [];
+
+    const result = await cachedProxyQuery(store, args, run, work => {
+      deferred.push(work);
+    });
+
+    expect(result).toEqual(SUCCESS);
+    await expect(Promise.all(deferred)).resolves.toBeDefined();
+  });
 });

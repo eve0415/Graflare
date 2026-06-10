@@ -184,11 +184,16 @@ export interface CachedProxyArgs {
  * `run` receives the (possibly snapped) params and performs the real upstream
  * fetch — it stays the sole owner of the security-critical allowlist + origin
  * assertion + credential attachment in `proxyQuery`.
+ *
+ * `defer` (e.g. `ctx.waitUntil`) takes the cache write off the response path;
+ * without it the write is awaited inline. The write's failure is swallowed and
+ * logged either way.
  */
 export const cachedProxyQuery = async (
   store: QueryCacheStore,
   { orgId, datasourceId, endpoint, params, cacheTtl }: CachedProxyArgs,
   run: (params: Record<string, string>) => Promise<PrometheusResponse>,
+  defer?: (work: Promise<void>) => void,
 ): Promise<PrometheusResponse> => {
   if (cacheTtl <= 0) return run(params);
 
@@ -216,10 +221,13 @@ export const cachedProxyQuery = async (
   // Only cache a genuinely-successful response with data — never an error or an
   // empty success, which would otherwise pin a transient failure for the full TTL.
   if (result.status === 'success' && result.data !== undefined) {
-    try {
-      await store.put(key, result, cacheTtl);
-    } catch (error) {
+    const write = store.put(key, result, cacheTtl).catch((error: unknown) => {
       console.error('query cache write failed (ignored):', error);
+    });
+    if (defer === undefined) {
+      await write;
+    } else {
+      defer(write);
     }
   }
 

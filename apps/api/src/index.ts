@@ -494,7 +494,9 @@ export class GraflareAPI extends WorkerEntrypoint<Bindings> {
       }
     };
 
-    return cachedProxyQuery(new CacheApiStore(caches.default), { orgId, datasourceId, endpoint, params, cacheTtl: ds.cacheTtl }, runLive);
+    return cachedProxyQuery(new CacheApiStore(caches.default), { orgId, datasourceId, endpoint, params, cacheTtl: ds.cacheTtl }, runLive, work => {
+      this.ctx.waitUntil(work);
+    });
   }
 
   // --- SQL RPC ---
