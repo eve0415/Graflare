@@ -419,6 +419,7 @@ const processOneRESTCollector = async (
   toTime: string,
   nowSeconds: number,
   statuses: DatasetStatusRow[],
+  syncTimes: ReadonlyMap<string, number>,
 ): Promise<CollectResult> => {
   const scopeId = env.CF_ACCOUNT_ID;
 
@@ -426,14 +427,8 @@ const processOneRESTCollector = async (
     return { dataset: collector.name, scope: collector.scope, scopeId, status: 'skipped', rowCount: 0, error: '' };
   }
 
-  const syncRows = await db
-    .select()
-    .from(syncState)
-    .where(and(eq(syncState.dataset, collector.name), eq(syncState.scope, collector.scope), eq(syncState.scopeId, scopeId)))
-    .limit(1);
-
-  const [lastSync] = syncRows;
-  if (lastSync !== undefined && nowSeconds - lastSync.lastSyncAt < collector.minIntervalSeconds) {
+  const lastSyncAt = syncTimes.get(syncKey(collector.name, collector.scope, scopeId));
+  if (lastSyncAt !== undefined && nowSeconds - lastSyncAt < collector.minIntervalSeconds) {
     return { dataset: collector.name, scope: collector.scope, scopeId, status: 'skipped', rowCount: 0, error: '' };
   }
 
@@ -476,29 +471,30 @@ const processRESTCollectors = async (
   toTime: string,
   nowSeconds: number,
   statuses: DatasetStatusRow[],
-): Promise<CollectResult[]> => Promise.all(collectors.map(c => processOneRESTCollector(db, env, c, fromTime, toTime, nowSeconds, statuses)));
+  syncTimes: ReadonlyMap<string, number>,
+): Promise<CollectResult[]> => Promise.all(collectors.map(c => processOneRESTCollector(db, env, c, fromTime, toTime, nowSeconds, statuses, syncTimes)));
 
-const getSyncStateTime = async (db: ReturnType<typeof drizzle>, dataset: string, scope: string, scopeId: string, defaultTime: number): Promise<number> => {
-  const rows = await db
-    .select()
-    .from(syncState)
-    .where(and(eq(syncState.dataset, dataset), eq(syncState.scope, scope), eq(syncState.scopeId, scopeId)))
-    .limit(1);
-  const [row] = rows;
-  return row === undefined ? defaultTime : row.lastSyncAt;
+const syncKey = (dataset: string, scope: string, scopeId: string): string => `${dataset}|${scope}|${scopeId}`;
+
+// One read of the whole (small) sync_state table per cron run, replacing a
+// point SELECT per collector per chunk. The snapshot is taken before tasks
+// start; that's safe because each task only reads its own collectors' rows and
+// only that task writes them.
+const loadSyncTimes = async (db: ReturnType<typeof drizzle>): Promise<Map<string, number>> => {
+  const rows = await db.select().from(syncState);
+  return new Map(rows.map(r => [syncKey(r.dataset, r.scope, r.scopeId), r.lastSyncAt]));
 };
 
-const buildTimeVars = async (
-  db: ReturnType<typeof drizzle>,
+const buildTimeVars = (
+  syncTimes: ReadonlyMap<string, number>,
   collectors: readonly GraphQLCollector[],
   scope: string,
   scopeId: string,
   nowSeconds: number,
   toTime: string,
-): Promise<{ fromTime: string; toTime: string; fromDate: string; toDate: string }> => {
+): { fromTime: string; toTime: string; fromDate: string; toDate: string } => {
   const defaultTime = nowSeconds - 86400;
-  const syncs = await Promise.all(collectors.map(c => getSyncStateTime(db, c.name, scope, scopeId, defaultTime)));
-  const earliest = Math.min(...syncs);
+  const earliest = Math.min(...collectors.map(c => syncTimes.get(syncKey(c.name, scope, scopeId)) ?? defaultTime));
   const ft = new Date(earliest * 1000).toISOString();
   return { fromTime: ft, toTime, fromDate: ft.slice(0, 10), toDate: toTime.slice(0, 10) };
 };
@@ -573,6 +569,7 @@ export const collectMetrics = async (env: BridgeEnv, scheduledTime: number): Pro
   const zoneCollectors = enabledDatasets.filter(c => c.scope === 'zone').map(c => toCollector(c));
 
   const statuses: DatasetStatusRow[] = await db.select().from(datasetStatus);
+  const syncTimes = await loadSyncTimes(db);
 
   const activeAccountCollectors = accountCollectors.filter(c => !isSkipped(statuses, c.name, 'account', env.CF_ACCOUNT_ID, nowSeconds));
   const activeZoneCollectors = zoneCollectors.filter(c => !zoneIds.every(zid => isSkipped(statuses, c.name, 'zone', zid, nowSeconds)));
@@ -583,30 +580,22 @@ export const collectMetrics = async (env: BridgeEnv, scheduledTime: number): Pro
 
   for (let i = 0; i < activeAccountCollectors.length; i += BATCH_CHUNK_SIZE) {
     const chunk = activeAccountCollectors.slice(i, i + BATCH_CHUNK_SIZE);
-    tasks.push(
-      (async () => {
-        const tv = await buildTimeVars(db, chunk, 'account', env.CF_ACCOUNT_ID, nowSeconds, toTime);
-        return processGraphQLBatch(db, env, chunk, 'account', env.CF_ACCOUNT_ID, tv.fromTime, tv.toTime, tv.fromDate, tv.toDate, nowSeconds, statuses);
-      })(),
-    );
+    const tv = buildTimeVars(syncTimes, chunk, 'account', env.CF_ACCOUNT_ID, nowSeconds, toTime);
+    tasks.push(processGraphQLBatch(db, env, chunk, 'account', env.CF_ACCOUNT_ID, tv.fromTime, tv.toTime, tv.fromDate, tv.toDate, nowSeconds, statuses));
   }
 
   for (const zid of zoneIds) {
     const perZone = activeZoneCollectors.filter(c => !isSkipped(statuses, c.name, 'zone', zid, nowSeconds));
     for (let i = 0; i < perZone.length; i += BATCH_CHUNK_SIZE) {
       const chunk = perZone.slice(i, i + BATCH_CHUNK_SIZE);
-      tasks.push(
-        (async () => {
-          const tv = await buildTimeVars(db, chunk, 'zone', zid, nowSeconds, toTime);
-          return processGraphQLBatch(db, env, chunk, 'zone', zid, tv.fromTime, tv.toTime, tv.fromDate, tv.toDate, nowSeconds, statuses);
-        })(),
-      );
+      const tv = buildTimeVars(syncTimes, chunk, 'zone', zid, nowSeconds, toTime);
+      tasks.push(processGraphQLBatch(db, env, chunk, 'zone', zid, tv.fromTime, tv.toTime, tv.fromDate, tv.toDate, nowSeconds, statuses));
     }
   }
 
   if (REST_COLLECTORS.length > 0) {
     const fromTime = new Date((nowSeconds - 86400) * 1000).toISOString();
-    tasks.push(processRESTCollectors(db, env, REST_COLLECTORS, fromTime, toTime, nowSeconds, statuses));
+    tasks.push(processRESTCollectors(db, env, REST_COLLECTORS, fromTime, toTime, nowSeconds, statuses, syncTimes));
   }
 
   const batchResults = await Promise.allSettled(tasks);
