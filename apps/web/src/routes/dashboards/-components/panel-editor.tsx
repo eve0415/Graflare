@@ -35,7 +35,10 @@ import { datasourcesQueryOptions } from '../../datasources/-queries';
 // Lazy so the dashboard view route's chunk doesn't eagerly pull the CodeMirror + PromQL stack
 // (~640 KB raw) the editor top-level-imports — it loads on first edit-sheet open. The explore
 // route imports the module statically and keeps its own eager path.
-const QueryCodeEditor = lazy(() => import('../../explore/-components/query-code-editor').then(m => ({ default: m.QueryCodeEditor })));
+const QueryCodeEditor = lazy(async () => {
+  const { QueryCodeEditor: editor } = await import('../../explore/-components/query-code-editor');
+  return { default: editor };
+});
 
 // Sized to the editor's single-line shell (36px content box) so the swap doesn't jump.
 const EDITOR_FALLBACK = <Skeleton className='h-9 w-full rounded-md' />;
