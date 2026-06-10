@@ -1,4 +1,5 @@
 import type { AlertRuleDO } from './alerting/alert-rule-do';
+import type { RuleLifecycleDeps } from './alerting/rule-lifecycle';
 import type { ServiceTokenClient } from './cloudflare/access-service-tokens';
 import type { Database } from './db';
 import type { AuthSubject } from './middleware/access';
@@ -29,16 +30,13 @@ import type { ErrorHandler } from 'hono';
 
 import { detectFormat, importDashboard as importDashboardFn } from '@graflare/shared/import';
 import { alertInstanceListQuerySchema, upsertAlertInstanceSchema } from '@graflare/shared/schemas/alert-instance';
-import { createAlertRuleSchema, updateAlertRuleSchema } from '@graflare/shared/schemas/alert-rule';
-import { createAlertRuleGroupSchema, updateAlertRuleGroupSchema } from '@graflare/shared/schemas/alert-rule-group';
+import { createAlertRuleGroupSchema } from '@graflare/shared/schemas/alert-rule-group';
 import { annotationListQuerySchema, createAnnotationSchema } from '@graflare/shared/schemas/annotation';
 import { createContactPointSchema, updateContactPointSchema } from '@graflare/shared/schemas/contact-point';
 import { createDashboardSchema, importDashboardSchema, updateDashboardSchema } from '@graflare/shared/schemas/dashboard';
 import { createDatasourceSchema, testConnectionInlineSchema, updateDatasourceSchema } from '@graflare/shared/schemas/datasource';
 import { createFolderSchema, updateFolderSchema } from '@graflare/shared/schemas/folder';
 import {
-  alertRuleGroupIdSchema,
-  alertRuleIdSchema,
   annotationIdSchema,
   contactPointIdSchema,
   dashboardIdSchema,
@@ -61,6 +59,7 @@ import { Hono } from 'hono';
 import { HTTPException } from 'hono/http-exception';
 
 import { encryptSecret, redactSecret, resolveSecretOnUpdate } from './alerting/contact-point-secrets';
+import { createRule, deleteRule, deleteRuleGroup, getRule, getRuleGroup, updateRule, updateRuleGroup } from './alerting/rule-lifecycle';
 import { CacheApiStore, cachedProxyQuery } from './cache/query-cache';
 import { createServiceTokenClient } from './cloudflare/access-service-tokens';
 import { encryptCredentials } from './crypto/credentials';
@@ -168,22 +167,6 @@ app.onError(onHttpError);
 
 export default app;
 
-// The DO config payload, derived from a stored rule row + its group's eval
-// interval — single-sourced so the create/update/group-update paths can't
-// drift on a field.
-const toRuleDoConfig = (orgId: string, rule: typeof alertRules.$inferSelect, evalIntervalS: number) => ({
-  orgId,
-  ruleId: rule.id,
-  queries: rule.queries,
-  condition: rule.condition,
-  evalIntervalS,
-  forDurationS: rule.forDurationS,
-  noDataState: rule.noDataState,
-  execErrState: rule.execErrState,
-  labels: rule.labels,
-  annotations: rule.annotations,
-});
-
 export class GraflareAPI extends WorkerEntrypoint<Bindings> {
   // Memoized: `drizzle()` walks the whole relational schema config on every
   // call, and a single RPC method can touch `this.db` five times.
@@ -198,6 +181,10 @@ export class GraflareAPI extends WorkerEntrypoint<Bindings> {
       return this.env.BRIDGE.fetch.bind(this.env.BRIDGE);
     }
     return fetch;
+  }
+
+  private get ruleDeps(): RuleLifecycleDeps {
+    return { db: this.db, alertRule: this.env.ALERT_RULE };
   }
 
   /**
@@ -1084,19 +1071,9 @@ export class GraflareAPI extends WorkerEntrypoint<Bindings> {
     return this.db.select().from(alertRuleGroups).where(eq(alertRuleGroups.orgId, orgId));
   }
 
-  private async getAlertRuleGroupCore(orgId: string, id: string) {
-    alertRuleGroupIdSchema.parse(id);
-    const rows = await this.db
-      .select()
-      .from(alertRuleGroups)
-      .where(and(eq(alertRuleGroups.id, id), eq(alertRuleGroups.orgId, orgId)))
-      .limit(1);
-    return rows[0] ?? null;
-  }
-
   async getAlertRuleGroup(jwt: string, id: string) {
     const { orgId } = await this.resolveAuth(jwt);
-    return this.getAlertRuleGroupCore(orgId, id);
+    return getRuleGroup(this.db, orgId, id);
   }
 
   async createAlertRuleGroup(jwt: string, input: CreateAlertRuleGroup) {
@@ -1125,52 +1102,12 @@ export class GraflareAPI extends WorkerEntrypoint<Bindings> {
 
   async updateAlertRuleGroup(jwt: string, id: string, input: UpdateAlertRuleGroup) {
     const { orgId } = await this.resolveAuth(jwt);
-    alertRuleGroupIdSchema.parse(id);
-    const parsed = updateAlertRuleGroupSchema.parse(input);
-    const now = new Date();
-
-    const setData: Record<string, unknown> = { updatedAt: now };
-    if (parsed.name !== undefined) setData['name'] = parsed.name;
-    if (parsed.folderId !== undefined) setData['folderId'] = parsed.folderId;
-    if (parsed.evalIntervalS !== undefined) setData['evalIntervalS'] = parsed.evalIntervalS;
-
-    let group: typeof alertRuleGroups.$inferSelect | null = null;
-    try {
-      await this.db
-        .update(alertRuleGroups)
-        .set(setData)
-        .where(and(eq(alertRuleGroups.id, id), eq(alertRuleGroups.orgId, orgId)));
-
-      group = await this.getAlertRuleGroupCore(orgId, id);
-
-      if (parsed.evalIntervalS !== undefined && group !== null) {
-        const { evalIntervalS } = group;
-        const rules = await this.db
-          .select()
-          .from(alertRules)
-          .where(and(eq(alertRules.groupId, id), eq(alertRules.orgId, orgId)));
-
-        await Promise.all(
-          rules.filter(rule => !rule.isPaused).map(rule => this.env.ALERT_RULE.getByName(rule.id).updateConfig(toRuleDoConfig(orgId, rule, evalIntervalS))),
-        );
-      }
-    } catch (error) {
-      console.error('updateAlertRuleGroup failed:', error);
-      throw new Error('Failed to update alert rule group', { cause: error });
-    }
-
-    return group;
+    return updateRuleGroup(this.ruleDeps, orgId, id, input);
   }
 
   async deleteAlertRuleGroup(jwt: string, id: string): Promise<void> {
     const { orgId } = await this.resolveAuth(jwt);
-    alertRuleGroupIdSchema.parse(id);
-    try {
-      await this.db.delete(alertRuleGroups).where(and(eq(alertRuleGroups.id, id), eq(alertRuleGroups.orgId, orgId)));
-    } catch (error) {
-      console.error('deleteAlertRuleGroup failed:', error);
-      throw new Error('Failed to delete alert rule group', { cause: error });
-    }
+    await deleteRuleGroup(this.ruleDeps, orgId, id);
   }
 
   // --- Alert Rule RPC ---
@@ -1180,115 +1117,24 @@ export class GraflareAPI extends WorkerEntrypoint<Bindings> {
     return this.db.select().from(alertRules).where(eq(alertRules.orgId, orgId));
   }
 
-  private async getAlertRuleCore(orgId: string, id: string) {
-    alertRuleIdSchema.parse(id);
-    const rows = await this.db
-      .select()
-      .from(alertRules)
-      .where(and(eq(alertRules.id, id), eq(alertRules.orgId, orgId)))
-      .limit(1);
-    return rows[0] ?? null;
-  }
-
   async getAlertRule(jwt: string, id: string) {
     const { orgId } = await this.resolveAuth(jwt);
-    return this.getAlertRuleCore(orgId, id);
+    return getRule(this.db, orgId, id);
   }
 
   async createAlertRule(jwt: string, input: CreateAlertRule) {
     const { orgId } = await this.resolveAuth(jwt);
-    const parsed = createAlertRuleSchema.parse(input);
-    const id = crypto.randomUUID();
-    const now = new Date();
-
-    try {
-      await this.db.insert(alertRules).values({
-        id,
-        orgId,
-        groupId: parsed.groupId,
-        title: parsed.title,
-        queries: parsed.queries,
-        condition: parsed.condition,
-        labels: parsed.labels ?? {},
-        annotations: parsed.annotations ?? {},
-        forDurationS: parsed.forDurationS ?? 0,
-        noDataState: parsed.noDataState ?? 'Alerting',
-        execErrState: parsed.execErrState ?? 'Alerting',
-        isPaused: parsed.isPaused ?? false,
-        createdAt: now,
-        updatedAt: now,
-      });
-
-      const created = await this.getAlertRuleCore(orgId, id);
-      if (created !== null && !created.isPaused) {
-        const group = await this.getAlertRuleGroupCore(orgId, created.groupId);
-        if (group !== null) {
-          await this.env.ALERT_RULE.getByName(id).init(toRuleDoConfig(orgId, created, group.evalIntervalS));
-        }
-      }
-      return created;
-    } catch (error) {
-      console.error('createAlertRule failed:', error);
-      throw new Error('Failed to create alert rule', { cause: error });
-    }
+    return createRule(this.ruleDeps, orgId, input);
   }
 
   async updateAlertRule(jwt: string, id: string, input: UpdateAlertRule) {
     const { orgId } = await this.resolveAuth(jwt);
-    alertRuleIdSchema.parse(id);
-    const parsed = updateAlertRuleSchema.parse(input);
-    const now = new Date();
-
-    const setData: Record<string, unknown> = { updatedAt: now };
-    if (parsed.groupId !== undefined) setData['groupId'] = parsed.groupId;
-    if (parsed.title !== undefined) setData['title'] = parsed.title;
-    if (parsed.queries !== undefined) setData['queries'] = parsed.queries;
-    if (parsed.condition !== undefined) setData['condition'] = parsed.condition;
-    if (parsed.labels !== undefined) setData['labels'] = parsed.labels;
-    if (parsed.annotations !== undefined) setData['annotations'] = parsed.annotations;
-    if (parsed.forDurationS !== undefined) setData['forDurationS'] = parsed.forDurationS;
-    if (parsed.noDataState !== undefined) setData['noDataState'] = parsed.noDataState;
-    if (parsed.execErrState !== undefined) setData['execErrState'] = parsed.execErrState;
-    if (parsed.isPaused !== undefined) setData['isPaused'] = parsed.isPaused;
-
-    try {
-      await this.db
-        .update(alertRules)
-        .set(setData)
-        .where(and(eq(alertRules.id, id), eq(alertRules.orgId, orgId)));
-
-      const updated = await this.getAlertRuleCore(orgId, id);
-      if (updated !== null) {
-        const stub = this.env.ALERT_RULE.getByName(id);
-        if (parsed.isPaused === true) {
-          await stub.stop();
-        } else if (parsed.isPaused === false || !updated.isPaused) {
-          const group = await this.getAlertRuleGroupCore(orgId, updated.groupId);
-          if (group !== null) {
-            const config = toRuleDoConfig(orgId, updated, group.evalIntervalS);
-            // Resuming re-inits the stopped DO; otherwise the running DO is reconfigured.
-            await (parsed.isPaused === false ? stub.init(config) : stub.updateConfig(config));
-          }
-        }
-      }
-      return updated;
-    } catch (error) {
-      console.error('updateAlertRule failed:', error);
-      throw new Error('Failed to update alert rule', { cause: error });
-    }
+    return updateRule(this.ruleDeps, orgId, id, input);
   }
 
   async deleteAlertRule(jwt: string, id: string): Promise<void> {
     const { orgId } = await this.resolveAuth(jwt);
-    alertRuleIdSchema.parse(id);
-    try {
-      const stub = this.env.ALERT_RULE.getByName(id);
-      await stub.stop();
-      await this.db.delete(alertRules).where(and(eq(alertRules.id, id), eq(alertRules.orgId, orgId)));
-    } catch (error) {
-      console.error('deleteAlertRule failed:', error);
-      throw new Error('Failed to delete alert rule', { cause: error });
-    }
+    await deleteRule(this.ruleDeps, orgId, id);
   }
 
   // --- Alert Instance RPC ---
