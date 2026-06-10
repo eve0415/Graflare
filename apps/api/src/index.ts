@@ -150,6 +150,22 @@ app.route('/api/v1/service-tokens', serviceTokenRoutes);
 
 export default app;
 
+// The DO config payload, derived from a stored rule row + its group's eval
+// interval — single-sourced so the create/update/group-update paths can't
+// drift on a field.
+const toRuleDoConfig = (orgId: string, rule: typeof alertRules.$inferSelect, evalIntervalS: number) => ({
+  orgId,
+  ruleId: rule.id,
+  queries: rule.queries,
+  condition: rule.condition,
+  evalIntervalS,
+  forDurationS: rule.forDurationS,
+  noDataState: rule.noDataState,
+  execErrState: rule.execErrState,
+  labels: rule.labels,
+  annotations: rule.annotations,
+});
+
 export class GraflareAPI extends WorkerEntrypoint<Bindings> {
   // Memoized: `drizzle()` walks the whole relational schema config on every
   // call, and a single RPC method can touch `this.db` five times.
@@ -1193,46 +1209,32 @@ export class GraflareAPI extends WorkerEntrypoint<Bindings> {
     if (parsed.folderId !== undefined) setData['folderId'] = parsed.folderId;
     if (parsed.evalIntervalS !== undefined) setData['evalIntervalS'] = parsed.evalIntervalS;
 
+    let group: typeof alertRuleGroups.$inferSelect | null = null;
     try {
       await this.db
         .update(alertRuleGroups)
         .set(setData)
         .where(and(eq(alertRuleGroups.id, id), eq(alertRuleGroups.orgId, orgId)));
 
-      if (parsed.evalIntervalS !== undefined) {
-        const group = await this.getAlertRuleGroupCore(orgId, id);
-        if (group !== null) {
-          const rules = await this.db
-            .select()
-            .from(alertRules)
-            .where(and(eq(alertRules.groupId, id), eq(alertRules.orgId, orgId)));
+      group = await this.getAlertRuleGroupCore(orgId, id);
 
-          await Promise.all(
-            rules
-              .filter(rule => !rule.isPaused)
-              .map(rule =>
-                this.env.ALERT_RULE.getByName(rule.id).updateConfig({
-                  orgId,
-                  ruleId: rule.id,
-                  queries: rule.queries,
-                  condition: rule.condition,
-                  evalIntervalS: group.evalIntervalS,
-                  forDurationS: rule.forDurationS,
-                  noDataState: rule.noDataState,
-                  execErrState: rule.execErrState,
-                  labels: rule.labels,
-                  annotations: rule.annotations,
-                }),
-              ),
-          );
-        }
+      if (parsed.evalIntervalS !== undefined && group !== null) {
+        const { evalIntervalS } = group;
+        const rules = await this.db
+          .select()
+          .from(alertRules)
+          .where(and(eq(alertRules.groupId, id), eq(alertRules.orgId, orgId)));
+
+        await Promise.all(
+          rules.filter(rule => !rule.isPaused).map(rule => this.env.ALERT_RULE.getByName(rule.id).updateConfig(toRuleDoConfig(orgId, rule, evalIntervalS))),
+        );
       }
     } catch (error) {
       console.error('updateAlertRuleGroup failed:', error);
       throw new Error('Failed to update alert rule group', { cause: error });
     }
 
-    return this.getAlertRuleGroupCore(orgId, id);
+    return group;
   }
 
   async deleteAlertRuleGroup(jwt: string, id: string): Promise<void> {
@@ -1292,30 +1294,18 @@ export class GraflareAPI extends WorkerEntrypoint<Bindings> {
         updatedAt: now,
       });
 
-      if (!(parsed.isPaused ?? false)) {
-        const group = await this.getAlertRuleGroupCore(orgId, parsed.groupId);
+      const created = await this.getAlertRuleCore(orgId, id);
+      if (created !== null && !created.isPaused) {
+        const group = await this.getAlertRuleGroupCore(orgId, created.groupId);
         if (group !== null) {
-          const stub = this.env.ALERT_RULE.getByName(id);
-          await stub.init({
-            orgId,
-            ruleId: id,
-            queries: parsed.queries,
-            condition: parsed.condition,
-            evalIntervalS: group.evalIntervalS,
-            forDurationS: parsed.forDurationS ?? 0,
-            noDataState: parsed.noDataState ?? 'Alerting',
-            execErrState: parsed.execErrState ?? 'Alerting',
-            labels: parsed.labels ?? {},
-            annotations: parsed.annotations ?? {},
-          });
+          await this.env.ALERT_RULE.getByName(id).init(toRuleDoConfig(orgId, created, group.evalIntervalS));
         }
       }
+      return created;
     } catch (error) {
       console.error('createAlertRule failed:', error);
       throw new Error('Failed to create alert rule', { cause: error });
     }
-
-    return this.getAlertRuleCore(orgId, id);
   }
 
   async updateAlertRule(jwt: string, id: string, input: UpdateAlertRule) {
@@ -1347,46 +1337,20 @@ export class GraflareAPI extends WorkerEntrypoint<Bindings> {
         const stub = this.env.ALERT_RULE.getByName(id);
         if (parsed.isPaused === true) {
           await stub.stop();
-        } else if (parsed.isPaused === false) {
+        } else if (parsed.isPaused === false || !updated.isPaused) {
           const group = await this.getAlertRuleGroupCore(orgId, updated.groupId);
           if (group !== null) {
-            await stub.init({
-              orgId,
-              ruleId: id,
-              queries: updated.queries,
-              condition: updated.condition,
-              evalIntervalS: group.evalIntervalS,
-              forDurationS: updated.forDurationS,
-              noDataState: updated.noDataState,
-              execErrState: updated.execErrState,
-              labels: updated.labels,
-              annotations: updated.annotations,
-            });
-          }
-        } else if (!updated.isPaused) {
-          const group = await this.getAlertRuleGroupCore(orgId, updated.groupId);
-          if (group !== null) {
-            await stub.updateConfig({
-              orgId,
-              ruleId: id,
-              queries: updated.queries,
-              condition: updated.condition,
-              evalIntervalS: group.evalIntervalS,
-              forDurationS: updated.forDurationS,
-              noDataState: updated.noDataState,
-              execErrState: updated.execErrState,
-              labels: updated.labels,
-              annotations: updated.annotations,
-            });
+            const config = toRuleDoConfig(orgId, updated, group.evalIntervalS);
+            // Resuming re-inits the stopped DO; otherwise the running DO is reconfigured.
+            await (parsed.isPaused === false ? stub.init(config) : stub.updateConfig(config));
           }
         }
       }
+      return updated;
     } catch (error) {
       console.error('updateAlertRule failed:', error);
       throw new Error('Failed to update alert rule', { cause: error });
     }
-
-    return this.getAlertRuleCore(orgId, id);
   }
 
   async deleteAlertRule(jwt: string, id: string): Promise<void> {
