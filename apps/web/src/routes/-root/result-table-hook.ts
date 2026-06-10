@@ -40,19 +40,31 @@ const readCell = (row: Row<ResultTableFeatures, ResultRow>, columnId: string): s
   return typeof value === 'string' ? value : '';
 };
 
+/** Sort regimes, in ascending display order: finite numbers, then text, then blanks. */
+const cellRegime = (cell: string): 0 | 1 | 2 => {
+  // `Number('')` is 0, so blanks must be classified before the numeric parse.
+  if (cell.trim() === '') return 2;
+  return Number.isFinite(Number(cell)) ? 0 : 1;
+};
+
 /**
- * Sorts numerically when both cells parse as finite numbers (Prometheus sample values),
- * falling back to plain string comparison otherwise (labels, ISO timestamps). `Number('')`
- * is 0, so blank cells are explicitly non-numeric and compare as strings. The built-in
- * `alphanumeric` sort fn is wrong for metric values: it splits on digit runs and parses
- * with `parseInt`, so decimals and scientific notation ("9.5", "1e3") misorder.
+ * Total order over result cells: finite numbers numerically (Prometheus sample values),
+ * then text lexically (labels, ISO timestamps), blanks last. Comparing regimes first keeps
+ * the comparator transitive on mixed columns — a pairwise numeric-else-string fallback is
+ * not ("10" < "2x" < "9" < "10" forms a cycle), and a non-transitive comparator makes the
+ * sort order algorithm-dependent. The built-in `alphanumeric` sort fn is wrong for metric
+ * values: it splits on digit runs and parses with `parseInt`, so decimals and scientific
+ * notation ("9.5", "1e3") misorder.
  */
 export const numericAwareSortFn: SortFn<ResultTableFeatures, ResultRow> = (rowA, rowB, columnId) => {
   const a = readCell(rowA, columnId);
   const b = readCell(rowB, columnId);
-  const aNum = a.trim() === '' ? Number.NaN : Number(a);
-  const bNum = b.trim() === '' ? Number.NaN : Number(b);
-  if (Number.isFinite(aNum) && Number.isFinite(bNum)) {
+  const regime = cellRegime(a);
+  const regimeDiff = regime - cellRegime(b);
+  if (regimeDiff !== 0) return regimeDiff;
+  if (regime === 0) {
+    const aNum = Number(a);
+    const bNum = Number(b);
     if (aNum === bNum) return 0;
     return aNum < bNum ? -1 : 1;
   }

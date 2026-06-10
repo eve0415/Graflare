@@ -84,6 +84,8 @@ const sortable = {
   ],
 };
 
+const mixed = { columns: ['value'], rows: [['10'], ['2x'], [''], ['9']] };
+
 describe('query-result-table sorting', () => {
   it('sorts a numeric column numerically, not lexically', () => {
     render(<QueryResultTable data={sortable} />);
@@ -120,6 +122,18 @@ describe('query-result-table sorting', () => {
     expect(th.getAttribute('aria-sort')).toBe('descending');
     fireEvent.click(button);
     expect(th.getAttribute('aria-sort')).toBeNull();
+  });
+
+  it('keeps a total order on a column mixing numbers, text, and blanks', () => {
+    // A pairwise numeric-else-string comparator is non-transitive here ("10" < "2x" < "9"
+    // < "10" — a cycle), which makes the sort order depend on the sort algorithm. The
+    // contract: numbers numerically first, then text lexically, blanks last.
+    render(<QueryResultTable data={mixed} />);
+    const header = screen.getByRole('button', { name: 'value' });
+    fireEvent.click(header);
+    expect(bodyRowTexts()).toEqual(['9', '10', '2x', '']);
+    fireEvent.click(header);
+    expect(bodyRowTexts()).toEqual(['', '2x', '10', '9']);
   });
 
   it('sorts duplicate-named columns independently (ids are position-suffixed)', () => {

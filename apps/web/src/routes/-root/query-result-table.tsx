@@ -61,8 +61,9 @@ export const QueryResultTable = ({ data, renderCell, scrollRegionLabel }: QueryR
             sortFn: numericAwareSortFn,
             cell: info => {
               const raw = info.getValue();
-              // info.row.index is the row's position in the ORIGINAL data, matching the
-              // pre-sorting contract of CellRenderer's rowIndex argument.
+              // info.row.index is the row's index in the ORIGINAL data (v9 sorting reorders
+              // row objects without reassigning it), so rowIndex is a stable row identity
+              // that diverges from the displayed position once the table is sorted.
               const rendered = renderCell?.(raw, info.row.index, index);
               return <DataCell text={rendered?.text ?? raw} color={rendered?.color} />;
             },
