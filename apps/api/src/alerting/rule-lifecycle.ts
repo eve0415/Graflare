@@ -140,12 +140,25 @@ export const updateRule = async ({ db, alertRule }: RuleLifecycleDeps, orgId: st
   }
 };
 
-export const deleteRule = async ({ db, alertRule }: RuleLifecycleDeps, orgId: string, id: string): Promise<void> => {
+export const deleteRule = async ({ db, alertRule }: RuleLifecycleDeps, orgId: string, id: string): Promise<boolean> => {
   alertRuleIdSchema.parse(id);
+
+  // Ownership check BEFORE touching the DO — getByName(id) is not org-scoped,
+  // so without it any caller could stop another org's evaluation loop by id.
+  const existing = await db
+    .select({ id: alertRules.id })
+    .from(alertRules)
+    .where(and(eq(alertRules.id, id), eq(alertRules.orgId, orgId)))
+    .limit(1);
+  if (existing.length === 0) return false;
+
   try {
-    const stub = alertRule.getByName(id);
-    await stub.stop();
+    // Row first, DO second: a crash in between leaves a zombie alarm (noisy,
+    // and stop() is retryable) rather than a live rule that silently never
+    // evaluates again.
     await db.delete(alertRules).where(and(eq(alertRules.id, id), eq(alertRules.orgId, orgId)));
+    await alertRule.getByName(id).stop();
+    return true;
   } catch (error) {
     console.error('deleteAlertRule failed:', error);
     throw new Error('Failed to delete alert rule', { cause: error });

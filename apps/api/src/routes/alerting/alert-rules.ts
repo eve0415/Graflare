@@ -54,21 +54,11 @@ app.put('/:id', sValidator('param', alertRuleIdParamSchema, onValidationError), 
 });
 
 app.delete('/:id', sValidator('param', alertRuleIdParamSchema, onValidationError), async c => {
-  const db = createDb(c.env.DB);
-  const orgId = c.get('orgId');
-  const { id } = c.req.valid('param');
+  const deleted = await deleteRule({ db: createDb(c.env.DB), alertRule: c.env.ALERT_RULE }, c.get('orgId'), c.req.valid('param').id);
 
-  const existing = await db
-    .select({ id: alertRules.id })
-    .from(alertRules)
-    .where(and(eq(alertRules.id, id), eq(alertRules.orgId, orgId)))
-    .limit(1);
-
-  if (existing.length === 0) {
+  if (!deleted) {
     return c.json({ error: 'Not found' }, 404);
   }
-
-  await deleteRule({ db, alertRule: c.env.ALERT_RULE }, orgId, id);
 
   return c.body(null, 204);
 });

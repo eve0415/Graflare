@@ -22,10 +22,10 @@ const testBindings: AppEnv['Bindings'] = {
   ACCESS_AUD: 'test-aud',
 };
 
-const createApp = () => {
+const createApp = (orgId: string = TEST_ORG_ID) => {
   const app = new Hono<AppEnv>();
   app.use('/*', async (c, next) => {
-    c.set('orgId', TEST_ORG_ID);
+    c.set('orgId', orgId);
     c.set('user', { kind: 'user', email: 'test@example.com', name: 'Test' });
     await next();
   });
@@ -219,5 +219,20 @@ describe('alert-rule routes', () => {
     const doState = await readRuleDoState(id);
     expect(doState.config).toBeUndefined();
     expect(doState.alarm).toBeNull();
+  });
+
+  // Regression: the delete op used to call stop() before checking ownership,
+  // letting any org halt another org's evaluation loop by guessing rule ids.
+  it('a cross-org delete is a 404 and leaves the DO running', async () => {
+    const app = createApp();
+    const createRes = await app.request(req('/', json(ruleInput())), {}, testBindings);
+    const id = readId(await createRes.json());
+
+    const foreignRes = await createApp('org-someone-else').request(req(`/${id}`, { method: 'DELETE' }), {}, testBindings);
+    expect(foreignRes.status).toBe(404);
+
+    const doState = await readRuleDoState(id);
+    expect(doState.config).toBeDefined();
+    expect(doState.alarm).not.toBeNull();
   });
 });
