@@ -57,6 +57,7 @@ import { resolveRange } from '@graflare/shared/time/resolve';
 import { WorkerEntrypoint } from 'cloudflare:workers';
 import { and, desc, eq, gte, like, lte, sql } from 'drizzle-orm';
 import { Hono } from 'hono';
+import { HTTPException } from 'hono/http-exception';
 
 import { encryptSecret, redactSecret, resolveSecretOnUpdate } from './alerting/contact-point-secrets';
 import { CacheApiStore, cachedProxyQuery } from './cache/query-cache';
@@ -151,6 +152,16 @@ app.route('/api/v1/silences', silenceRoutes);
 app.route('/api/v1/mute-timings', muteTimingRoutes);
 app.route('/api/v1/annotations', annotationRoutes);
 app.route('/api/v1/service-tokens', serviceTokenRoutes);
+
+app.notFound(c => c.json({ error: 'Not found' }, 404));
+app.onError((err, c) => {
+  if (err instanceof HTTPException) {
+    return err.getResponse();
+  }
+  // Mirrors the RPC methods' log-and-wrap so the two surfaces fail alike.
+  console.error(`${c.req.method} ${c.req.path} failed:`, err);
+  return c.json({ error: 'Internal server error' }, 500);
+});
 
 export default app;
 
