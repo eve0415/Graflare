@@ -22,7 +22,7 @@ import { initialRefresh, initialTimeRange, intervalToMs } from '../-components/d
 import { PanelEditor } from '../-components/panel-editor';
 import { PanelActionsProvider } from '../-components/panels/panel-actions-context';
 import { VariableBar } from '../-components/variable-bar';
-import { buildEffectiveValues, resolveAdhocVariables } from '../-components/variable-defaults';
+import { buildDisplayValues, buildEffectiveValues, resolveAdhocVariables } from '../-components/variable-defaults';
 import { annotationsQueryOptions, dashboardQueryOptions } from '../-queries';
 import { useRecentDashboards } from '../../-root/use-recent-dashboards';
 import { datasourcesQueryOptions } from '../../datasources/-queries';
@@ -75,7 +75,9 @@ const DashboardViewPage = () => {
   const [editingPanel, setEditingPanel] = useState<Panel | null>(null);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [annotationsOpen, setAnnotationsOpen] = useState(false);
-  const [variableValues, setVariableValues] = useState<Map<string, string>>(new Map());
+  // The user's live selections, keyed by variable name. A multi-select holds an array; the All
+  // choice is stored as the `$__all` sentinel (resolved by buildEffectiveValues before any query).
+  const [variableValues, setVariableValues] = useState<Map<string, string | string[]>>(new Map());
   // Live adhoc-filter edits, keyed by variable name. Runtime-only: seeded from each adhoc
   // variable's saved `filters` (when absent here) and never written back through updateDashboard —
   // the bar owns the live filters; the editor only sets the variable's type + datasource.
@@ -100,7 +102,13 @@ const DashboardViewPage = () => {
 
   // Merge each variable's computed default under any user selection so panels interpolate against
   // a real value on first render — `variableValues` starts empty, and the grid reads this map
-  // directly (it doesn't fall back to `current` the way the bar's display does).
+  // directly (it doesn't fall back to `current` the way the bar's display does). Two views of the
+  // same merge: the bar shows the raw selection (`$__all` kept so All displays as selected), the
+  // panels get the resolved one (All expanded to the options array / a custom allValue).
+  const displayValues = useMemo(
+    () => buildDisplayValues(dashboardVariables, variableValues, datasources ?? []),
+    [dashboardVariables, variableValues, datasources],
+  );
   const effectiveValues = useMemo(
     () => buildEffectiveValues(dashboardVariables, variableValues, datasources ?? []),
     [dashboardVariables, variableValues, datasources],
@@ -224,7 +232,7 @@ const DashboardViewPage = () => {
     void queryClient.invalidateQueries({ queryKey: ['dashboard', id] });
   }, [id, queryClient]);
 
-  const handleVariableChange = useCallback((name: string, value: string) => {
+  const handleVariableChange = useCallback((name: string, value: string | string[]) => {
     setVariableValues(prev => {
       const next = new Map(prev);
       next.set(name, value);
@@ -273,7 +281,7 @@ const DashboardViewPage = () => {
 
       <VariableBar
         variables={dashboardVariables}
-        values={effectiveValues}
+        values={displayValues}
         onChange={handleVariableChange}
         adhocVariables={dashboardAdhocVariables}
         onAdhocFiltersChange={handleAdhocFiltersChange}

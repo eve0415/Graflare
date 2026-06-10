@@ -3,7 +3,7 @@ import type { Variable } from '@graflare/shared/schemas/variable';
 
 import { describe, expect, it } from 'vitest';
 
-import { buildEffectiveValues, computeVariableDefault, filterDatasourceItems, resolveAdhocVariables } from './variable-defaults';
+import { buildDisplayValues, buildEffectiveValues, computeVariableDefault, filterDatasourceItems, resolveAdhocVariables } from './variable-defaults';
 
 const baseVariable: Variable = {
   name: 'v',
@@ -129,6 +129,18 @@ describe('computeVariableDefault', () => {
     expect(computeVariableDefault(makeVariable({ type: 'query', current: '', options: ['x', 'y'] }), datasources)).toBe('x');
     expect(computeVariableDefault(makeVariable({ type: 'query', current: '', options: [] }), datasources)).toBe('');
   });
+
+  it('passes a multi array current through unchanged for query/custom', () => {
+    expect(computeVariableDefault(makeVariable({ type: 'custom', multi: true, current: ['a', 'b'], options: ['a', 'b', 'c'] }), datasources)).toEqual([
+      'a',
+      'b',
+    ]);
+  });
+
+  it('collapses an off-type array current to its first element for the single-choice types', () => {
+    expect(computeVariableDefault(makeVariable({ type: 'textbox', current: ['hello', 'extra'] }), datasources)).toBe('hello');
+    expect(computeVariableDefault(makeVariable({ type: 'interval', current: ['5m'], options: ['1m', '5m'] }), datasources)).toBe('5m');
+  });
 });
 
 describe('buildEffectiveValues', () => {
@@ -154,6 +166,60 @@ describe('buildEffectiveValues', () => {
     const variables = [makeVariable({ name: 'text', type: 'textbox', current: 'hello' })];
     const result = buildEffectiveValues(variables, new Map([['text', '']]), datasources);
     expect(result.get('text')).toBe('');
+  });
+});
+
+describe('buildEffectiveValues — $__all resolution', () => {
+  const multiVar = makeVariable({ name: 'job', type: 'query', multi: true, includeAll: true, options: ['node', 'api'] });
+
+  it('resolves a $__all override to the full options array', () => {
+    const result = buildEffectiveValues([multiVar], new Map([['job', '$__all']]), datasources);
+    expect(result.get('job')).toEqual(['node', 'api']);
+  });
+
+  it('resolves an All selection arriving inside a multi array', () => {
+    const result = buildEffectiveValues([multiVar], new Map([['job', ['$__all']]]), datasources);
+    expect(result.get('job')).toEqual(['node', 'api']);
+  });
+
+  it('resolves a saved $__all current with no override (the map never leaks the sentinel)', () => {
+    const variable = makeVariable({ name: 'job', type: 'custom', includeAll: true, current: '$__all', options: ['a', 'b'] });
+    const result = buildEffectiveValues([variable], new Map(), datasources);
+    expect(result.get('job')).toEqual(['a', 'b']);
+  });
+
+  it('uses a non-empty allValue verbatim as a plain string (interpolation-only, never escaped)', () => {
+    const variable = makeVariable({ name: 'job', type: 'query', multi: true, includeAll: true, allValue: '.+', options: ['a', 'b'] });
+    const result = buildEffectiveValues([variable], new Map([['job', '$__all']]), datasources);
+    expect(result.get('job')).toBe('.+');
+  });
+
+  it('passes a multi array selection through unchanged', () => {
+    const result = buildEffectiveValues([multiVar], new Map([['job', ['node', 'api']]]), datasources);
+    expect(result.get('job')).toEqual(['node', 'api']);
+  });
+
+  it('keeps an empty multi selection empty instead of falling back to All', () => {
+    const result = buildEffectiveValues([multiVar], new Map([['job', []]]), datasources);
+    expect(result.get('job')).toEqual([]);
+  });
+
+  it('leaves a plain single string selection unchanged', () => {
+    const result = buildEffectiveValues([multiVar], new Map([['job', 'node']]), datasources);
+    expect(result.get('job')).toBe('node');
+  });
+});
+
+describe('buildDisplayValues', () => {
+  it('keeps the $__all sentinel so the bar can show All as selected', () => {
+    const variable = makeVariable({ name: 'job', type: 'query', multi: true, includeAll: true, options: ['a', 'b'] });
+    const result = buildDisplayValues([variable], new Map([['job', ['$__all']]]), datasources);
+    expect(result.get('job')).toEqual(['$__all']);
+  });
+
+  it('merges computed defaults under user selections exactly like buildEffectiveValues', () => {
+    const variables = [makeVariable({ name: 'step', type: 'interval', options: ['1m', '5m'] })];
+    expect(buildDisplayValues(variables, new Map(), datasources).get('step')).toBe('1m');
   });
 });
 

@@ -69,6 +69,8 @@ const populatedPanel = (): Panel => ({
     { id: 'limit', options: { count: 5 } },
     { id: 'reduce', options: { calc: 'last' } },
   ],
+  repeatDirection: 'h',
+  maxPerRow: 4,
 });
 
 describe('panel-editor field-overrides + transformations a11y', () => {

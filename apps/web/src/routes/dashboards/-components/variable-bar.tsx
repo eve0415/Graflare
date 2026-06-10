@@ -10,12 +10,13 @@ import { useCallback, useId, useMemo } from 'react';
 import { datasourcesQueryOptions } from '../../datasources/-queries';
 
 import { AdhocFilterRow } from './variable-adhoc-bar';
-import { filterDatasourceItems } from './variable-defaults';
+import { ALL_VALUE, filterDatasourceItems } from './variable-defaults';
 
 interface VariableBarProps {
   variables: Variable[];
-  values: Map<string, string>;
-  onChange: (name: string, value: string) => void;
+  /** DISPLAY values (see buildDisplayValues): the `$__all` sentinel is kept so All shows selected. */
+  values: ReadonlyMap<string, string | string[]>;
+  onChange: (name: string, value: string | string[]) => void;
   /** Adhoc variables with their LIVE filters folded in (the bar renders/edits these). */
   adhocVariables: readonly Variable[];
   onAdhocFiltersChange: (name: string, filters: AdhocFilter[]) => void;
@@ -43,26 +44,35 @@ export const VariableBar = ({ variables, values, onChange, adhocVariables, onAdh
 
 interface VariableControlProps {
   variable: Variable;
-  value: string;
-  onChange: (name: string, value: string) => void;
+  value: string | string[];
+  onChange: (name: string, value: string | string[]) => void;
 }
+
+/** The single-choice controls take one value; a (multi-shaped) array collapses to its first entry. */
+const toSingleValue = (value: string | string[]): string => (typeof value === 'string' ? value : (value[0] ?? ''));
 
 // One control per variable, picked by type. `constant` shows static text; `textbox` is a free
 // text input; `datasource` resolves its options from the live datasource list; `query`/`custom`/
-// `interval` are a dropdown driven by the variable's `options`. (`adhoc` is handled upstream by
-// the bar, which renders an AdhocFilterRow instead — so it never reaches this switch.)
+// `interval` are a dropdown driven by the variable's `options` — multi-select for a `multi`
+// query/custom variable, single-select otherwise. (`adhoc` is handled upstream by the bar, which
+// renders an AdhocFilterRow instead — so it never reaches this switch.)
 const VariableControl = ({ variable, value, onChange }: VariableControlProps) => {
   switch (variable.type) {
     case 'constant':
-      return <VariableConstant variable={variable} value={value} />;
+      return <VariableConstant variable={variable} value={toSingleValue(value)} />;
     case 'textbox':
-      return <VariableTextbox variable={variable} value={value} onChange={onChange} />;
+      return <VariableTextbox variable={variable} value={toSingleValue(value)} onChange={onChange} />;
     case 'datasource':
-      return <VariableDatasourceSelect variable={variable} value={value} onChange={onChange} />;
+      return <VariableDatasourceSelect variable={variable} value={toSingleValue(value)} onChange={onChange} />;
     case 'query':
     case 'custom':
+      return variable.multi ? (
+        <VariableMultiSelect variable={variable} value={value} onChange={onChange} />
+      ) : (
+        <VariableOptionsSelect variable={variable} value={toSingleValue(value)} onChange={onChange} />
+      );
     case 'interval':
-      return <VariableOptionsSelect variable={variable} value={value} onChange={onChange} />;
+      return <VariableOptionsSelect variable={variable} value={toSingleValue(value)} onChange={onChange} />;
     case 'adhoc':
       // Unreachable: the bar routes adhoc variables to AdhocFilterRow before this switch. Return
       // null defensively so the union stays exhaustive without a non-null assertion or cast.
@@ -79,6 +89,14 @@ const VariableField = ({ label, htmlFor, children }: { label: string; htmlFor?: 
   </div>
 );
 
+// The concrete single-value controls: the parent collapses any multi-shaped value before
+// rendering these, so they only ever see (and emit) plain strings.
+interface SingleControlProps {
+  variable: Variable;
+  value: string;
+  onChange: (name: string, value: string) => void;
+}
+
 const VariableConstant = ({ variable, value }: { variable: Variable; value: string }) => (
   <div className='flex items-center gap-1.5'>
     <span className='text-muted-foreground text-xs'>{variable.label || variable.name}:</span>
@@ -86,7 +104,7 @@ const VariableConstant = ({ variable, value }: { variable: Variable; value: stri
   </div>
 );
 
-const VariableTextbox = ({ variable, value, onChange }: VariableControlProps) => {
+const VariableTextbox = ({ variable, value, onChange }: SingleControlProps) => {
   const id = useId();
   const label = variable.label || variable.name;
 
@@ -133,7 +151,7 @@ const VariableTextbox = ({ variable, value, onChange }: VariableControlProps) =>
   );
 };
 
-const VariableOptionsSelect = ({ variable, value, onChange }: VariableControlProps) => {
+const VariableOptionsSelect = ({ variable, value, onChange }: SingleControlProps) => {
   const label = variable.label || variable.name;
 
   const handleChange = useCallback(
@@ -146,11 +164,13 @@ const VariableOptionsSelect = ({ variable, value, onChange }: VariableControlPro
   // `includeAll` only applies to the multi-value list types (query/custom); interval is a single
   // choice, so it never shows an "All" entry even if the flag is set.
   const allowAll = variable.includeAll && variable.type !== 'interval';
-  const { options: varOptions, current: varCurrent } = variable;
+  const { options: varOptions } = variable;
   const items = useMemo(() => {
-    const opts = varOptions.length > 0 ? varOptions : [varCurrent].filter(Boolean);
-    return [...(allowAll ? [{ value: '$__all', label: 'All' }] : []), ...opts.map(opt => ({ value: opt, label: opt }))];
-  }, [varOptions, varCurrent, allowAll]);
+    // With no configured options, fall back to the resolved display value so the trigger still
+    // shows something selectable instead of an empty dropdown.
+    const opts = varOptions.length > 0 ? varOptions : [value].filter(Boolean);
+    return [...(allowAll ? [{ value: ALL_VALUE, label: 'All' }] : []), ...opts.map(opt => ({ value: opt, label: opt }))];
+  }, [varOptions, value, allowAll]);
 
   return (
     <VariableField label={label}>
@@ -159,7 +179,73 @@ const VariableOptionsSelect = ({ variable, value, onChange }: VariableControlPro
   );
 };
 
-const VariableDatasourceSelect = ({ variable, value, onChange }: VariableControlProps) => {
+// Multi-select for a `multi` query/custom variable: Base UI's native `multiple` Select with the
+// variable's options (plus an "All" entry when `includeAll`). Selection semantics mirror Grafana:
+// choosing All clears the concrete selections, choosing a concrete value drops All, and clearing
+// everything leaves an EMPTY selection (it does not snap back to All).
+const VariableMultiSelect = ({ variable, value, onChange }: VariableControlProps) => {
+  const label = variable.label || variable.name;
+  const { name, options: varOptions, includeAll } = variable;
+
+  // Normalize the display value to the Select's array shape ('' means nothing selected).
+  const selected = useMemo((): string[] => {
+    if (Array.isArray(value)) return value;
+    return value === '' ? [] : [value];
+  }, [value]);
+
+  const items = useMemo(() => {
+    // With no configured options, fall back to the concrete selected values so the dropdown
+    // still lists (and can deselect) what is currently chosen.
+    const opts = varOptions.length > 0 ? varOptions : selected.filter(v => v !== ALL_VALUE);
+    return [...(includeAll ? [{ value: ALL_VALUE, label: 'All' }] : []), ...opts.map(opt => ({ value: opt, label: opt }))];
+  }, [varOptions, selected, includeAll]);
+
+  const handleChange = useCallback(
+    (next: string[]) => {
+      const hadAll = selected.includes(ALL_VALUE);
+      const hasAll = next.includes(ALL_VALUE);
+      if (hasAll && !hadAll) {
+        // All was just chosen — it replaces any concrete selection.
+        onChange(name, [ALL_VALUE]);
+        return;
+      }
+      // A concrete choice drops All; unchecking All (or a value) just passes through. An empty
+      // result stays empty — Grafana keeps an explicit none-selected state.
+      onChange(
+        name,
+        next.filter(v => v !== ALL_VALUE),
+      );
+    },
+    [onChange, name, selected],
+  );
+
+  // Trigger label: 'All' / the lone value / 'a, b' for two / 'N selected' beyond that.
+  const renderTriggerLabel = useCallback(() => {
+    if (selected.includes(ALL_VALUE)) return 'All';
+    if (selected.length === 0) return 'None';
+    if (selected.length <= 2) return selected.join(', ');
+    return `${String(selected.length)} selected`;
+  }, [selected]);
+
+  return (
+    <VariableField label={label}>
+      <Select multiple value={selected} onValueChange={handleChange} items={items}>
+        <SelectTrigger className='h-7 w-auto min-w-24 text-xs' aria-label={`Variable ${label}`}>
+          <SelectValue>{renderTriggerLabel}</SelectValue>
+        </SelectTrigger>
+        <SelectContent>
+          {items.map(o => (
+            <SelectItem key={o.value} value={o.value}>
+              {o.label}
+            </SelectItem>
+          ))}
+        </SelectContent>
+      </Select>
+    </VariableField>
+  );
+};
+
+const VariableDatasourceSelect = ({ variable, value, onChange }: SingleControlProps) => {
   const label = variable.label || variable.name;
 
   // Fetch the datasource list with useQuery (already prefetched/cached by the route loader)

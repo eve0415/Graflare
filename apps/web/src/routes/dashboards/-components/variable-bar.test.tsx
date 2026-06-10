@@ -84,13 +84,22 @@ const makeVariable = (overrides: Partial<Variable>): Variable => ({ ...baseVaria
 
 // Hoisted so the empty-array / empty-map props keep a stable identity (react-perf).
 const EMPTY_VARIABLES: Variable[] = [];
-const NO_VALUES = new Map<string, string>();
+const NO_VALUES = new Map<string, string | string[]>();
 const NO_ADHOC: readonly Variable[] = [];
-const noop = vi.fn<(name: string, value: string) => void>();
+const noop = vi.fn<(name: string, value: string | string[]) => void>();
 const noopFilters = vi.fn<(name: string, filters: AdhocFilter[]) => void>();
 
-const renderBar = (variables: Variable[], values = NO_VALUES, adhocVariables: readonly Variable[] = NO_ADHOC) => {
-  const onChange = vi.fn<(name: string, value: string) => void>();
+// Base UI's Select.Item commits on a pointer interaction, not a bare click (the same idiom as the
+// variable-form selectOption helper) — drive the full pointer sequence.
+const pickOption = async (optionName: string): Promise<void> => {
+  const option = await screen.findByRole('option', { name: optionName });
+  fireEvent.pointerDown(option);
+  fireEvent.pointerUp(option);
+  fireEvent.click(option);
+};
+
+const renderBar = (variables: Variable[], values: ReadonlyMap<string, string | string[]> = NO_VALUES, adhocVariables: readonly Variable[] = NO_ADHOC) => {
+  const onChange = vi.fn<(name: string, value: string | string[]) => void>();
   const onAdhocFiltersChange = vi.fn<(name: string, filters: AdhocFilter[]) => void>();
   const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   const wrapper = ({ children }: { children: ReactNode }): ReactNode => <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>;
@@ -202,6 +211,63 @@ describe('variable-bar', () => {
       expect(trigger.getAttribute('role')).toBe('combobox');
       fireEvent.click(trigger);
       expect(screen.getByText('All')).toBeDefined();
+    });
+  });
+
+  describe('multi-select', () => {
+    const multiVariable = makeVariable({ name: 'job', type: 'custom', multi: true, includeAll: true, options: ['a', 'b', 'c'] });
+
+    it('adds a concrete value to the existing selection instead of replacing it', async () => {
+      const { onChange } = renderBar([multiVariable], new Map([['job', ['a']]]));
+      fireEvent.click(screen.getByLabelText('Variable job'));
+      await pickOption('b');
+      expect(onChange).toHaveBeenCalledWith('job', ['a', 'b']);
+    });
+
+    it('choosing All clears the concrete selections', async () => {
+      const { onChange } = renderBar([multiVariable], new Map([['job', ['a', 'b']]]));
+      fireEvent.click(screen.getByLabelText('Variable job'));
+      await pickOption('All');
+      expect(onChange).toHaveBeenCalledWith('job', ['$__all']);
+    });
+
+    it('choosing a concrete value drops All', async () => {
+      const { onChange } = renderBar([multiVariable], new Map([['job', ['$__all']]]));
+      fireEvent.click(screen.getByLabelText('Variable job'));
+      await pickOption('a');
+      expect(onChange).toHaveBeenCalledWith('job', ['a']);
+    });
+
+    it('deselecting the last value leaves an empty selection (no All fallback)', async () => {
+      const { onChange } = renderBar([multiVariable], new Map([['job', ['a']]]));
+      fireEvent.click(screen.getByLabelText('Variable job'));
+      await pickOption('a');
+      expect(onChange).toHaveBeenCalledWith('job', []);
+    });
+
+    it('labels the trigger All when the All selection is active', () => {
+      renderBar([multiVariable], new Map([['job', ['$__all']]]));
+      expect(screen.getByLabelText('Variable job').textContent).toContain('All');
+    });
+
+    it('labels the trigger with the lone selected value', () => {
+      renderBar([multiVariable], new Map([['job', ['a']]]));
+      expect(screen.getByLabelText('Variable job').textContent).toContain('a');
+    });
+
+    it('labels the trigger with both values for a pair', () => {
+      renderBar([multiVariable], new Map([['job', ['a', 'b']]]));
+      expect(screen.getByLabelText('Variable job').textContent).toContain('a, b');
+    });
+
+    it('labels the trigger with a count beyond two values', () => {
+      renderBar([multiVariable], new Map([['job', ['a', 'b', 'c']]]));
+      expect(screen.getByLabelText('Variable job').textContent).toContain('3 selected');
+    });
+
+    it('labels the trigger None for an empty selection', () => {
+      renderBar([multiVariable], new Map<string, string | string[]>([['job', []]]));
+      expect(screen.getByLabelText('Variable job').textContent).toContain('None');
     });
   });
 
