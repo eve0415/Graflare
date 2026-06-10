@@ -1,5 +1,6 @@
 import type { AlertRuleDO } from './alerting/alert-rule-do';
 import type { ServiceTokenClient } from './cloudflare/access-service-tokens';
+import type { Database } from './db';
 import type { AuthSubject } from './middleware/access';
 import type { AlertInstanceListQuery, UpsertAlertInstance } from '@graflare/shared/schemas/alert-instance';
 import type { CreateAlertRule, UpdateAlertRule } from '@graflare/shared/schemas/alert-rule';
@@ -150,8 +151,12 @@ app.route('/api/v1/service-tokens', serviceTokenRoutes);
 export default app;
 
 export class GraflareAPI extends WorkerEntrypoint<Bindings> {
-  private get db() {
-    return createDb(this.env.DB);
+  // Memoized: `drizzle()` walks the whole relational schema config on every
+  // call, and a single RPC method can touch `this.db` five times.
+  #db: Database | undefined;
+
+  private get db(): Database {
+    return (this.#db ??= createDb(this.env.DB));
   }
 
   private get bridgeFetch(): typeof fetch {
