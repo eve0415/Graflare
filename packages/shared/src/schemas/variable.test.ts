@@ -19,6 +19,34 @@ describe('variableSchema — backward compatibility', () => {
   });
 });
 
+describe('variableSchema — multi-value current + allValue', () => {
+  it('still parses a pre-existing variable with a plain-string current', () => {
+    const parsed = variableSchema.parse({ name: 'job', type: 'query', current: 'foo' });
+    expect(parsed.current).toBe('foo');
+  });
+
+  it('parses a multi-value current array', () => {
+    const parsed = variableSchema.parse({ name: 'job', type: 'query', multi: true, current: ['a', 'b'] });
+    expect(parsed.current).toEqual(['a', 'b']);
+  });
+
+  it('defaults a missing current to an empty string, not an empty array', () => {
+    expect(variableSchema.parse({ name: 'job', type: 'query' }).current).toBe('');
+  });
+
+  it('rejects a current array with non-string elements', () => {
+    expect(variableSchema.safeParse({ name: 'job', type: 'query', current: ['a', 1] }).success).toBe(false);
+  });
+
+  it('defaults a missing allValue to an empty string (pre-existing JSON parses unchanged)', () => {
+    expect(variableSchema.parse({ name: 'job', type: 'query' }).allValue).toBe('');
+  });
+
+  it('parses an explicit allValue', () => {
+    expect(variableSchema.parse({ name: 'job', type: 'query', includeAll: true, allValue: '.*' }).allValue).toBe('.*');
+  });
+});
+
 describe('variableSchema — adhoc', () => {
   it('parses an adhoc variable with filters and a datasource scope', () => {
     const parsed = variableSchema.parse({

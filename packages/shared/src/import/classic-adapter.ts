@@ -95,6 +95,9 @@ const mapVariable = (v: GrafanaVariable, warnings: string[]): Variable | null =>
     multi: v.multi,
     includeAll: v.includeAll,
     current: currentValue,
+    // The classic `allValue` isn't mapped yet; imported variables fall back to expanding an All
+    // selection over the option list.
+    allValue: '',
     options,
     filters,
   };
@@ -146,6 +149,9 @@ const convertPanel = (gp: GrafanaBasePanel, index: number, warnings: string[]): 
     // Data transformations, warn-dropping any transform id/option we don't model (same honest-loss
     // approach as the overrides above).
     transformations: mapTransformations(gp.transformations, warnings),
+    // The classic repeat fields aren't mapped yet; imported panels take the no-repeat defaults.
+    repeatDirection: 'h',
+    maxPerRow: 4,
   };
 };
 

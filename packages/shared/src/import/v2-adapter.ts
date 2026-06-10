@@ -73,6 +73,9 @@ const mapV2Variable = (v: V2Variable, warnings: string[]): Variable | null => {
     multi: v.multi,
     includeAll: v.includeAll,
     current: '',
+    // The v2 `allValue` isn't mapped yet; imported variables fall back to expanding an All
+    // selection over the option list.
+    allValue: '',
     options,
     filters,
   };
@@ -156,6 +159,9 @@ export const importV2 = (json: Record<string, unknown>): ImportResult => {
       fieldConfig: { defaults: { unit: '', mappings: [] }, overrides: mapOverrides(element.spec.fieldConfig?.overrides ?? [], warnings) },
       // Data transformations from `spec.data.transformations`, warn-dropping the unmappable.
       transformations: mapTransformations(element.spec.data.transformations, warnings),
+      // The v2 repeat fields aren't mapped yet; imported panels take the no-repeat defaults.
+      repeatDirection: 'h',
+      maxPerRow: 4,
     });
 
     panelIndex += 1;

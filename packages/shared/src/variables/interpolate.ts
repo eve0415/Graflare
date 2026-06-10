@@ -4,9 +4,28 @@ import type { AdhocFilter } from '../schemas/variable';
 import { injectAdhocFilters } from './inject-adhoc';
 
 /**
+ * RE2-escape one multi-value element for a PromQL `=~` alternation: the backslash first (so the
+ * escapes added next aren't re-escaped), then every metacharacter Prometheus' RE2 engine
+ * recognises. Mirrors Grafana's prometheus `prometheusSpecialRegexEscape`.
+ */
+const escapeRe2 = (value: string): string => value.replaceAll('\\', String.raw`\\`).replaceAll(/[$^*{}[\]+?.()|]/g, String.raw`\$&`);
+
+/**
+ * Format a multi-value variable the way Grafana's prometheus datasource does: RE2-escape each
+ * value, join with `|`, and wrap in parentheses only when there is more than one value. A
+ * single-element array renders as just the escaped value; an empty array renders as ''.
+ */
+const formatMultiValue = (values: readonly string[]): string => {
+  const escaped = values.map(value => escapeRe2(value));
+  return escaped.length > 1 ? `(${escaped.join('|')})` : (escaped[0] ?? '');
+};
+
+/**
  * Replace template variables (`$var`, `${var}`, legacy `[[var]]`) in a PromQL expression.
  *
- * - Multi-value variables are joined with `|` (regex alternation).
+ * - Multi-value variables are RE2-escaped per value, joined with `|` (regex alternation), and
+ *   parenthesized when more than one value remains — Grafana's prometheus formatting.
+ * - Plain-string values are pasted raw (documented divergence from Grafana's regular-escape).
  * - Content inside single-quoted strings is left untouched.
  * - `$$` is an escape for a literal `$`.
  * - Unknown variables are left as-is.
@@ -62,7 +81,7 @@ export const interpolateVariables = (expr: string, variables: ReadonlyMap<string
           // unknown variable — leave original text
           result += expr.slice(i, close + 1);
         } else {
-          result += Array.isArray(value) ? value.join('|') : value;
+          result += Array.isArray(value) ? formatMultiValue(value) : value;
         }
         i = close + 1;
         continue;
@@ -83,7 +102,7 @@ export const interpolateVariables = (expr: string, variables: ReadonlyMap<string
       if (value === undefined) {
         result += expr.slice(i, end);
       } else {
-        result += Array.isArray(value) ? value.join('|') : value;
+        result += Array.isArray(value) ? formatMultiValue(value) : value;
       }
       i = end;
       continue;
@@ -98,7 +117,7 @@ export const interpolateVariables = (expr: string, variables: ReadonlyMap<string
         if (value === undefined) {
           result += expr.slice(i, close + 2);
         } else {
-          result += Array.isArray(value) ? value.join('|') : value;
+          result += Array.isArray(value) ? formatMultiValue(value) : value;
         }
         i = close + 2;
         continue;

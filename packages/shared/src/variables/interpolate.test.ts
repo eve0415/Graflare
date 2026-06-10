@@ -31,14 +31,14 @@ describe('interpolateVariables', () => {
     expect(interpolateVariables(`${braced('metric')}_total`, vars)).toBe('cpu_usage_total');
   });
 
-  it('joins multi-value variables with pipe', () => {
+  it('joins multi-value variables with pipe inside parentheses', () => {
     const vars = new Map<string, string | string[]>([['instance', ['host1', 'host2', 'host3']]]);
-    expect(interpolateVariables('up{instance=~"$instance"}', vars)).toBe('up{instance=~"host1|host2|host3"}');
+    expect(interpolateVariables('up{instance=~"$instance"}', vars)).toBe('up{instance=~"(host1|host2|host3)"}');
   });
 
   it('joins multi-value variables in braced syntax', () => {
     const vars = new Map<string, string | string[]>([['env', ['staging', 'prod']]]);
-    expect(interpolateVariables(`up{env=~"${braced('env')}"}`, vars)).toBe('up{env=~"staging|prod"}');
+    expect(interpolateVariables(`up{env=~"${braced('env')}"}`, vars)).toBe('up{env=~"(staging|prod)"}');
   });
 
   it('leaves unknown bare variables as-is', () => {
@@ -127,9 +127,9 @@ describe('interpolateVariables', () => {
     expect(interpolateVariables('up{job="[[job]]"}', vars)).toBe('up{job="node"}');
   });
 
-  it('joins multi-value [[name]] with pipe', () => {
+  it('joins multi-value [[name]] with pipe inside parentheses', () => {
     const vars = new Map<string, string | string[]>([['env', ['staging', 'prod']]]);
-    expect(interpolateVariables('up{env=~"[[env]]"}', vars)).toBe('up{env=~"staging|prod"}');
+    expect(interpolateVariables('up{env=~"[[env]]"}', vars)).toBe('up{env=~"(staging|prod)"}');
   });
 
   it('leaves unknown [[name]] as-is', () => {
@@ -145,6 +145,68 @@ describe('interpolateVariables', () => {
   it('does not replace [[name]] inside single-quoted strings', () => {
     const vars = new Map([['x', 'replaced']]);
     expect(interpolateVariables("metric{l='[[x]]'} + [[x]]", vars)).toBe("metric{l='[[x]]'} + replaced");
+  });
+});
+
+describe('interpolateVariables — multi-value PromQL formatting', () => {
+  // Grafana's prometheus rule: RE2-escape each value (backslash first, then the metacharacters),
+  // join with '|', parenthesize only when there is more than one value.
+  it('escapes every RE2 metacharacter in a multi-value element', () => {
+    const cases: [string, string][] = [
+      ['a$b', String.raw`a\$b`],
+      ['a^b', String.raw`a\^b`],
+      ['a*b', String.raw`a\*b`],
+      ['a{b', String.raw`a\{b`],
+      ['a}b', String.raw`a\}b`],
+      ['a[b', String.raw`a\[b`],
+      ['a]b', String.raw`a\]b`],
+      ['a+b', String.raw`a\+b`],
+      ['a?b', String.raw`a\?b`],
+      ['a.b', String.raw`a\.b`],
+      ['a(b', String.raw`a\(b`],
+      ['a)b', String.raw`a\)b`],
+      ['a|b', String.raw`a\|b`],
+      [String.raw`a\b`, String.raw`a\\b`],
+    ];
+    for (const [raw, escaped] of cases) {
+      const vars = new Map<string, string | string[]>([['v', [raw]]]);
+      expect(interpolateVariables('$v', vars)).toBe(escaped);
+    }
+  });
+
+  it('escapes the backslash first so combined values do not double-escape', () => {
+    const vars = new Map<string, string | string[]>([['v', [String.raw`host.with*meta\chars`]]]);
+    expect(interpolateVariables('$v', vars)).toBe(String.raw`host\.with\*meta\\chars`);
+  });
+
+  it('wraps in parentheses only when there is more than one value', () => {
+    const vars = new Map<string, string | string[]>([
+      ['two', ['a', 'b']],
+      ['one', ['a']],
+    ]);
+    expect(interpolateVariables('$two', vars)).toBe('(a|b)');
+    expect(interpolateVariables('$one', vars)).toBe('a');
+  });
+
+  it('escapes a single-element array without parentheses', () => {
+    const vars = new Map<string, string | string[]>([['v', ['10.0.0.1:9090']]]);
+    expect(interpolateVariables('$v', vars)).toBe(String.raw`10\.0\.0\.1:9090`);
+  });
+
+  it('escapes each element before joining so a value containing | stays one alternative', () => {
+    const vars = new Map<string, string | string[]>([['v', ['a|b', 'c']]]);
+    expect(interpolateVariables('$v', vars)).toBe(String.raw`(a\|b|c)`);
+  });
+
+  it('renders an empty array as an empty string', () => {
+    const vars = new Map<string, string | string[]>([['v', []]]);
+    expect(interpolateVariables('up{instance=~"$v"}', vars)).toBe('up{instance=~""}');
+  });
+
+  it('leaves plain-string values untouched, even when they contain metacharacters', () => {
+    // Documented divergence from Grafana's regular-escape: single values are pasted raw.
+    const vars = new Map<string, string | string[]>([['v', String.raw`a.b|c$d\e`]]);
+    expect(interpolateVariables('$v', vars)).toBe(String.raw`a.b|c$d\e`);
   });
 });
 
@@ -164,7 +226,7 @@ describe('interpolateQueries', () => {
       ['env', ['staging', 'prod']],
     ]);
     const result = interpolateQueries([query('up{job="$job"}'), query('rate(req{env=~"$env"}[5m])')], vars);
-    expect(result.map(q => q.expr)).toEqual(['up{job="node"}', 'rate(req{env=~"staging|prod"}[5m])']);
+    expect(result.map(q => q.expr)).toEqual(['up{job="node"}', 'rate(req{env=~"(staging|prod)"}[5m])']);
   });
 
   it('returns the queries unchanged with an empty variable map', () => {

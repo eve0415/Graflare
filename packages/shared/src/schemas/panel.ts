@@ -193,6 +193,13 @@ export const panelSchema = z.object({
   // identity no-op, same array reference).
   transformations: z._default(z.array(transformationSchema), []),
   description: z._default(z.string().check(z.maxLength(2048)), ''),
+  // Repeating panels (Grafana semantics). `repeat` names the template variable whose values fan
+  // this panel out at render time — absent means no repeat, and the clones are runtime-only
+  // (never persisted). `repeatDirection` lays instances out side by side ('h', up to `maxPerRow`
+  // per 24-wide band) or stacked ('v'). Additive: stored panels parse unchanged via the defaults.
+  repeat: z.optional(z.string().check(z.minLength(1), z.maxLength(128))),
+  repeatDirection: z._default(z.enum(['h', 'v']), 'h'),
+  maxPerRow: z._default(z.int().check(z.minimum(1), z.maximum(24)), 4),
 });
 
 export type Panel = z.infer<typeof panelSchema>;

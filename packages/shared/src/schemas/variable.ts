@@ -42,7 +42,13 @@ export const variableSchema = z.object({
   sort: z._default(variableSortSchema, 'disabled'),
   multi: z._default(z.boolean(), false),
   includeAll: z._default(z.boolean(), false),
-  current: z._default(z.string(), ''),
+  // The saved selection: a plain string for single-select variables, a string array for a
+  // multi/include-all selection. Widened additively — dashboards saved before multi-select
+  // existed hold plain strings and parse unchanged.
+  current: z._default(z.union([z.string(), z.array(z.string())]), ''),
+  // Custom "All" value, used VERBATIM at interpolation time (never escaped). Empty means no
+  // custom value, so an All selection expands over the option list instead.
+  allValue: z._default(z.string(), ''),
   options: z._default(z.array(z.string()), []),
   // Adhoc label filters. Empty for every non-adhoc type (and an adhoc variable with none),
   // so it is purely additive: dashboards saved before adhoc existed omit the key and default to [].
