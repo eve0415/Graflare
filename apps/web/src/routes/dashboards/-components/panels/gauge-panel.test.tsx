@@ -5,7 +5,7 @@ import type { Panel } from '@graflare/shared/schemas/panel';
 import { cleanup, render, screen } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
-import { GaugePanel } from './gauge-panel';
+import { GaugePanel, describeArc } from './gauge-panel';
 
 // Mock the data hook so we feed the gauge an exact Prometheus value and assert purely on the
 // formatting/override wiring (the gauge math itself is covered elsewhere).
@@ -78,5 +78,17 @@ describe('gauge-panel formatting', () => {
     mockUsePanelData.mockReturnValue({ data: null, isLoading: false, error: null, refetch: vi.fn<() => void>() });
     render(<GaugePanel panel={gaugePanel({ defaults: { unit: 'bytes', mappings: [] }, overrides: [] })} timeRange={timeRange} refetchInterval={false} />);
     expect(screen.getByText('—')).toBeDefined();
+  });
+});
+
+describe('describeArc', () => {
+  it('maps the sweep onto the TOP semicircle: min at the left, max at the right', () => {
+    // -90deg = min, +90deg = max. The old cos/sin mapping drew the RIGHT half-circle
+    // (12 o'clock to 6 o'clock), leaving half the dial outside the 200x130 viewBox.
+    expect(describeArc(-90, 90, 80)).toBe('M 20 100 A 80 80 0 0 1 180 100');
+  });
+
+  it("puts the midpoint at 12 o'clock", () => {
+    expect(describeArc(-90, 0, 80)).toBe('M 20 100 A 80 80 0 0 1 100 20');
   });
 });

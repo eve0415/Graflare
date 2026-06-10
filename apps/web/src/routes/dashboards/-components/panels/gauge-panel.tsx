@@ -15,17 +15,26 @@ interface GaugePanelProps {
   refetchInterval: number | false;
 }
 
-const describeArc = (startAngle: number, endAngle: number, radius: number): string => {
+/** Round away float dust (sin/cos of right angles) so path strings stay exact. */
+const fmt = (n: number): string => String(Math.round(n * 1000) / 1000);
+
+/**
+ * Arc on the TOP semicircle of a dial centered at (100,100): −90° is the left end (min),
+ * 0° is 12 o'clock, +90° is the right end (max) — x from sin, y from −cos. (A plain
+ * cos/sin mapping puts −90° at 12 o'clock and draws the right half-circle, half of it
+ * below the 200×130 viewBox.)
+ */
+export const describeArc = (startAngle: number, endAngle: number, radius: number): string => {
   const startRad = (startAngle * Math.PI) / 180;
   const endRad = (endAngle * Math.PI) / 180;
   const cx = 100;
   const cy = 100;
-  const x1 = cx + radius * Math.cos(startRad);
-  const y1 = cy + radius * Math.sin(startRad);
-  const x2 = cx + radius * Math.cos(endRad);
-  const y2 = cy + radius * Math.sin(endRad);
+  const x1 = cx + radius * Math.sin(startRad);
+  const y1 = cy - radius * Math.cos(startRad);
+  const x2 = cx + radius * Math.sin(endRad);
+  const y2 = cy - radius * Math.cos(endRad);
   const largeArc = endAngle - startAngle > 180 ? 1 : 0;
-  return `M ${String(x1)} ${String(y1)} A ${String(radius)} ${String(radius)} 0 ${String(largeArc)} 1 ${String(x2)} ${String(y2)}`;
+  return `M ${fmt(x1)} ${fmt(y1)} A ${String(radius)} ${String(radius)} 0 ${String(largeArc)} 1 ${fmt(x2)} ${fmt(y2)}`;
 };
 
 export const GaugePanel = ({ panel, timeRange, refetchInterval }: GaugePanelProps) => {
@@ -95,11 +104,16 @@ export const GaugePanel = ({ panel, timeRange, refetchInterval }: GaugePanelProp
 
   return (
     <PanelFrame title={panel.title} panelId={panel.id} loading={isLoading} error={error instanceof Error ? error.message : null} onRetry={handleRetry}>
-      <meter
-        className='flex h-full appearance-none flex-col items-center justify-center [&::-webkit-meter-bar]:bg-transparent [&::-webkit-meter-optimum-value]:bg-transparent'
-        min={min}
-        max={max}
-        value={value ?? undefined}
+      {/* NOT a native <meter>: children of <meter> are fallback content and never render in
+          modern browsers, so the SVG arc was invisible behind the UA meter bar. A div with
+          role='meter' renders the SVG and keeps the semantics (the role requires
+          aria-valuenow, so it and the value attributes are only set when a value exists). */}
+      <div
+        role={value === null ? undefined : 'meter'}
+        aria-valuemin={value === null ? undefined : min}
+        aria-valuemax={value === null ? undefined : max}
+        aria-valuenow={value === null ? undefined : normalizedValue}
+        className='flex h-full flex-col items-center justify-center'
         aria-label={`${panel.title}: ${value === null ? 'no data' : centerText}`}
       >
         <svg viewBox='0 0 200 130' className='w-full max-w-48'>
@@ -107,7 +121,7 @@ export const GaugePanel = ({ panel, timeRange, refetchInterval }: GaugePanelProp
             <path key={String(i)} d={describeArc(arc.start, arc.end, 80)} fill='none' stroke={arc.color} strokeWidth='12' strokeLinecap='round' opacity={0.3} />
           ))}
           {value !== null && <path d={describeArc(-90, angle, 80)} fill='none' stroke={thresholdColor} strokeWidth='12' strokeLinecap='round' />}
-          {/* When there's no value this reads as a bare em-dash; the meter's
+          {/* When there's no value this reads as a bare em-dash; the gauge's
               aria-label already says "no data", so hide the sentinel glyph. */}
           <text x='100' y='105' textAnchor='middle' className='fill-foreground text-2xl font-semibold' aria-hidden={value === null ? true : undefined}>
             {centerText}
@@ -119,7 +133,7 @@ export const GaugePanel = ({ panel, timeRange, refetchInterval }: GaugePanelProp
             {maxLabel}
           </text>
         </svg>
-      </meter>
+      </div>
     </PanelFrame>
   );
 };
