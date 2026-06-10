@@ -9,9 +9,14 @@ import { useCallback, useState } from 'react';
 
 type GroupingMode = 'by' | 'without';
 
-const GROUPING_MODES = new Set<string>(['by', 'without']);
+// Single source feeds both the Select's `items` (trigger label) and the dropdown options
+// (base-ui-select rule), plus the narrowing guard.
+const GROUPING_MODE_OPTIONS = [
+  { value: 'by', label: 'by' },
+  { value: 'without', label: 'without' },
+] as const;
 
-const isGroupingMode = (value: string): value is GroupingMode => GROUPING_MODES.has(value);
+const isGroupingMode = (value: string): value is GroupingMode => GROUPING_MODE_OPTIONS.some(o => o.value === value);
 
 interface PromqlFunctionComposerProps {
   functions: FunctionApplication[];
@@ -74,13 +79,16 @@ const ParamEditor = ({ param, onChange }: { param: FunctionParam; onChange: (par
 
   return (
     <div className='flex items-center gap-1'>
-      <Select value={param.mode} onValueChange={handleModeChange}>
+      <Select value={param.mode} onValueChange={handleModeChange} items={GROUPING_MODE_OPTIONS}>
         <SelectTrigger aria-label='Grouping mode' className='h-6 w-20 text-xs'>
           <SelectValue />
         </SelectTrigger>
         <SelectContent>
-          <SelectItem value='by'>by</SelectItem>
-          <SelectItem value='without'>without</SelectItem>
+          {GROUPING_MODE_OPTIONS.map(o => (
+            <SelectItem key={o.value} value={o.value}>
+              {o.label}
+            </SelectItem>
+          ))}
         </SelectContent>
       </Select>
       <Input
