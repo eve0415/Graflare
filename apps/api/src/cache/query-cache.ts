@@ -221,9 +221,13 @@ export const cachedProxyQuery = async (
   // Only cache a genuinely-successful response with data — never an error or an
   // empty success, which would otherwise pin a transient failure for the full TTL.
   if (result.status === 'success' && result.data !== undefined) {
-    const write = store.put(key, result, cacheTtl).catch((error: unknown) => {
-      console.error('query cache write failed (ignored):', error);
-    });
+    const write = (async () => {
+      try {
+        await store.put(key, result, cacheTtl);
+      } catch (error) {
+        console.error('query cache write failed (ignored):', error);
+      }
+    })();
     if (defer === undefined) {
       await write;
     } else {

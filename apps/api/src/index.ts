@@ -25,6 +25,7 @@ import type { PrometheusResponse } from '@graflare/shared/schemas/prometheus';
 import type { CreateServiceToken, ServiceTokenCreateResult, ServiceTokenMetadata } from '@graflare/shared/schemas/service-token';
 import type { CreateSilence, UpdateSilence } from '@graflare/shared/schemas/silence';
 import type { SqlFormat, SqlResponse } from '@graflare/shared/schemas/sql';
+import type { ErrorHandler } from 'hono';
 
 import { detectFormat, importDashboard as importDashboardFn } from '@graflare/shared/import';
 import { alertInstanceListQuerySchema, upsertAlertInstanceSchema } from '@graflare/shared/schemas/alert-instance';
@@ -153,15 +154,17 @@ app.route('/api/v1/mute-timings', muteTimingRoutes);
 app.route('/api/v1/annotations', annotationRoutes);
 app.route('/api/v1/service-tokens', serviceTokenRoutes);
 
-app.notFound(c => c.json({ error: 'Not found' }, 404));
-app.onError((err, c) => {
+// Mirrors the RPC methods' log-and-wrap so the two surfaces fail alike.
+const onHttpError: ErrorHandler<AppEnv> = (err, c) => {
   if (err instanceof HTTPException) {
     return err.getResponse();
   }
-  // Mirrors the RPC methods' log-and-wrap so the two surfaces fail alike.
   console.error(`${c.req.method} ${c.req.path} failed:`, err);
   return c.json({ error: 'Internal server error' }, 500);
-});
+};
+
+app.notFound(c => c.json({ error: 'Not found' }, 404));
+app.onError(onHttpError);
 
 export default app;
 

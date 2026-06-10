@@ -36,4 +36,3 @@ const importKey = async (keyBase64: string): Promise<CryptoKey> => {
   keyCache.set(keyBase64, key);
   return key;
 };
-

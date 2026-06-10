@@ -280,7 +280,6 @@ describe('cachedProxyQuery wrapper', () => {
 
   it('a deferred write failure resolves (swallowed + logged), never rejects', async () => {
     const store = new FakeStore();
-    store.match = () => Promise.resolve(undefined);
     store.put = () => Promise.reject(new Error('cache put exploded'));
     const run = vi.fn<RunFn>(() => Promise.resolve(SUCCESS));
     const deferred: Promise<void>[] = [];
