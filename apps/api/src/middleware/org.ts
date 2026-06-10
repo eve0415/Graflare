@@ -31,21 +31,37 @@ const serviceTokenOrgId = async (db: Db, clientId: string): Promise<string | nul
 // exist — a service token cannot create an org, only attach to the one that
 // minted it. Returns null for an unknown/revoked service token (caller → 401).
 // Shared by orgMiddleware (HTTP) and resolveAuth (RPC) so the two cannot drift.
+// Org ids this isolate has already bootstrapped. The insert is idempotent
+// (ON CONFLICT DO NOTHING), so a cold isolate redoing it is harmless — the set
+// only keeps a serialized D1 write off the hot path of every request after an
+// org's first sighting.
+const bootstrappedOrgs = new Set<string>();
+
+// Test hook: isolated-storage tests reset D1 between tests while module state
+// persists — without clearing, later tests skip the org insert their fresh DB
+// still needs.
+const resetOrgBootstrapCache = (): void => {
+  bootstrappedOrgs.clear();
+};
+
 const resolveOrgId = async (db: Db, subject: AuthSubject): Promise<string | null> => {
   if (subject.kind === 'service') {
     return serviceTokenOrgId(db, subject.clientId);
   }
   const orgId = await emailToOrgId(subject.email);
-  const now = new Date();
-  await db
-    .insert(organizations)
-    .values({
-      id: orgId,
-      name: subject.email,
-      createdAt: now,
-      updatedAt: now,
-    })
-    .onConflictDoNothing();
+  if (!bootstrappedOrgs.has(orgId)) {
+    const now = new Date();
+    await db
+      .insert(organizations)
+      .values({
+        id: orgId,
+        name: subject.email,
+        createdAt: now,
+        updatedAt: now,
+      })
+      .onConflictDoNothing();
+    bootstrappedOrgs.add(orgId);
+  }
   return orgId;
 };
 
@@ -62,4 +78,4 @@ const orgMiddleware = (): MiddlewareHandler<AppEnv> => async (c: Context<AppEnv>
   return next();
 };
 
-export { emailToOrgId, orgMiddleware, resolveOrgId, serviceTokenOrgId };
+export { emailToOrgId, orgMiddleware, resetOrgBootstrapCache, resolveOrgId, serviceTokenOrgId };
