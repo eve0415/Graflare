@@ -8,12 +8,12 @@ import { resolveRange } from '@graflare/shared/time/resolve';
 import { useMemo } from 'react';
 
 import { chartThemeColors, timeScaleX } from '../../../-root/chart-theme';
-import { QueryResultTable, formatPrometheusToTable } from '../../../-root/query-result-table';
 import { useTheme } from '../../../-root/theme-provider';
 
 import { annotationMarkers } from './annotations-plugin';
 import { resolveSharedAxisLayout } from './multi-axis';
 import { extractTransformedSeriesWithQuery, seriesDescriptor } from './panel-data-extract';
+import { PanelDataTable } from './panel-data-table';
 import { UPlotPanel } from './uplot-panel';
 import { usePanelQuery } from './use-panel-query';
 
@@ -37,9 +37,11 @@ export const TimeSeriesPanel = ({ panel, timeRange, refetchInterval, width, heig
   const queried = useMemo(() => extractTransformedSeriesWithQuery(data, panel.queries, panel.transformations), [data, panel.queries, panel.transformations]);
   const chartResult = useMemo(() => queried.map(q => q.series), [queried]);
 
+  // refId→legendFormat once, instead of an O(series × queries) find inside the map.
+  const legendFormats = useMemo(() => new Map(panel.queries.map(q => [q.refId, q.legendFormat])), [panel.queries]);
   const seriesLabels = useMemo(
-    () => queried.map((q, i) => seriesLabel(panel.queries.find(x => x.refId === q.refId)?.legendFormat, q.series.metric, i)),
-    [queried, panel.queries],
+    () => queried.map((q, i) => seriesLabel(q.refId === undefined ? undefined : legendFormats.get(q.refId), q.series.metric, i)),
+    [queried, legendFormats],
   );
 
   // Effective field config per series (unit/min/max), resolved against the panel overrides keyed on
@@ -132,8 +134,9 @@ export const TimeSeriesPanel = ({ panel, timeRange, refetchInterval, width, heig
     };
   }, [width, height, chartResult, seriesLabels, seriesConfigs, panel, resolved, timeRange.from, timeRange.to]);
 
-  const tableData = useMemo(() => formatPrometheusToTable(chartResult), [chartResult]);
-  const dataTable = useMemo(() => <QueryResultTable data={tableData} scrollRegionLabel={`${panel.title} data table`} />, [tableData, panel.title]);
+  // A cheap element — PanelDataTable formats the series only when PanelFrame mounts it
+  // (data-table toggle on), not on every refresh.
+  const dataTable = useMemo(() => <PanelDataTable series={chartResult} scrollRegionLabel={`${panel.title} data table`} />, [chartResult, panel.title]);
 
   return (
     <UPlotPanel

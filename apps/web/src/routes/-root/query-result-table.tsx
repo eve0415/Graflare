@@ -159,21 +159,20 @@ export const formatPrometheusToTable = (
     }
   }
 
-  const columns = [...metricKeys, 'Timestamp', 'Value'];
+  const keys = [...metricKeys];
+  const columns = [...keys, 'Timestamp', 'Value'];
   const rows: string[][] = [];
 
   for (const r of result) {
+    // Label cells are constant per series — build them once, copy per point.
+    const labelCells = keys.map(k => r.metric[k] ?? '');
     if (r.values !== undefined) {
       for (const [ts, val] of r.values) {
-        const row = [...metricKeys].map(k => r.metric[k] ?? '');
-        row.push(new Date(ts * 1000).toISOString(), val);
-        rows.push(row);
+        rows.push([...labelCells, new Date(ts * 1000).toISOString(), val]);
       }
     } else if (r.value !== undefined) {
       const [ts, val] = r.value;
-      const row = [...metricKeys].map(k => r.metric[k] ?? '');
-      row.push(new Date(ts * 1000).toISOString(), val);
-      rows.push(row);
+      rows.push([...labelCells, new Date(ts * 1000).toISOString(), val]);
     }
   }
 
