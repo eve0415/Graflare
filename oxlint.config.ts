@@ -440,5 +440,15 @@ export default defineConfig({
         'no-await-in-loop': 'off',
       },
     },
+    // Notification delivery walks the resolved groups sequentially on purpose: each group is a
+    // chain of durable Workflow steps (mute-check → group_wait sleep → load → deliver → annotate).
+    // Parallelizing would interleave the per-group group_wait sleeps in the durable engine —
+    // behaviour the unit harness can't verify — so sequential await is the intended pattern here.
+    {
+      files: ['apps/api/src/alerting/notification-workflow.ts'],
+      rules: {
+        'no-await-in-loop': 'off',
+      },
+    },
   ],
 });
