@@ -15,6 +15,16 @@ interface StatPanelProps {
   refetchInterval: number | false;
 }
 
+/**
+ * Caps the stat font so the value always fits the panel body: the configured size is the
+ * upper bound, scaled down via container-query units (the <output> is a size container).
+ * 150/len cqw ≈ 90% of the body width over tabular digits (~0.6em per glyph); 70cqh stops
+ * short values towering past the body height. A fixed px size clipped "10.13" to "0.1" in
+ * a quarter-width panel at tablet sizes.
+ */
+export const statFontSize = (textSize: number, textLength: number): string =>
+  `min(${String(textSize)}px, ${(150 / Math.max(1, textLength)).toFixed(1)}cqw, 70cqh)`;
+
 export const StatPanel = ({ panel, timeRange, refetchInterval }: StatPanelProps) => {
   const { data, isLoading, error, handleRetry } = usePanelQuery(panel, timeRange, refetchInterval);
 
@@ -50,12 +60,14 @@ export const StatPanel = ({ panel, timeRange, refetchInterval }: StatPanelProps)
   const thresholdColor = isNumeric && panel.thresholds.length > 0 ? getThresholdColor(numericValue, panel.thresholds, 'var(--color-foreground)') : undefined;
   const effectiveColor = mapping?.color ?? thresholdColor;
 
+  const renderedText = value === null ? '—' : displayText;
+
   const valueStyle = useMemo(
     () => ({
-      fontSize: `${String(textSize)}px`,
+      fontSize: statFontSize(textSize, renderedText.length),
       color: colorMode === 'value' && effectiveColor !== undefined ? effectiveColor : undefined,
     }),
-    [textSize, colorMode, effectiveColor],
+    [textSize, renderedText.length, colorMode, effectiveColor],
   );
 
   const bgStyle = useMemo(() => {
@@ -68,14 +80,14 @@ export const StatPanel = ({ panel, timeRange, refetchInterval }: StatPanelProps)
   return (
     <PanelFrame title={panel.title} panelId={panel.id} loading={isLoading} error={error instanceof Error ? error.message : null} onRetry={handleRetry}>
       <output
-        className='flex h-full items-center justify-center rounded'
+        className='[container-type:size] flex h-full items-center justify-center rounded'
         style={bgStyle}
         aria-label={`${panel.title}: ${value === null ? 'no data' : displayText}`}
       >
         {/* The em-dash is a visual no-data sentinel; the output's aria-label already
             says "no data", so hide the bare glyph from assistive tech. */}
         <span className='font-semibold tabular-nums' style={valueStyle} aria-hidden={value === null ? true : undefined}>
-          {value === null ? '—' : displayText}
+          {renderedText}
         </span>
       </output>
     </PanelFrame>

@@ -6,7 +6,7 @@ import { cleanup, render, screen } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { barGaugeSegments } from './bar-gauge-data';
-import { StatPanel } from './stat-panel';
+import { StatPanel, statFontSize } from './stat-panel';
 
 // Mock the data hook so we feed the panel an exact Prometheus value and assert
 // purely on the formatting/mapping wiring (the math itself is covered in shared).
@@ -146,5 +146,19 @@ describe('cross-panel override consistency', () => {
     mockUsePanelData.mockReturnValue({ data, isLoading: false, error: null, refetch: vi.fn<() => void>() });
     render(<StatPanel panel={panel} timeRange={timeRange} refetchInterval={false} />);
     expect(screen.getByText('1.5 KiB')).toBeDefined();
+  });
+});
+
+describe('statFontSize', () => {
+  it('caps the configured size by per-glyph container width and container height', () => {
+    expect(statFontSize(48, 5)).toBe('min(48px, 30.0cqw, 70cqh)');
+  });
+
+  it('longer values get proportionally smaller width caps', () => {
+    expect(statFontSize(48, 10)).toBe('min(48px, 15.0cqw, 70cqh)');
+  });
+
+  it('guards against a zero-length value', () => {
+    expect(statFontSize(48, 0)).toBe('min(48px, 150.0cqw, 70cqh)');
   });
 });
