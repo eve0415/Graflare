@@ -9,19 +9,19 @@ import { PromqlFunctionComposer } from './promql-function-composer';
 import { PromqlLabelFilters } from './promql-label-filters';
 import { PromqlMetricSelector } from './promql-metric-selector';
 
+// ADD_LABEL / ADD_FUNCTION carry the new row's id, generated at dispatch time — the reducer
+// must stay pure (React Compiler assumes it; explore-query-row also pre-runs it to preview the
+// next state, so an impure reducer would observe each action twice).
 export type PromqlBuilderAction =
   | { type: 'SET_METRIC'; metric: string }
-  | { type: 'ADD_LABEL' }
+  | { type: 'ADD_LABEL'; id: string }
   | { type: 'REMOVE_LABEL'; index: number }
   | { type: 'UPDATE_LABEL'; index: number; matcher: LabelMatcher }
-  | { type: 'ADD_FUNCTION'; name: string }
+  | { type: 'ADD_FUNCTION'; name: string; id: string }
   | { type: 'REMOVE_FUNCTION'; index: number }
   | { type: 'REORDER_FUNCTION'; fromIndex: number; toIndex: number }
   | { type: 'UPDATE_FUNCTION_PARAM'; fnIndex: number; paramIndex: number; param: FunctionParam }
   | { type: 'RESET' };
-
-let nextLabelId = 0;
-let nextFnId = 0;
 
 const makeDefaultParams = (name: string): FunctionParam[] => {
   const entry = catalogByName.get(name);
@@ -40,7 +40,7 @@ export const promqlBuilderReducer = (state: PromQLBuilderState, action: PromqlBu
     case 'ADD_LABEL':
       return {
         ...state,
-        labels: [...state.labels, { id: String(++nextLabelId), label: '', operator: '=', value: '' }],
+        labels: [...state.labels, { id: action.id, label: '', operator: '=', value: '' }],
       };
     case 'REMOVE_LABEL':
       return { ...state, labels: state.labels.filter((_, i) => i !== action.index) };
@@ -51,7 +51,7 @@ export const promqlBuilderReducer = (state: PromQLBuilderState, action: PromqlBu
     }
     case 'ADD_FUNCTION': {
       const fn: FunctionApplication = {
-        id: String(++nextFnId),
+        id: action.id,
         name: action.name,
         params: makeDefaultParams(action.name),
       };
@@ -104,7 +104,7 @@ export const PromqlBuilder = ({ datasourceId, state, dispatch }: PromqlBuilderPr
   );
 
   const handleAddLabel = useCallback(() => {
-    dispatch({ type: 'ADD_LABEL' });
+    dispatch({ type: 'ADD_LABEL', id: crypto.randomUUID() });
   }, [dispatch]);
 
   const handleRemoveLabel = useCallback(
@@ -123,7 +123,7 @@ export const PromqlBuilder = ({ datasourceId, state, dispatch }: PromqlBuilderPr
 
   const handleAddFunction = useCallback(
     (name: string) => {
-      dispatch({ type: 'ADD_FUNCTION', name });
+      dispatch({ type: 'ADD_FUNCTION', name, id: crypto.randomUUID() });
     },
     [dispatch],
   );
