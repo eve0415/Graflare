@@ -1,10 +1,8 @@
-import journal from './meta/_journal.json';
-import m0000 from './0000_cloudy_forgotten_one.sql';
+import m0000 from './20260608055504_cloudy_forgotten_one/migration.sql';
 
   export default {
-    journal,
     migrations: {
-      m0000
-    }
+      "20260608055504_cloudy_forgotten_one": m0000
+}
   }
   
