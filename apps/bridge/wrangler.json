@@ -9,7 +9,8 @@
       "binding": "DB",
       "database_name": "graflare-bridge",
       "database_id": "b2ea302b-4212-4308-a856-a7622be3a261",
-      "migrations_dir": "drizzle"
+      "migrations_dir": "drizzle",
+      "migrations_pattern": "drizzle/*/migration.sql"
     }
   ],
   "vars": {

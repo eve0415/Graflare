@@ -10,7 +10,8 @@
       "binding": "DB",
       "database_name": "graflare",
       "database_id": "23b0e196-786f-4d3c-ae3a-f394bbd87c8e",
-      "migrations_dir": "drizzle"
+      "migrations_dir": "drizzle",
+      "migrations_pattern": "drizzle/*/migration.sql"
     }
   ],
   "durable_objects": {
