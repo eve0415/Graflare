@@ -1,0 +1,321 @@
+{
+  "dialect": "sqlite",
+  "id": "99291be4-98ca-472c-a6f5-0aeb6b0e6f02",
+  "prevIds": [
+    "9ed3ec2b-2354-4308-ae8c-fad8a1cb0fb3"
+  ],
+  "version": "7",
+  "ddl": [
+    {
+      "name": "dataset_status",
+      "entityType": "tables"
+    },
+    {
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "name": "dataset",
+      "table": "dataset_status",
+      "entityType": "columns"
+    },
+    {
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "name": "scope",
+      "table": "dataset_status",
+      "entityType": "columns"
+    },
+    {
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "name": "scope_id",
+      "table": "dataset_status",
+      "entityType": "columns"
+    },
+    {
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "name": "status",
+      "table": "dataset_status",
+      "entityType": "columns"
+    },
+    {
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": "''",
+      "generated": null,
+      "name": "last_error",
+      "table": "dataset_status",
+      "entityType": "columns"
+    },
+    {
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": "0",
+      "generated": null,
+      "name": "retry_after",
+      "table": "dataset_status",
+      "entityType": "columns"
+    },
+    {
+      "columns": [
+        {
+          "value": "dataset",
+          "isExpression": false
+        },
+        {
+          "value": "scope",
+          "isExpression": false
+        },
+        {
+          "value": "scope_id",
+          "isExpression": false
+        }
+      ],
+      "isUnique": true,
+      "where": null,
+      "origin": "manual",
+      "name": "dataset_status_pk",
+      "table": "dataset_status",
+      "entityType": "indexes"
+    },
+    {
+      "name": "metrics",
+      "entityType": "tables"
+    },
+    {
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "name": "ts",
+      "table": "metrics",
+      "entityType": "columns"
+    },
+    {
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "name": "dataset",
+      "table": "metrics",
+      "entityType": "columns"
+    },
+    {
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": "'account'",
+      "generated": null,
+      "name": "scope",
+      "table": "metrics",
+      "entityType": "columns"
+    },
+    {
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": "''",
+      "generated": null,
+      "name": "scope_id",
+      "table": "metrics",
+      "entityType": "columns"
+    },
+    {
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "name": "resource",
+      "table": "metrics",
+      "entityType": "columns"
+    },
+    {
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "name": "metric_name",
+      "table": "metrics",
+      "entityType": "columns"
+    },
+    {
+      "type": "real",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "name": "value",
+      "table": "metrics",
+      "entityType": "columns"
+    },
+    {
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": "'{}'",
+      "generated": null,
+      "name": "dims",
+      "table": "metrics",
+      "entityType": "columns"
+    },
+    {
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": "''",
+      "generated": null,
+      "name": "dims_hash",
+      "table": "metrics",
+      "entityType": "columns"
+    },
+    {
+      "columns": [
+        {
+          "value": "ts",
+          "isExpression": false
+        },
+        {
+          "value": "dataset",
+          "isExpression": false
+        },
+        {
+          "value": "scope",
+          "isExpression": false
+        },
+        {
+          "value": "scope_id",
+          "isExpression": false
+        },
+        {
+          "value": "resource",
+          "isExpression": false
+        },
+        {
+          "value": "metric_name",
+          "isExpression": false
+        },
+        {
+          "value": "dims_hash",
+          "isExpression": false
+        }
+      ],
+      "isUnique": true,
+      "where": null,
+      "origin": "manual",
+      "name": "metrics_pk",
+      "table": "metrics",
+      "entityType": "indexes"
+    },
+    {
+      "columns": [
+        {
+          "value": "scope",
+          "isExpression": false
+        },
+        {
+          "value": "scope_id",
+          "isExpression": false
+        },
+        {
+          "value": "dataset",
+          "isExpression": false
+        },
+        {
+          "value": "ts",
+          "isExpression": false
+        }
+      ],
+      "isUnique": false,
+      "where": null,
+      "origin": "manual",
+      "name": "metrics_dataset_ts",
+      "table": "metrics",
+      "entityType": "indexes"
+    },
+    {
+      "name": "sync_state",
+      "entityType": "tables"
+    },
+    {
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "name": "dataset",
+      "table": "sync_state",
+      "entityType": "columns"
+    },
+    {
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": "'account'",
+      "generated": null,
+      "name": "scope",
+      "table": "sync_state",
+      "entityType": "columns"
+    },
+    {
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": "''",
+      "generated": null,
+      "name": "scope_id",
+      "table": "sync_state",
+      "entityType": "columns"
+    },
+    {
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "name": "last_sync_at",
+      "table": "sync_state",
+      "entityType": "columns"
+    },
+    {
+      "columns": [
+        {
+          "value": "dataset",
+          "isExpression": false
+        },
+        {
+          "value": "scope",
+          "isExpression": false
+        },
+        {
+          "value": "scope_id",
+          "isExpression": false
+        }
+      ],
+      "isUnique": true,
+      "where": null,
+      "origin": "manual",
+      "name": "sync_state_pk",
+      "table": "sync_state",
+      "entityType": "indexes"
+    }
+  ],
+  "renames": []
+}

@@ -1,0 +1,152 @@
+{
+  "dialect": "sqlite",
+  "id": "9ed3ec2b-2354-4308-ae8c-fad8a1cb0fb3",
+  "prevIds": [
+    "00000000-0000-0000-0000-000000000000"
+  ],
+  "version": "7",
+  "ddl": [
+    {
+      "name": "metrics",
+      "entityType": "tables"
+    },
+    {
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "name": "ts",
+      "table": "metrics",
+      "entityType": "columns"
+    },
+    {
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "name": "dataset",
+      "table": "metrics",
+      "entityType": "columns"
+    },
+    {
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "name": "resource",
+      "table": "metrics",
+      "entityType": "columns"
+    },
+    {
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "name": "metric_name",
+      "table": "metrics",
+      "entityType": "columns"
+    },
+    {
+      "type": "real",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "name": "value",
+      "table": "metrics",
+      "entityType": "columns"
+    },
+    {
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": "'{}'",
+      "generated": null,
+      "name": "dims",
+      "table": "metrics",
+      "entityType": "columns"
+    },
+    {
+      "columns": [
+        {
+          "value": "ts",
+          "isExpression": false
+        },
+        {
+          "value": "dataset",
+          "isExpression": false
+        },
+        {
+          "value": "resource",
+          "isExpression": false
+        },
+        {
+          "value": "metric_name",
+          "isExpression": false
+        }
+      ],
+      "isUnique": true,
+      "where": null,
+      "origin": "manual",
+      "name": "metrics_pk",
+      "table": "metrics",
+      "entityType": "indexes"
+    },
+    {
+      "columns": [
+        {
+          "value": "dataset",
+          "isExpression": false
+        },
+        {
+          "value": "ts",
+          "isExpression": false
+        }
+      ],
+      "isUnique": false,
+      "where": null,
+      "origin": "manual",
+      "name": "metrics_dataset_ts",
+      "table": "metrics",
+      "entityType": "indexes"
+    },
+    {
+      "name": "sync_state",
+      "entityType": "tables"
+    },
+    {
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "name": "dataset",
+      "table": "sync_state",
+      "entityType": "columns"
+    },
+    {
+      "columns": [
+        "dataset"
+      ],
+      "nameExplicit": false,
+      "name": "sync_state_pk",
+      "table": "sync_state",
+      "entityType": "pks"
+    },
+    {
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "name": "last_sync_at",
+      "table": "sync_state",
+      "entityType": "columns"
+    }
+  ],
+  "renames": []
+}
