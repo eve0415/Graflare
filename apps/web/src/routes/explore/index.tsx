@@ -28,7 +28,7 @@ const ExplorePage = () => {
         <h1 className='text-2xl font-semibold tracking-tight'>Explore</h1>
         <div className='flex items-center gap-2'>
           <TimeRangePicker value={timeRange} onChange={setTimeRange} />
-          <Separator orientation='vertical' className='!h-6' />
+          <Separator orientation='vertical' className='!h-6 !self-center' />
           <Toggle size='sm' pressed={split} onPressedChange={setSplit} aria-label='Split view'>
             <Columns2 className='h-4 w-4' />
           </Toggle>

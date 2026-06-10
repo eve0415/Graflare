@@ -43,7 +43,9 @@ const RootComponent = () => {
             <SidebarInset className='min-w-0'>
               <header className='flex h-12 shrink-0 items-center gap-2 border-b px-4'>
                 <SidebarTrigger className='-ml-1 shrink-0' />
-                <Separator orientation='vertical' className='mr-2 !h-4 shrink-0' />
+                {/* !self-center: the base Separator's data-vertical:self-stretch wins on
+                    specificity over a plain self-center, pinning the 16px bar to the header top. */}
+                <Separator orientation='vertical' className='mr-2 !h-4 shrink-0 !self-center' />
                 {/* `min-w-0 flex-1` lets the breadcrumb shrink (and truncate, see Breadcrumbs)
                     below its content width so a deep trail can't push the fixed-width search
                     trigger past the viewport — the tablet (768px, sidebar expanded) overflow fix. */}

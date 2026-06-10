@@ -41,13 +41,15 @@ export const Breadcrumbs = () => {
           return (
             <Fragment key={key}>
               {index > 0 && <BreadcrumbSeparator className='shrink-0' />}
-              {/* Earlier crumbs stay intact; only the last (current page) truncates, so the trail
-                  reads "Home / … / Long Page Name…" rather than clipping mid-path. */}
-              <BreadcrumbItem className={isLast ? 'min-w-0' : 'shrink-0'}>
+              {/* The current page keeps a readable floor (min-w-24) while earlier crumbs share
+                  the squeeze (each shrinkable, capped at max-w-40, ellipsizing individually) —
+                  with shrink-0 ancestors a deep trail at tablet widths crushed the current
+                  page to an unreadable sliver. */}
+              <BreadcrumbItem className={isLast ? 'min-w-24 overflow-hidden' : 'max-w-40 min-w-0 overflow-hidden'}>
                 {isLast || crumb.to === undefined ? (
                   <BreadcrumbPage className='truncate'>{crumb.label}</BreadcrumbPage>
                 ) : (
-                  <BreadcrumbLink render={<Link to={crumb.to}>{crumb.label}</Link>} />
+                  <BreadcrumbLink className='truncate' render={<Link to={crumb.to}>{crumb.label}</Link>} />
                 )}
               </BreadcrumbItem>
             </Fragment>
