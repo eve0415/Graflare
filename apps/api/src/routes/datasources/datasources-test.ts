@@ -1,15 +1,16 @@
 import type { AppEnv } from '../../index';
 
-import { datasourceCredentialsSchema } from '@graflare/shared/schemas/datasource';
 import { datasourceIdParamSchema } from '@graflare/shared/schemas/proxy';
 import { sValidator } from '@hono/standard-validator';
 import { and, eq } from 'drizzle-orm';
 import { Hono } from 'hono';
 
-import { decryptCredentials } from '../../crypto/credentials';
 import { createDb } from '../../db';
 import { datasources } from '../../db/schema';
 import { onValidationError } from '../../middleware/validate';
+import { decryptedAuth } from '../../prometheus/auth';
+import { testPrometheusEndpoint } from '../../prometheus/test-connection';
+import { createSqlClient } from '../../sql/factory';
 
 const app = new Hono<AppEnv>();
 
@@ -28,50 +29,15 @@ app.post('/:id/test', sValidator('param', datasourceIdParamSchema, onValidationE
   if (ds === undefined) {
     return c.json({ error: 'Not found' }, 404);
   }
-  const start = Date.now();
 
-  try {
-    const headers: Record<string, string> = {};
-
-    if (ds.credentials !== null) {
-      const creds = datasourceCredentialsSchema.parse(JSON.parse(await decryptCredentials(ds.credentials, c.env.ENCRYPTION_KEY)));
-      if (ds.authType === 'basic' && creds.username && creds.password) {
-        headers['Authorization'] = `Basic ${btoa(`${creds.username}:${creds.password}`)}`;
-      } else if (ds.authType === 'bearer' && creds.token) {
-        headers['Authorization'] = `Bearer ${creds.token}`;
-      }
-    }
-
-    const base = new URL(ds.url);
-    base.pathname = `${base.pathname.replace(/\/$/, '')}/api/v1/labels`;
-    base.searchParams.set('limit', '1');
-    const targetUrl = base.toString();
-
-    if (new URL(targetUrl).origin !== new URL(ds.url).origin) {
-      return c.json({ success: false, error: 'URL origin mismatch', latencyMs: Date.now() - start });
-    }
-
-    const res = await fetch(targetUrl, {
-      headers,
-      signal: AbortSignal.timeout(ds.queryTimeoutMs),
-    });
-
-    const latencyMs = Date.now() - start;
-
-    if (!res.ok) {
-      return c.json({
-        success: false,
-        error: `Upstream returned ${res.status}`,
-        latencyMs,
-      });
-    }
-
-    return c.json({ success: true, latencyMs });
-  } catch (error) {
-    const latencyMs = Date.now() - start;
-    const message = error instanceof Error ? error.message : 'Connection failed';
-    return c.json({ success: false, error: message, latencyMs });
+  if (ds.type === 'sql') {
+    const bridgeFetch = c.env.BRIDGE ? c.env.BRIDGE.fetch.bind(c.env.BRIDGE) : fetch;
+    const client = await createSqlClient(ds, c.env.ENCRYPTION_KEY, bridgeFetch);
+    return c.json(await client.testConnection());
   }
+
+  const auth = await decryptedAuth(ds.credentials, ds.authType, c.env.ENCRYPTION_KEY);
+  return c.json(await testPrometheusEndpoint(ds.url, auth, ds.queryTimeoutMs));
 });
 
 export { app as datasourceTestRoutes };

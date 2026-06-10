@@ -2,6 +2,7 @@ import type { AlertRuleDO } from './alerting/alert-rule-do';
 import type { ServiceTokenClient } from './cloudflare/access-service-tokens';
 import type { Database } from './db';
 import type { AuthSubject } from './middleware/access';
+import type { PrometheusAuth } from './prometheus/client';
 import type { AlertInstanceListQuery, UpsertAlertInstance } from '@graflare/shared/schemas/alert-instance';
 import type { CreateAlertRule, UpdateAlertRule } from '@graflare/shared/schemas/alert-rule';
 import type { CreateAlertRuleGroup, UpdateAlertRuleGroup } from '@graflare/shared/schemas/alert-rule-group';
@@ -32,7 +33,7 @@ import { createAlertRuleGroupSchema, updateAlertRuleGroupSchema } from '@graflar
 import { annotationListQuerySchema, createAnnotationSchema } from '@graflare/shared/schemas/annotation';
 import { createContactPointSchema, updateContactPointSchema } from '@graflare/shared/schemas/contact-point';
 import { createDashboardSchema, importDashboardSchema, updateDashboardSchema } from '@graflare/shared/schemas/dashboard';
-import { createDatasourceSchema, datasourceCredentialsSchema, testConnectionInlineSchema, updateDatasourceSchema } from '@graflare/shared/schemas/datasource';
+import { createDatasourceSchema, testConnectionInlineSchema, updateDatasourceSchema } from '@graflare/shared/schemas/datasource';
 import { createFolderSchema, updateFolderSchema } from '@graflare/shared/schemas/folder';
 import {
   alertRuleGroupIdSchema,
@@ -60,7 +61,7 @@ import { Hono } from 'hono';
 import { encryptSecret, redactSecret, resolveSecretOnUpdate } from './alerting/contact-point-secrets';
 import { CacheApiStore, cachedProxyQuery } from './cache/query-cache';
 import { createServiceTokenClient } from './cloudflare/access-service-tokens';
-import { decryptCredentials, encryptCredentials } from './crypto/credentials';
+import { encryptCredentials } from './crypto/credentials';
 import { createDb } from './db';
 import {
   accessServiceTokens,
@@ -79,7 +80,9 @@ import {
 } from './db/schema';
 import { accessMiddleware, subjectFromPayload, subjectLabel, verifyJwt } from './middleware/access';
 import { orgMiddleware, resolveOrgId } from './middleware/org';
+import { authHeaders, decryptedAuth } from './prometheus/auth';
 import { createPrometheusClient } from './prometheus/factory';
+import { testPrometheusEndpoint } from './prometheus/test-connection';
 import { alertInstanceRoutes } from './routes/alerting/alert-instances';
 import { alertRuleGroupRoutes } from './routes/alerting/alert-rule-groups';
 import { alertRuleRoutes } from './routes/alerting/alert-rules';
@@ -358,34 +361,8 @@ export class GraflareAPI extends WorkerEntrypoint<Bindings> {
       return client.testConnection();
     }
 
-    const start = Date.now();
-
-    try {
-      const headers: Record<string, string> = {};
-      if (ds.credentials) {
-        const creds = datasourceCredentialsSchema.parse(JSON.parse(await decryptCredentials(ds.credentials, this.env.ENCRYPTION_KEY)));
-        if (ds.authType === 'basic' && creds.username !== undefined && creds.password !== undefined) {
-          headers['Authorization'] = `Basic ${btoa(`${creds.username}:${creds.password}`)}`;
-        } else if (ds.authType === 'bearer' && creds.token !== undefined) {
-          headers['Authorization'] = `Bearer ${creds.token}`;
-        }
-      }
-
-      const res = await fetch(`${ds.url}/api/v1/labels?limit=1`, {
-        headers,
-        signal: AbortSignal.timeout(ds.queryTimeoutMs),
-      });
-
-      const latencyMs = Date.now() - start;
-      if (!res.ok) {
-        return { success: false, latencyMs, error: `Upstream returned ${String(res.status)}` };
-      }
-      return { success: true, latencyMs };
-    } catch (error) {
-      const latencyMs = Date.now() - start;
-      const message = error instanceof Error ? error.message : 'Connection failed';
-      return { success: false, latencyMs, error: message };
-    }
+    const auth = await decryptedAuth(ds.credentials, ds.authType, this.env.ENCRYPTION_KEY);
+    return testPrometheusEndpoint(ds.url, auth, ds.queryTimeoutMs);
   }
 
   async testConnectionInline(jwt: string, input: TestConnectionInline): Promise<{ success: boolean; latencyMs: number; error?: string }> {
@@ -395,40 +372,15 @@ export class GraflareAPI extends WorkerEntrypoint<Bindings> {
 
     const parsed = testConnectionInlineSchema.parse(input);
 
+    const auth: PrometheusAuth =
+      parsed.authType !== 'none' && parsed.credentials !== undefined ? { type: parsed.authType, credentials: parsed.credentials } : { type: 'none' };
+
     if (parsed.type === 'sql') {
-      const auth =
-        parsed.authType !== 'none' && parsed.credentials !== undefined ? { type: parsed.authType, credentials: parsed.credentials } : { type: 'none' as const };
       const client = new SqlClient(parsed.url, auth, parsed.queryTimeoutMs, this.bridgeFetch);
       return client.testConnection();
     }
 
-    const start = Date.now();
-
-    try {
-      const headers: Record<string, string> = {};
-      if (parsed.credentials !== undefined) {
-        if (parsed.authType === 'basic' && parsed.credentials.username !== undefined && parsed.credentials.password !== undefined) {
-          headers['Authorization'] = `Basic ${btoa(`${parsed.credentials.username}:${parsed.credentials.password}`)}`;
-        } else if (parsed.authType === 'bearer' && parsed.credentials.token !== undefined) {
-          headers['Authorization'] = `Bearer ${parsed.credentials.token}`;
-        }
-      }
-
-      const res = await fetch(`${parsed.url}/api/v1/labels?limit=1`, {
-        headers,
-        signal: AbortSignal.timeout(parsed.queryTimeoutMs),
-      });
-
-      const latencyMs = Date.now() - start;
-      if (!res.ok) {
-        return { success: false, latencyMs, error: `Upstream returned ${String(res.status)}` };
-      }
-      return { success: true, latencyMs };
-    } catch (error) {
-      const latencyMs = Date.now() - start;
-      const message = error instanceof Error ? error.message : 'Connection failed';
-      return { success: false, latencyMs, error: message };
-    }
+    return testPrometheusEndpoint(parsed.url, auth, parsed.queryTimeoutMs);
   }
 
   private static ALLOWED_ENDPOINTS = new Set(['/api/v1/query', '/api/v1/query_range', '/api/v1/labels', '/api/v1/series']);
@@ -471,14 +423,7 @@ export class GraflareAPI extends WorkerEntrypoint<Bindings> {
         }
 
         // Attach credentials only after confirming the target origin matches the datasource.
-        if (ds.credentials) {
-          const creds = datasourceCredentialsSchema.parse(JSON.parse(await decryptCredentials(ds.credentials, this.env.ENCRYPTION_KEY)));
-          if (ds.authType === 'basic' && creds.username !== undefined && creds.password !== undefined) {
-            headers['Authorization'] = `Basic ${btoa(`${creds.username}:${creds.password}`)}`;
-          } else if (ds.authType === 'bearer' && creds.token !== undefined) {
-            headers['Authorization'] = `Bearer ${creds.token}`;
-          }
-        }
+        Object.assign(headers, authHeaders(await decryptedAuth(ds.credentials, ds.authType, this.env.ENCRYPTION_KEY)));
 
         const res = await fetch(targetUrl, {
           method: isPost ? 'POST' : 'GET',

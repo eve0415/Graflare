@@ -3,6 +3,8 @@ import type { PrometheusResponse } from '@graflare/shared/schemas/prometheus';
 
 import { prometheusResponseSchema } from '@graflare/shared/schemas/prometheus';
 
+import { authHeaders } from './auth';
+
 export interface PrometheusAuth {
   type: 'none' | 'basic' | 'bearer';
   credentials?: DatasourceCredentials;
@@ -47,16 +49,7 @@ export class PrometheusClient {
   }
 
   private getHeaders(): Record<string, string> {
-    const headers: Record<string, string> = {};
-    if (this.auth.type === 'basic' && this.auth.credentials) {
-      const { username, password } = this.auth.credentials;
-      if (username && password) {
-        headers['Authorization'] = `Basic ${btoa(`${username}:${password}`)}`;
-      }
-    } else if (this.auth.type === 'bearer' && this.auth.credentials?.token) {
-      headers['Authorization'] = `Bearer ${this.auth.credentials.token}`;
-    }
-    return headers;
+    return authHeaders(this.auth);
   }
 
   private async get(path: string, params: URLSearchParams): Promise<PrometheusResponse> {
