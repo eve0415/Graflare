@@ -1434,18 +1434,21 @@ export class GraflareAPI extends WorkerEntrypoint<Bindings> {
       };
     });
 
+    const [first, ...rest] = rows.map(row =>
+      this.db
+        .insert(alertInstances)
+        .values(row)
+        .onConflictDoUpdate({
+          target: [alertInstances.ruleId, alertInstances.labelsHash],
+          set: { labels: row.labels, state: row.state, value: row.value, activeAt: row.activeAt, lastEvalAt: row.lastEvalAt },
+        }),
+    );
+    if (first === undefined) return;
+
     try {
-      await Promise.all(
-        rows.map(row =>
-          this.db
-            .insert(alertInstances)
-            .values(row)
-            .onConflictDoUpdate({
-              target: [alertInstances.ruleId, alertInstances.labelsHash],
-              set: { labels: row.labels, state: row.state, value: row.value, activeAt: row.activeAt, lastEvalAt: row.lastEvalAt },
-            }),
-        ),
-      );
+      // One atomic round trip instead of N parallel D1 calls — an evaluation
+      // cycle's instance states land together or not at all.
+      await this.db.batch([first, ...rest]);
     } catch (error) {
       console.error('upsertAlertInstances failed:', error);
       throw new Error('Failed to upsert alert instances', { cause: error });
