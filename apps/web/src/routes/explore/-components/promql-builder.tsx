@@ -152,14 +152,14 @@ export const PromqlBuilder = ({ datasourceId, state, dispatch }: PromqlBuilderPr
   return (
     <div className='flex flex-col gap-3'>
       {/* Metric */}
-      <div className='flex items-center gap-2'>
+      <div className='flex flex-col gap-1 sm:flex-row sm:items-center sm:gap-2'>
         <Label className='w-24 shrink-0 text-xs font-medium'>Metric</Label>
         <PromqlMetricSelector datasourceId={datasourceId} value={state.metric} onChange={handleMetricChange} />
       </div>
 
       {/* Labels */}
-      <div className='flex items-start gap-2'>
-        <Label className='mt-1.5 w-24 shrink-0 text-xs font-medium'>Labels</Label>
+      <div className='flex flex-col gap-1 sm:flex-row sm:items-start sm:gap-2'>
+        <Label className='w-24 shrink-0 text-xs font-medium sm:mt-1.5'>Labels</Label>
         <PromqlLabelFilters
           datasourceId={datasourceId}
           metric={state.metric}
@@ -171,8 +171,8 @@ export const PromqlBuilder = ({ datasourceId, state, dispatch }: PromqlBuilderPr
       </div>
 
       {/* Functions */}
-      <div className='flex items-start gap-2'>
-        <Label className='mt-1.5 w-24 shrink-0 text-xs font-medium'>Functions</Label>
+      <div className='flex flex-col gap-1 sm:flex-row sm:items-start sm:gap-2'>
+        <Label className='w-24 shrink-0 text-xs font-medium sm:mt-1.5'>Functions</Label>
         <PromqlFunctionComposer
           functions={state.functions}
           onAdd={handleAddFunction}

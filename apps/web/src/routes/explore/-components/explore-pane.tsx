@@ -425,7 +425,7 @@ export const ExplorePane = ({ timeRange, label }: ExplorePaneProps) => {
     // live pane width — the chart canvas is then sized from it. Every block descendant down to the
     // chart is this same content width, so measuring here gives the chart its exact width.
     <div ref={chartContainerRef} className='space-y-3' aria-label={label}>
-      <div className='flex items-center gap-2'>
+      <div className='flex flex-wrap items-center gap-2'>
         <Select value={datasourceId} onValueChange={handleDatasourceChange} items={dsItems}>
           <SelectTrigger className='w-48' aria-label='Select data source'>
             <SelectValue placeholder='Data source' />
