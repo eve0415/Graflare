@@ -354,10 +354,7 @@ export class GraflareAPI extends WorkerEntrypoint<Bindings> {
     }
 
     if (ds.type === 'sql') {
-      const client = await createSqlClient(this.env.DB, this.env.ENCRYPTION_KEY, orgId, id, this.bridgeFetch);
-      if (client === null) {
-        return { success: false, latencyMs: 0, error: 'Not found' };
-      }
+      const client = await createSqlClient(ds, this.env.ENCRYPTION_KEY, this.bridgeFetch);
       return client.testConnection();
     }
 
@@ -529,11 +526,7 @@ export class GraflareAPI extends WorkerEntrypoint<Bindings> {
 
     const { sql: expandedSql, params } = expandSqlMacros(rawSql, dialect, resolvedTimeRange);
 
-    const client = await createSqlClient(this.env.DB, this.env.ENCRYPTION_KEY, orgId, datasourceId, this.bridgeFetch);
-    if (client === null) {
-      return { columns: [], rows: [], error: 'Data source not found' };
-    }
-
+    const client = await createSqlClient(ds, this.env.ENCRYPTION_KEY, this.bridgeFetch);
     return client.query(expandedSql, params);
   }
 
@@ -555,8 +548,7 @@ export class GraflareAPI extends WorkerEntrypoint<Bindings> {
       if (ds.type !== 'sql') return { tables: [], error: 'Data source is not a SQL type' };
 
       const dialect = ds.dialect === 'postgres' ? 'postgres' : 'sqlite';
-      const client = await createSqlClient(this.env.DB, this.env.ENCRYPTION_KEY, orgId, datasourceId, this.bridgeFetch);
-      if (client === null) return { tables: [], error: 'Data source not found' };
+      const client = await createSqlClient(ds, this.env.ENCRYPTION_KEY, this.bridgeFetch);
 
       const q = listTablesQuery(dialect);
       const result = await client.query(q.sql, q.params);
@@ -593,8 +585,7 @@ export class GraflareAPI extends WorkerEntrypoint<Bindings> {
       if (ds.type !== 'sql') return { columns: [], error: 'Data source is not a SQL type' };
 
       const dialect = ds.dialect === 'postgres' ? 'postgres' : 'sqlite';
-      const client = await createSqlClient(this.env.DB, this.env.ENCRYPTION_KEY, orgId, datasourceId, this.bridgeFetch);
-      if (client === null) return { columns: [], error: 'Data source not found' };
+      const client = await createSqlClient(ds, this.env.ENCRYPTION_KEY, this.bridgeFetch);
 
       const q = describeTableQuery(dialect, tableName, schema);
       const result = await client.query(q.sql, q.params);
@@ -633,8 +624,7 @@ export class GraflareAPI extends WorkerEntrypoint<Bindings> {
       if (ds.type !== 'sql') return { tables: {}, error: 'Data source is not a SQL type' };
 
       const dialect = ds.dialect === 'postgres' ? 'postgres' : 'sqlite';
-      const client = await createSqlClient(this.env.DB, this.env.ENCRYPTION_KEY, orgId, datasourceId, this.bridgeFetch);
-      if (client === null) return { tables: {}, error: 'Data source not found' };
+      const client = await createSqlClient(ds, this.env.ENCRYPTION_KEY, this.bridgeFetch);
 
       const tq = listTablesQuery(dialect);
       const tablesResult = await client.query(tq.sql, tq.params);
