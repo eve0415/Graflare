@@ -27,6 +27,8 @@ const piePanel = (unit: string, mappings: ValueMapping[] = [], pie?: PieDisplay)
   displayOptions: pie === undefined ? {} : { pie },
   fieldConfig: fieldConfig(unit, mappings),
   transformations: [],
+  repeatDirection: 'h',
+  maxPerRow: 4,
 });
 
 // Same panel but with a full field config, so a test can supply per-field overrides.
@@ -41,6 +43,8 @@ const piePanelWithConfig = (config: FieldConfig): Panel => ({
   displayOptions: {},
   fieldConfig: config,
   transformations: [],
+  repeatDirection: 'h',
+  maxPerRow: 4,
 });
 
 const vector = (samples: { metric: Record<string, string>; value: number }[]): PanelDataResult[] => [

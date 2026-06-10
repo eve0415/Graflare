@@ -30,6 +30,8 @@ const gaugePanel = (fieldConfig: FieldConfig): Panel => ({
   displayOptions: {},
   fieldConfig,
   transformations: [],
+  repeatDirection: 'h',
+  maxPerRow: 4,
 });
 
 const byNameUnit = (seriesName: string): FieldConfig => ({

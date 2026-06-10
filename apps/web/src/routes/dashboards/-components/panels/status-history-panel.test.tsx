@@ -28,6 +28,8 @@ const panel = (display?: StatusHistoryDisplay): Panel => ({
   displayOptions: display === undefined ? {} : { 'status-history': display },
   fieldConfig: { defaults: { unit: 'short', mappings: [] }, overrides: [] },
   transformations: [],
+  repeatDirection: 'h',
+  maxPerRow: 4,
 });
 
 // Same panel but with a full field config so a test can supply per-field overrides.
@@ -42,6 +44,8 @@ const panelWithConfig = (config: FieldConfig): Panel => ({
   displayOptions: {},
   fieldConfig: config,
   transformations: [],
+  repeatDirection: 'h',
+  maxPerRow: 4,
 });
 
 const matrix = (rows: { metric: Record<string, string>; values: [number, number][] }[]): PanelDataResult[] => [

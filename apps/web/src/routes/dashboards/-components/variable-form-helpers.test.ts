@@ -50,6 +50,7 @@ const sample: Variable = {
   multi: true,
   includeAll: true,
   current: 'node',
+  allValue: '',
   options: ['node', 'api'],
   filters: [],
 };
@@ -67,6 +68,7 @@ describe('resetForType', () => {
       multi: false,
       includeAll: false,
       current: '',
+      allValue: '',
       options: [],
       filters: [],
     });

@@ -29,6 +29,8 @@ const basePanel = (): Panel => ({
   displayOptions: {},
   fieldConfig: { defaults: { unit: '', mappings: [] }, overrides: [] },
   transformations: [],
+  repeatDirection: 'h',
+  maxPerRow: 4,
 });
 
 const renderEditor = (panel: Panel, onSave: (p: Panel) => void) => {

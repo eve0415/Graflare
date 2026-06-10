@@ -15,6 +15,7 @@ const baseVariable: Variable = {
   multi: false,
   includeAll: false,
   current: '',
+  allValue: '',
   options: [],
   filters: [],
 };

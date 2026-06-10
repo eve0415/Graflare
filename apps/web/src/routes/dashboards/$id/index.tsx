@@ -169,6 +169,8 @@ const DashboardViewPage = () => {
       displayOptions: {},
       fieldConfig: { defaults: { unit: '', mappings: [] }, overrides: [] },
       transformations: [],
+      repeatDirection: 'h',
+      maxPerRow: 4,
     };
     setPanels(prev => [...prev, newPanel]);
     setEditingPanel(newPanel);

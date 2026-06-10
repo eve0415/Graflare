@@ -52,6 +52,7 @@ export const resetForType = (variable: Variable, type: VariableType): Variable =
   multi: false,
   includeAll: false,
   current: '',
+  allValue: '',
   options: [],
   // Filters reset with the type; an adhoc variable's live filters are managed by the bar, not here.
   filters: [],
@@ -70,6 +71,7 @@ export const blankVariable = (): Variable => ({
   multi: false,
   includeAll: false,
   current: '',
+  allValue: '',
   options: [],
   filters: [],
 });

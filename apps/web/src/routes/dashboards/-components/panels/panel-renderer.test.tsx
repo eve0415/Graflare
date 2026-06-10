@@ -25,6 +25,8 @@ const tablePanel = (expr: string, datasourceId?: string): Panel => ({
   displayOptions: {},
   fieldConfig: { defaults: { unit: '', mappings: [] }, overrides: [] },
   transformations: [],
+  repeatDirection: 'h',
+  maxPerRow: 4,
 });
 
 const adhocVar = (datasourceId: string, filters: Variable['filters']): Variable => ({
@@ -38,6 +40,7 @@ const adhocVar = (datasourceId: string, filters: Variable['filters']): Variable 
   multi: false,
   includeAll: false,
   current: '',
+  allValue: '',
   options: [],
   filters,
 });

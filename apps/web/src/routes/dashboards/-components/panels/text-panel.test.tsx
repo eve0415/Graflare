@@ -21,6 +21,8 @@ const textPanel = (content: string, mode: TextDisplay['mode']): Panel => ({
   displayOptions: { text: { content, mode } },
   fieldConfig: { defaults: { unit: '', mappings: [] }, overrides: [] },
   transformations: [],
+  repeatDirection: 'h',
+  maxPerRow: 4,
 });
 
 // Built from parts so the lint rule that bans `javascript:` URL literals doesn't trip on

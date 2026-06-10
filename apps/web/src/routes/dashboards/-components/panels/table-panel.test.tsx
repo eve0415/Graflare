@@ -24,6 +24,8 @@ const tablePanel = (fieldConfig: FieldConfig): Panel => ({
   displayOptions: {},
   fieldConfig,
   transformations: [],
+  repeatDirection: 'h',
+  maxPerRow: 4,
 });
 
 // A SQL response: two columns (a numeric `bytes` and a string `label`), one row. The table

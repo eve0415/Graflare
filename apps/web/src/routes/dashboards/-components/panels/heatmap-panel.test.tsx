@@ -23,6 +23,8 @@ const heatmapPanel = (heatmap?: HeatmapDisplay): Panel => ({
   displayOptions: heatmap === undefined ? {} : { heatmap },
   fieldConfig: { defaults: { unit: 'short', mappings: [] }, overrides: [] },
   transformations: [],
+  repeatDirection: 'h',
+  maxPerRow: 4,
 });
 
 const matrix = (rows: { metric: Record<string, string>; values: [number, number][] }[]): PanelDataResult[] => [
