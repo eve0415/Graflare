@@ -98,23 +98,24 @@ app.delete('/:id', sValidator('param', folderIdParamSchema, onValidationError), 
     return c.json({ error: 'Not found' }, 404);
   }
 
+  // One atomic batch, mirroring the RPC path — a failure mid-way must not
+  // leave children re-parented while the folder still exists.
   const { parentId: parentFolderId } = found;
-  await db
-    .update(folders)
-    .set({ parentId: parentFolderId })
-    .where(and(eq(folders.parentId, id), eq(folders.orgId, orgId)));
-
-  await db
-    .update(dashboards)
-    .set({ folderId: parentFolderId })
-    .where(and(eq(dashboards.folderId, id), eq(dashboards.orgId, orgId)));
-
-  await db
-    .update(alertRuleGroups)
-    .set({ folderId: parentFolderId })
-    .where(and(eq(alertRuleGroups.folderId, id), eq(alertRuleGroups.orgId, orgId)));
-
-  await db.delete(folders).where(and(eq(folders.id, id), eq(folders.orgId, orgId)));
+  await db.batch([
+    db
+      .update(folders)
+      .set({ parentId: parentFolderId })
+      .where(and(eq(folders.parentId, id), eq(folders.orgId, orgId))),
+    db
+      .update(dashboards)
+      .set({ folderId: parentFolderId })
+      .where(and(eq(dashboards.folderId, id), eq(dashboards.orgId, orgId))),
+    db
+      .update(alertRuleGroups)
+      .set({ folderId: parentFolderId })
+      .where(and(eq(alertRuleGroups.folderId, id), eq(alertRuleGroups.orgId, orgId))),
+    db.delete(folders).where(and(eq(folders.id, id), eq(folders.orgId, orgId))),
+  ]);
 
   return c.body(null, 204);
 });
