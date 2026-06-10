@@ -1,11 +1,29 @@
+import type { D1Migration } from '@cloudflare/vitest-pool-workers';
+
+import fs from 'node:fs';
 import path from 'node:path';
 
-import { cloudflareTest, readD1Migrations } from '@cloudflare/vitest-pool-workers';
+import { cloudflareTest } from '@cloudflare/vitest-pool-workers';
 import { configDefaults, defineConfig, defineProject } from 'vitest/config';
+import { unstable_splitSqlQuery } from 'wrangler';
 
-export default defineConfig(async () => {
-  const migrationsPath = path.join(__dirname, 'drizzle');
-  const migrations = await readD1Migrations(migrationsPath);
+// drizzle-kit v1 emits per-migration folders (<timestamp>_<name>/migration.sql),
+// but the pool's readD1Migrations only reads flat *.sql files. Read the nested
+// layout ourselves: the fixed-width timestamp prefix makes a lexical sort
+// chronological, and unstable_splitSqlQuery is what readD1Migrations uses.
+const readNestedD1Migrations = (migrationsPath: string): D1Migration[] =>
+  fs
+    .readdirSync(migrationsPath, { withFileTypes: true })
+    .filter(entry => entry.isDirectory())
+    .map(entry => entry.name)
+    .sort()
+    .map(name => ({
+      name,
+      queries: unstable_splitSqlQuery(fs.readFileSync(path.join(migrationsPath, name, 'migration.sql'), 'utf8')),
+    }));
+
+export default defineConfig(() => {
+  const migrations = readNestedD1Migrations(path.join(__dirname, 'drizzle'));
 
   return defineProject({
     plugins: [
