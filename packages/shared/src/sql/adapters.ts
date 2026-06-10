@@ -58,6 +58,9 @@ export const sqlRowsToSeries = (response: SqlResponse): PrometheusResponse => {
         labels[colDef.name] = String(v);
       }
     }
+    // Stringified once per row; combined with the column name below it identifies the series
+    // without rebuilding + stringifying a metric object per (row × numeric column).
+    const labelsKey = JSON.stringify(labels);
 
     for (const ni of numericCols) {
       const v = row[ni];
@@ -65,12 +68,11 @@ export const sqlRowsToSeries = (response: SqlResponse): PrometheusResponse => {
       const colDef = response.columns[ni];
       if (colDef === undefined) continue;
 
-      const metric = { __name__: colDef.name, ...labels };
-      const key = JSON.stringify(metric);
+      const key = `${colDef.name}\0${labelsKey}`;
 
       let series = seriesMap.get(key);
       if (series === undefined) {
-        series = { metric, values: [] };
+        series = { metric: { __name__: colDef.name, ...labels }, values: [] };
         seriesMap.set(key, series);
       }
       series.values.push([ts, String(v)]);
