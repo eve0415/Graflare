@@ -78,4 +78,4 @@ const orgMiddleware = (): MiddlewareHandler<AppEnv> => async (c: Context<AppEnv>
   return next();
 };
 
-export { emailToOrgId, orgMiddleware, resetOrgBootstrapCache, resolveOrgId, serviceTokenOrgId };
+export { emailToOrgId, orgMiddleware, resetOrgBootstrapCache, resolveOrgId };

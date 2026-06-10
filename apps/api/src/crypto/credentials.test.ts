@@ -1,6 +1,13 @@
 import { describe, expect, it } from 'vitest';
 
-import { decryptCredentials, encryptCredentials, generateEncryptionKey } from './credentials';
+import { decryptCredentials, encryptCredentials } from './credentials';
+
+// Test-only key fixture — production keys are provisioned out of band
+// (`wrangler secret put ENCRYPTION_KEY`), so this lives with the tests.
+const generateEncryptionKey = (): Promise<string> => {
+  const key = crypto.getRandomValues(new Uint8Array(32));
+  return Promise.resolve(btoa(String.fromCodePoint(...key)));
+};
 
 // Corrupt the final byte of a base64 payload (255 - b never equals b), which
 // invalidates the AES-GCM auth tag. Kept out of the test body so the necessary

@@ -37,7 +37,3 @@ const importKey = async (keyBase64: string): Promise<CryptoKey> => {
   return key;
 };
 
-export const generateEncryptionKey = (): Promise<string> => {
-  const key = crypto.getRandomValues(new Uint8Array(32));
-  return Promise.resolve(btoa(String.fromCodePoint(...key)));
-};
