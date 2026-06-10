@@ -21,15 +21,23 @@ import { Input } from '@graflare/ui/components/input';
 import { Label } from '@graflare/ui/components/label';
 import { Select, SelectContent, SelectGroup, SelectItem, SelectLabel, SelectTrigger, SelectValue } from '@graflare/ui/components/select';
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@graflare/ui/components/sheet';
+import { Skeleton } from '@graflare/ui/components/skeleton';
 import { Textarea } from '@graflare/ui/components/textarea';
 import { ToggleGroup, ToggleGroupItem } from '@graflare/ui/components/toggle-group';
 import { useQuery } from '@tanstack/react-query';
 import { ChevronDown, ChevronUp, Plus, Trash2, X } from 'lucide-react';
-import { useCallback, useMemo, useState } from 'react';
+import { Suspense, lazy, useCallback, useMemo, useState } from 'react';
 
 import { databaseSchemaQueryOptions } from '../../-root/introspection-queries';
 import { datasourcesQueryOptions } from '../../datasources/-queries';
-import { QueryCodeEditor } from '../../explore/-components/query-code-editor';
+
+// Lazy so the dashboard view route's chunk doesn't eagerly pull the CodeMirror + PromQL stack
+// (~640 KB raw) the editor top-level-imports — it loads on first edit-sheet open. The explore
+// route imports the module statically and keeps its own eager path.
+const QueryCodeEditor = lazy(() => import('../../explore/-components/query-code-editor').then(m => ({ default: m.QueryCodeEditor })));
+
+// Sized to the editor's single-line shell (36px content box) so the swap doesn't jump.
+const EDITOR_FALLBACK = <Skeleton className='h-9 w-full rounded-md' />;
 
 const PANEL_TYPE_OPTIONS = [
   { value: 'timeseries', label: 'Time Series' },
@@ -689,15 +697,17 @@ const QueryRow = ({
           <X className='h-3 w-3' />
         </Button>
       </div>
-      <QueryCodeEditor
-        datasourceType={datasourceType}
-        dialect={dialect}
-        schema={schema}
-        value={query.expr}
-        onChange={handleExprChange}
-        onRun={handleRun}
-        placeholder={datasourceType === 'sql' ? 'SQL query...' : 'PromQL expression...'}
-      />
+      <Suspense fallback={EDITOR_FALLBACK}>
+        <QueryCodeEditor
+          datasourceType={datasourceType}
+          dialect={dialect}
+          schema={schema}
+          value={query.expr}
+          onChange={handleExprChange}
+          onRun={handleRun}
+          placeholder={datasourceType === 'sql' ? 'SQL query...' : 'PromQL expression...'}
+        />
+      </Suspense>
       <Input placeholder='Legend format (optional)' value={query.legendFormat} onChange={handleLegendChange} className='text-sm' />
     </div>
   );
