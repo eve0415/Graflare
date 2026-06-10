@@ -2,7 +2,7 @@ import type { AppEnv } from '../../index';
 
 import { dashboardIdParamSchema, dashboardVersionParamSchema } from '@graflare/shared/schemas/dashboard';
 import { sValidator } from '@hono/standard-validator';
-import { and, desc, eq } from 'drizzle-orm';
+import { and, desc, eq, sql } from 'drizzle-orm';
 import { Hono } from 'hono';
 
 import { createDb } from '../../db';
@@ -115,42 +115,42 @@ app.post('/:id/versions/:version/restore', sValidator('param', dashboardVersionP
     return c.json({ error: 'Not found' }, 404);
   }
   const now = new Date();
-  const newVersion = current.version + 1;
 
-  const restoreFields: Record<string, unknown> = { version: newVersion, updatedAt: now };
+  const changes: Record<string, unknown> = {};
 
-  if ('title' in snapshot && typeof snapshot.title === 'string') restoreFields['title'] = snapshot.title;
-  if ('slug' in snapshot && typeof snapshot.slug === 'string') restoreFields['slug'] = snapshot.slug;
-  if ('description' in snapshot && typeof snapshot.description === 'string') restoreFields['description'] = snapshot.description;
-  if ('tags' in snapshot && Array.isArray(snapshot.tags)) restoreFields['tags'] = snapshot.tags;
-  if ('panels' in snapshot && Array.isArray(snapshot.panels)) restoreFields['panels'] = snapshot.panels;
-  if ('variables' in snapshot && Array.isArray(snapshot.variables)) restoreFields['variables'] = snapshot.variables;
+  if ('title' in snapshot && typeof snapshot.title === 'string') changes['title'] = snapshot.title;
+  if ('slug' in snapshot && typeof snapshot.slug === 'string') changes['slug'] = snapshot.slug;
+  if ('description' in snapshot && typeof snapshot.description === 'string') changes['description'] = snapshot.description;
+  if ('tags' in snapshot && Array.isArray(snapshot.tags)) changes['tags'] = snapshot.tags;
+  if ('panels' in snapshot && Array.isArray(snapshot.panels)) changes['panels'] = snapshot.panels;
+  if ('variables' in snapshot && Array.isArray(snapshot.variables)) changes['variables'] = snapshot.variables;
   if ('timeRange' in snapshot && typeof snapshot.timeRange === 'object' && snapshot.timeRange !== null) {
-    restoreFields['timeRange'] = snapshot.timeRange;
+    changes['timeRange'] = snapshot.timeRange;
   }
-  if ('folderId' in snapshot) restoreFields['folderId'] = snapshot.folderId;
+  if ('folderId' in snapshot) changes['folderId'] = snapshot.folderId;
 
-  await db
-    .update(dashboards)
-    .set(restoreFields)
-    .where(and(eq(dashboards.id, id), eq(dashboards.orgId, orgId)));
+  // One atomic batch with a DB-side version increment, mirroring the RPC path.
+  await db.batch([
+    db
+      .update(dashboards)
+      .set({ ...changes, updatedAt: now, version: sql`version + 1` })
+      .where(and(eq(dashboards.id, id), eq(dashboards.orgId, orgId))),
+    db.insert(dashboardVersions).values({
+      id: crypto.randomUUID(),
+      dashboardId: id,
+      version: sql`(select version from ${dashboards} where ${dashboards.id} = ${id})`,
+      data: JSON.stringify({ ...current, ...changes, version: current.version + 1, updatedAt: now }),
+      message: `Restored from version ${versionNum}`,
+      createdBy: subjectLabel(user),
+      createdAt: now,
+    }),
+  ]);
 
   const updated = await db
     .select()
     .from(dashboards)
     .where(and(eq(dashboards.id, id), eq(dashboards.orgId, orgId)))
     .limit(1);
-
-  const versionId = crypto.randomUUID();
-  await db.insert(dashboardVersions).values({
-    id: versionId,
-    dashboardId: id,
-    version: newVersion,
-    data: JSON.stringify(updated[0]),
-    message: `Restored from version ${versionNum}`,
-    createdBy: subjectLabel(user),
-    createdAt: now,
-  });
 
   return c.json(updated[0]);
 });

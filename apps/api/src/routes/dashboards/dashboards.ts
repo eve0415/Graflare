@@ -2,7 +2,7 @@ import type { AppEnv } from '../../index';
 
 import { createDashboardSchema, dashboardIdParamSchema, dashboardListQuerySchema, updateDashboardSchema } from '@graflare/shared/schemas/dashboard';
 import { sValidator } from '@hono/standard-validator';
-import { and, eq, like } from 'drizzle-orm';
+import { and, eq, like, sql } from 'drizzle-orm';
 import { Hono } from 'hono';
 
 import { createDb } from '../../db';
@@ -80,33 +80,32 @@ app.post('/', sValidator('json', createDashboardSchema, onValidationError), asyn
   const now = new Date();
   const slug = slugify(data.title);
 
-  await db.insert(dashboards).values({
-    id,
-    orgId,
-    folderId: data.folderId ?? null,
-    title: data.title,
-    slug,
-    description: data.description ?? '',
-    tags: data.tags ?? [],
-    panels: data.panels ?? [],
-    variables: data.variables ?? [],
-    timeRange: data.timeRange ?? { from: 'now-1h', to: 'now', refresh: null },
-    version: 1,
-    createdAt: now,
-    updatedAt: now,
-  });
-
-  const versionId = crypto.randomUUID();
-  const dashboardData = { ...data, id, orgId, slug, version: 1 };
-  await db.insert(dashboardVersions).values({
-    id: versionId,
-    dashboardId: id,
-    version: 1,
-    data: JSON.stringify(dashboardData),
-    message: 'Initial version',
-    createdBy: subjectLabel(user),
-    createdAt: now,
-  });
+  await db.batch([
+    db.insert(dashboards).values({
+      id,
+      orgId,
+      folderId: data.folderId ?? null,
+      title: data.title,
+      slug,
+      description: data.description ?? '',
+      tags: data.tags ?? [],
+      panels: data.panels ?? [],
+      variables: data.variables ?? [],
+      timeRange: data.timeRange ?? { from: 'now-1h', to: 'now', refresh: null },
+      version: 1,
+      createdAt: now,
+      updatedAt: now,
+    }),
+    db.insert(dashboardVersions).values({
+      id: crypto.randomUUID(),
+      dashboardId: id,
+      version: 1,
+      data: JSON.stringify({ ...data, id, orgId, slug, version: 1 }),
+      message: 'Initial version',
+      createdBy: subjectLabel(user),
+      createdAt: now,
+    }),
+  ]);
 
   const created = await db.select().from(dashboards).where(eq(dashboards.id, id)).limit(1);
   return c.json(created[0], 201);
@@ -131,43 +130,45 @@ app.put('/:id', sValidator('param', dashboardIdParamSchema, onValidationError), 
   }
 
   const now = new Date();
-  const newVersion = current.version + 1;
 
   const { message, ...updates } = data;
-  const setData: Record<string, unknown> = { updatedAt: now, version: newVersion };
+  const changes: Record<string, unknown> = {};
 
   if (updates.title !== undefined) {
-    setData['title'] = updates.title;
-    setData['slug'] = slugify(updates.title);
+    changes['title'] = updates.title;
+    changes['slug'] = slugify(updates.title);
   }
-  if (updates.folderId !== undefined) setData['folderId'] = updates.folderId;
-  if (updates.description !== undefined) setData['description'] = updates.description;
-  if (updates.tags !== undefined) setData['tags'] = updates.tags;
-  if (updates.panels !== undefined) setData['panels'] = updates.panels;
-  if (updates.variables !== undefined) setData['variables'] = updates.variables;
-  if (updates.timeRange !== undefined) setData['timeRange'] = updates.timeRange;
+  if (updates.folderId !== undefined) changes['folderId'] = updates.folderId;
+  if (updates.description !== undefined) changes['description'] = updates.description;
+  if (updates.tags !== undefined) changes['tags'] = updates.tags;
+  if (updates.panels !== undefined) changes['panels'] = updates.panels;
+  if (updates.variables !== undefined) changes['variables'] = updates.variables;
+  if (updates.timeRange !== undefined) changes['timeRange'] = updates.timeRange;
 
-  await db
-    .update(dashboards)
-    .set(setData)
-    .where(and(eq(dashboards.id, id), eq(dashboards.orgId, orgId)));
+  // One atomic batch with a DB-side version increment, mirroring the RPC
+  // path — concurrent saves can't collide on the version number, and an
+  // update can never land without its version row.
+  await db.batch([
+    db
+      .update(dashboards)
+      .set({ ...changes, updatedAt: now, version: sql`version + 1` })
+      .where(and(eq(dashboards.id, id), eq(dashboards.orgId, orgId))),
+    db.insert(dashboardVersions).values({
+      id: crypto.randomUUID(),
+      dashboardId: id,
+      version: sql`(select version from ${dashboards} where ${dashboards.id} = ${id})`,
+      data: JSON.stringify({ ...current, ...changes, version: current.version + 1, updatedAt: now }),
+      message: message ?? '',
+      createdBy: subjectLabel(user),
+      createdAt: now,
+    }),
+  ]);
 
   const updated = await db
     .select()
     .from(dashboards)
     .where(and(eq(dashboards.id, id), eq(dashboards.orgId, orgId)))
     .limit(1);
-
-  const versionId = crypto.randomUUID();
-  await db.insert(dashboardVersions).values({
-    id: versionId,
-    dashboardId: id,
-    version: newVersion,
-    data: JSON.stringify(updated[0]),
-    message: message ?? '',
-    createdBy: subjectLabel(user),
-    createdAt: now,
-  });
 
   return c.json(updated[0]);
 });

@@ -883,32 +883,32 @@ export class GraflareAPI extends WorkerEntrypoint<Bindings> {
     const slug = slugify(parsed.title);
 
     try {
-      await this.db.insert(dashboards).values({
-        id,
-        orgId,
-        folderId: parsed.folderId ?? null,
-        title: parsed.title,
-        slug,
-        description: parsed.description ?? '',
-        tags: parsed.tags ?? [],
-        panels: parsed.panels ?? [],
-        variables: parsed.variables ?? [],
-        timeRange: parsed.timeRange ?? { from: 'now-1h', to: 'now', refresh: null },
-        version: 1,
-        createdAt: now,
-        updatedAt: now,
-      });
-
-      const versionId = crypto.randomUUID();
-      await this.db.insert(dashboardVersions).values({
-        id: versionId,
-        dashboardId: id,
-        version: 1,
-        data: JSON.stringify({ ...parsed, id, orgId, slug, version: 1 }),
-        message: 'Initial version',
-        createdBy,
-        createdAt: now,
-      });
+      await this.db.batch([
+        this.db.insert(dashboards).values({
+          id,
+          orgId,
+          folderId: parsed.folderId ?? null,
+          title: parsed.title,
+          slug,
+          description: parsed.description ?? '',
+          tags: parsed.tags ?? [],
+          panels: parsed.panels ?? [],
+          variables: parsed.variables ?? [],
+          timeRange: parsed.timeRange ?? { from: 'now-1h', to: 'now', refresh: null },
+          version: 1,
+          createdAt: now,
+          updatedAt: now,
+        }),
+        this.db.insert(dashboardVersions).values({
+          id: crypto.randomUUID(),
+          dashboardId: id,
+          version: 1,
+          data: JSON.stringify({ ...parsed, id, orgId, slug, version: 1 }),
+          message: 'Initial version',
+          createdBy,
+          createdAt: now,
+        }),
+      ]);
     } catch (error) {
       console.error('createDashboard failed:', error);
       throw new Error('Failed to create dashboard', { cause: error });
@@ -939,43 +939,45 @@ export class GraflareAPI extends WorkerEntrypoint<Bindings> {
     const now = new Date();
     const { message, ...updates } = parsed;
 
-    const setData: Record<string, unknown> = { updatedAt: now, version: sql`version + 1` };
+    const changes: Record<string, unknown> = {};
     if (updates.title !== undefined) {
-      setData['title'] = updates.title;
-      setData['slug'] = slugify(updates.title);
+      changes['title'] = updates.title;
+      changes['slug'] = slugify(updates.title);
     }
-    if (updates.folderId !== undefined) setData['folderId'] = updates.folderId;
-    if (updates.description !== undefined) setData['description'] = updates.description;
-    if (updates.tags !== undefined) setData['tags'] = updates.tags;
-    if (updates.panels !== undefined) setData['panels'] = updates.panels;
-    if (updates.variables !== undefined) setData['variables'] = updates.variables;
-    if (updates.timeRange !== undefined) setData['timeRange'] = updates.timeRange;
+    if (updates.folderId !== undefined) changes['folderId'] = updates.folderId;
+    if (updates.description !== undefined) changes['description'] = updates.description;
+    if (updates.tags !== undefined) changes['tags'] = updates.tags;
+    if (updates.panels !== undefined) changes['panels'] = updates.panels;
+    if (updates.variables !== undefined) changes['variables'] = updates.variables;
+    if (updates.timeRange !== undefined) changes['timeRange'] = updates.timeRange;
 
     try {
-      await this.db
-        .update(dashboards)
-        .set(setData)
-        .where(and(eq(dashboards.id, id), eq(dashboards.orgId, orgId)));
+      // One atomic batch — a dashboard update can never land without its
+      // version row. The version row's `version` reads the post-UPDATE value
+      // via subselect so concurrent saves can't collide on it (the JSON
+      // snapshot may lag one save behind in that race).
+      await this.db.batch([
+        this.db
+          .update(dashboards)
+          .set({ ...changes, updatedAt: now, version: sql`version + 1` })
+          .where(and(eq(dashboards.id, id), eq(dashboards.orgId, orgId))),
+        this.db.insert(dashboardVersions).values({
+          id: crypto.randomUUID(),
+          dashboardId: id,
+          version: sql`(select version from ${dashboards} where ${dashboards.id} = ${id})`,
+          data: JSON.stringify({ ...current, ...changes, version: current.version + 1, updatedAt: now }),
+          message: message ?? '',
+          createdBy: subjectLabel(subject),
+          createdAt: now,
+        }),
+      ]);
 
       const updated = await this.db
         .select()
         .from(dashboards)
         .where(and(eq(dashboards.id, id), eq(dashboards.orgId, orgId)))
         .limit(1);
-      if (updated[0] === undefined) return null;
-
-      const versionId = crypto.randomUUID();
-      await this.db.insert(dashboardVersions).values({
-        id: versionId,
-        dashboardId: id,
-        version: updated[0].version,
-        data: JSON.stringify(updated[0]),
-        message: message ?? '',
-        createdBy: subjectLabel(subject),
-        createdAt: now,
-      });
-
-      return updated[0];
+      return updated[0] ?? null;
     } catch (error) {
       console.error('updateDashboard failed:', error);
       throw new Error('Failed to update dashboard', { cause: error });
@@ -1050,7 +1052,8 @@ export class GraflareAPI extends WorkerEntrypoint<Bindings> {
       .where(and(eq(dashboards.id, dashboardId), eq(dashboards.orgId, orgId)))
       .limit(1);
 
-    if (existing.length === 0) return null;
+    const [current] = existing;
+    if (current === undefined) return null;
 
     const versionRows = await this.db
       .select()
@@ -1067,43 +1070,42 @@ export class GraflareAPI extends WorkerEntrypoint<Bindings> {
     const snapshot = snapshotData;
     const now = new Date();
 
-    const restoreFields: Record<string, unknown> = { version: sql`version + 1`, updatedAt: now };
-    if ('title' in snapshot && typeof snapshot.title === 'string') restoreFields['title'] = snapshot.title;
-    if ('slug' in snapshot && typeof snapshot.slug === 'string') restoreFields['slug'] = snapshot.slug;
-    if ('description' in snapshot && typeof snapshot.description === 'string') restoreFields['description'] = snapshot.description;
-    if ('tags' in snapshot && Array.isArray(snapshot.tags)) restoreFields['tags'] = snapshot.tags;
-    if ('panels' in snapshot && Array.isArray(snapshot.panels)) restoreFields['panels'] = snapshot.panels;
-    if ('variables' in snapshot && Array.isArray(snapshot.variables)) restoreFields['variables'] = snapshot.variables;
+    const changes: Record<string, unknown> = {};
+    if ('title' in snapshot && typeof snapshot.title === 'string') changes['title'] = snapshot.title;
+    if ('slug' in snapshot && typeof snapshot.slug === 'string') changes['slug'] = snapshot.slug;
+    if ('description' in snapshot && typeof snapshot.description === 'string') changes['description'] = snapshot.description;
+    if ('tags' in snapshot && Array.isArray(snapshot.tags)) changes['tags'] = snapshot.tags;
+    if ('panels' in snapshot && Array.isArray(snapshot.panels)) changes['panels'] = snapshot.panels;
+    if ('variables' in snapshot && Array.isArray(snapshot.variables)) changes['variables'] = snapshot.variables;
     if ('timeRange' in snapshot && typeof snapshot.timeRange === 'object' && snapshot.timeRange !== null) {
-      restoreFields['timeRange'] = snapshot.timeRange;
+      changes['timeRange'] = snapshot.timeRange;
     }
-    if ('folderId' in snapshot) restoreFields['folderId'] = snapshot.folderId;
+    if ('folderId' in snapshot) changes['folderId'] = snapshot.folderId;
 
     try {
-      await this.db
-        .update(dashboards)
-        .set(restoreFields)
-        .where(and(eq(dashboards.id, dashboardId), eq(dashboards.orgId, orgId)));
+      // Same atomic update+version-row batch as updateDashboard.
+      await this.db.batch([
+        this.db
+          .update(dashboards)
+          .set({ ...changes, updatedAt: now, version: sql`version + 1` })
+          .where(and(eq(dashboards.id, dashboardId), eq(dashboards.orgId, orgId))),
+        this.db.insert(dashboardVersions).values({
+          id: crypto.randomUUID(),
+          dashboardId,
+          version: sql`(select version from ${dashboards} where ${dashboards.id} = ${dashboardId})`,
+          data: JSON.stringify({ ...current, ...changes, version: current.version + 1, updatedAt: now }),
+          message: `Restored from version ${version}`,
+          createdBy: subjectLabel(subject),
+          createdAt: now,
+        }),
+      ]);
 
       const updated = await this.db
         .select()
         .from(dashboards)
         .where(and(eq(dashboards.id, dashboardId), eq(dashboards.orgId, orgId)))
         .limit(1);
-      if (updated[0] === undefined) return null;
-
-      const versionId = crypto.randomUUID();
-      await this.db.insert(dashboardVersions).values({
-        id: versionId,
-        dashboardId,
-        version: updated[0].version,
-        data: JSON.stringify(updated[0]),
-        message: `Restored from version ${version}`,
-        createdBy: subjectLabel(subject),
-        createdAt: now,
-      });
-
-      return updated[0];
+      return updated[0] ?? null;
     } catch (error) {
       console.error('restoreDashboardVersion failed:', error);
       throw new Error('Failed to restore dashboard version', { cause: error });
