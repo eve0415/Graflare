@@ -1,11 +1,15 @@
+import type { AlertRuleDO } from '../../alerting/alert-rule-do';
 import type { AppEnv } from '../../index';
 
+import { runInDurableObject } from 'cloudflare:test';
 import { env } from 'cloudflare:workers';
+import { drizzle } from 'drizzle-orm/durable-sqlite';
 import { Hono } from 'hono';
 import { beforeEach, describe, expect, it } from 'vitest';
 
+import { config as doConfigTable, instances as doInstances } from '../../alerting/do-schema';
 import { createDb } from '../../db';
-import { alertRuleGroups, folders, organizations } from '../../db/schema';
+import { alertRuleGroups, alertRules, folders, organizations } from '../../db/schema';
 
 import { alertRuleGroupRoutes } from './alert-rule-groups';
 
@@ -42,6 +46,34 @@ const readId = (value: unknown): string => {
     throw new Error('bad shape: missing string id');
   }
   return value.id;
+};
+
+// The rule_config the DO holds for a rule, parsed — null when the DO has none.
+const readRuleDoConfig = async (ruleId: string): Promise<unknown> => {
+  const stub = env.ALERT_RULE.getByName(ruleId);
+  return runInDurableObject<AlertRuleDO, unknown>(stub, (_instance, state) => {
+    const doDb = drizzle(state.storage, { schema: { instances: doInstances, config: doConfigTable } });
+    const rows = doDb.select().from(doConfigTable).all();
+    const value = rows[0]?.value;
+    if (value === undefined) return null;
+    const parsed: unknown = JSON.parse(value);
+    return parsed;
+  });
+};
+
+const seedMemberRule = async (groupId: string): Promise<string> => {
+  const db = createDb(env.DB);
+  const ruleId = crypto.randomUUID();
+  await db.insert(alertRules).values({
+    id: ruleId,
+    orgId: TEST_ORG_ID,
+    groupId,
+    title: 'Member rule',
+    condition: { refId: 'A', reducer: 'last', operator: 'gt', threshold: 0 },
+    createdAt: new Date(),
+    updatedAt: new Date(),
+  });
+  return ruleId;
 };
 
 describe('alert-rule-group routes', () => {
@@ -148,5 +180,24 @@ describe('alert-rule-group routes', () => {
 
     const getRes = await app.request(req(`/${id}`), {}, testBindings);
     expect(getRes.status).toBe(404);
+  });
+
+  // Regression: the HTTP group update used to write D1 only — running member
+  // DOs kept evaluating on the old interval until each rule was next touched.
+  it('propagates an eval-interval change to member rule DOs', async () => {
+    const app = createApp();
+    const createRes = await app.request(req('/', json({ name: 'interval-group' })), {}, testBindings);
+    const groupId = readId(await createRes.json());
+    const ruleId = await seedMemberRule(groupId);
+
+    const res = await app.request(
+      req(`/${groupId}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ evalIntervalS: 120 }) }),
+      {},
+      testBindings,
+    );
+    expect(res.status).toBe(200);
+
+    const config = await readRuleDoConfig(ruleId);
+    expect(config).toMatchObject({ ruleId, evalIntervalS: 120 });
   });
 });

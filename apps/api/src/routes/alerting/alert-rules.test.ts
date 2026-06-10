@@ -1,9 +1,13 @@
+import type { AlertRuleDO } from '../../alerting/alert-rule-do';
 import type { AppEnv } from '../../index';
 
+import { runInDurableObject } from 'cloudflare:test';
 import { env } from 'cloudflare:workers';
+import { drizzle } from 'drizzle-orm/durable-sqlite';
 import { Hono } from 'hono';
 import { beforeEach, describe, expect, it } from 'vitest';
 
+import { config as doConfigTable, instances as doInstances } from '../../alerting/do-schema';
 import { createDb } from '../../db';
 import { alertRuleGroups, alertRules, organizations } from '../../db/schema';
 
@@ -42,6 +46,18 @@ const readId = (value: unknown): string => {
     throw new Error('bad shape: missing string id');
   }
   return value.id;
+};
+
+// The DO's own view of a rule: the stored rule_config row and whether an
+// evaluation alarm is scheduled. init() must produce both; stop() must clear both.
+const readRuleDoState = async (ruleId: string): Promise<{ config: string | undefined; alarm: number | null }> => {
+  const stub = env.ALERT_RULE.getByName(ruleId);
+  return runInDurableObject<AlertRuleDO, { config: string | undefined; alarm: number | null }>(stub, async (_instance, state) => {
+    const doDb = drizzle(state.storage, { schema: { instances: doInstances, config: doConfigTable } });
+    const rows = doDb.select().from(doConfigTable).all();
+    const alarm = await state.storage.getAlarm();
+    return { config: rows[0]?.value, alarm };
+  });
 };
 
 let testGroupId: string;
@@ -151,5 +167,57 @@ describe('alert-rule routes', () => {
 
     const rows = await db.select().from(alertRules);
     expect(rows).toHaveLength(0);
+  });
+
+  // Regression: the HTTP routes used to write D1 only — a rule created over
+  // HTTP never evaluated, and one deleted over HTTP kept its alarm forever.
+  it('starts the evaluation DO when a rule is created', async () => {
+    const app = createApp();
+    const createRes = await app.request(req('/', json(ruleInput())), {}, testBindings);
+    const id = readId(await createRes.json());
+
+    const doState = await readRuleDoState(id);
+    expect(doState.config).toBeDefined();
+    expect(doState.alarm).not.toBeNull();
+  });
+
+  it('does not start the evaluation DO for a paused rule', async () => {
+    const app = createApp();
+    const createRes = await app.request(req('/', json(ruleInput({ isPaused: true }))), {}, testBindings);
+    const id = readId(await createRes.json());
+
+    const doState = await readRuleDoState(id);
+    expect(doState.config).toBeUndefined();
+    expect(doState.alarm).toBeNull();
+  });
+
+  it('stops the evaluation DO when a rule is paused', async () => {
+    const app = createApp();
+    const createRes = await app.request(req('/', json(ruleInput())), {}, testBindings);
+    const id = readId(await createRes.json());
+
+    const res = await app.request(
+      req(`/${id}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ isPaused: true }) }),
+      {},
+      testBindings,
+    );
+    expect(res.status).toBe(200);
+
+    const doState = await readRuleDoState(id);
+    expect(doState.config).toBeUndefined();
+    expect(doState.alarm).toBeNull();
+  });
+
+  it('stops the evaluation DO when a rule is deleted', async () => {
+    const app = createApp();
+    const createRes = await app.request(req('/', json(ruleInput())), {}, testBindings);
+    const id = readId(await createRes.json());
+
+    const res = await app.request(req(`/${id}`, { method: 'DELETE' }), {}, testBindings);
+    expect(res.status).toBe(204);
+
+    const doState = await readRuleDoState(id);
+    expect(doState.config).toBeUndefined();
+    expect(doState.alarm).toBeNull();
   });
 });

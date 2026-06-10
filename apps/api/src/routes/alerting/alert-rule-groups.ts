@@ -5,6 +5,7 @@ import { sValidator } from '@hono/standard-validator';
 import { and, eq } from 'drizzle-orm';
 import { Hono } from 'hono';
 
+import { deleteRuleGroup, updateRuleGroup } from '../../alerting/rule-lifecycle';
 import { createDb } from '../../db';
 import { alertRuleGroups } from '../../db/schema';
 import { onValidationError } from '../../middleware/validate';
@@ -63,39 +64,13 @@ app.put(
   sValidator('param', alertRuleGroupIdParamSchema, onValidationError),
   sValidator('json', updateAlertRuleGroupSchema, onValidationError),
   async c => {
-    const db = createDb(c.env.DB);
-    const orgId = c.get('orgId');
-    const { id } = c.req.valid('param');
+    const group = await updateRuleGroup({ db: createDb(c.env.DB), alertRule: c.env.ALERT_RULE }, c.get('orgId'), c.req.valid('param').id, c.req.valid('json'));
 
-    const existing = await db
-      .select()
-      .from(alertRuleGroups)
-      .where(and(eq(alertRuleGroups.id, id), eq(alertRuleGroups.orgId, orgId)))
-      .limit(1);
-
-    if (existing.length === 0) {
+    if (group === null) {
       return c.json({ error: 'Not found' }, 404);
     }
 
-    const data = c.req.valid('json');
-    const now = new Date();
-    const updates: Record<string, unknown> = { updatedAt: now };
-
-    if (data.name !== undefined) updates['name'] = data.name;
-    if (data.folderId !== undefined) updates['folderId'] = data.folderId;
-    if (data.evalIntervalS !== undefined) updates['evalIntervalS'] = data.evalIntervalS;
-
-    await db
-      .update(alertRuleGroups)
-      .set(updates)
-      .where(and(eq(alertRuleGroups.id, id), eq(alertRuleGroups.orgId, orgId)));
-
-    const updated = await db
-      .select()
-      .from(alertRuleGroups)
-      .where(and(eq(alertRuleGroups.id, id), eq(alertRuleGroups.orgId, orgId)))
-      .limit(1);
-    return c.json(updated[0]);
+    return c.json(group);
   },
 );
 
@@ -114,7 +89,7 @@ app.delete('/:id', sValidator('param', alertRuleGroupIdParamSchema, onValidation
     return c.json({ error: 'Not found' }, 404);
   }
 
-  await db.delete(alertRuleGroups).where(and(eq(alertRuleGroups.id, id), eq(alertRuleGroups.orgId, orgId)));
+  await deleteRuleGroup({ db, alertRule: c.env.ALERT_RULE }, orgId, id);
 
   return c.body(null, 204);
 });
