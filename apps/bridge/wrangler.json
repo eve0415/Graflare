@@ -14,7 +14,7 @@
     }
   ],
   "vars": {
-    "CF_ZONE_IDS": "eve0415.net"
+    "CF_ZONE_IDS": "5c5515f7b476206c9f2c60ba46293978"
   },
   "triggers": {
     "crons": ["*/5 * * * *"]
