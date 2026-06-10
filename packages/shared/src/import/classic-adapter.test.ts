@@ -739,7 +739,7 @@ describe('importClassic', () => {
       expect(result.dashboard.variables[0]?.query).toBe('');
     });
 
-    it('joins array current.value with commas', () => {
+    it('keeps an array current.value as an array (multi-select selection survives import)', () => {
       const result = importClassic({
         ...minimalDashboard,
         templating: {
@@ -756,7 +756,29 @@ describe('importClassic', () => {
         },
       });
 
-      expect(result.dashboard.variables[0]?.current).toBe('host-a,host-b,host-c');
+      expect(result.dashboard.variables[0]?.current).toEqual(['host-a', 'host-b', 'host-c']);
+      expect(result.dashboard.variables[0]?.multi).toBe(true);
+    });
+
+    it('maps allValue verbatim, defaulting null and absent to empty', () => {
+      const result = importClassic({
+        ...minimalDashboard,
+        templating: {
+          list: [
+            { name: 'custom', type: 'query', query: 'q', multi: true, includeAll: true, allValue: '.*', current: { value: '' }, options: [] },
+            { name: 'nulled', type: 'query', query: 'q', includeAll: true, allValue: null, current: { value: '' }, options: [] },
+            { name: 'absent', type: 'query', query: 'q', current: { value: '' }, options: [] },
+          ],
+        },
+      });
+
+      const [custom, nulled, absent] = result.dashboard.variables;
+      expect(custom?.allValue).toBe('.*');
+      // multi/includeAll keep mapping alongside the new field.
+      expect(custom?.multi).toBe(true);
+      expect(custom?.includeAll).toBe(true);
+      expect(nulled?.allValue).toBe('');
+      expect(absent?.allValue).toBe('');
     });
 
     it('sets sort to disabled', () => {
@@ -991,5 +1013,105 @@ describe('importClassic — transformations', () => {
       panels: [{ type: 'stat', title: 'X', targets: [{ refId: 'A', expr: 'up' }], gridPos: { x: 0, y: 0, w: 4, h: 4 } }],
     });
     expect(result.dashboard.panels[0]?.transformations).toEqual([]);
+  });
+});
+
+describe('importClassic — repeating panels', () => {
+  it('maps repeat, repeatDirection and maxPerRow onto the panel', () => {
+    const result = importClassic({
+      ...minimalDashboard,
+      panels: [{ ...makePanel('timeseries'), repeat: 'host', repeatDirection: 'v', maxPerRow: 6 }],
+    });
+
+    const [panel] = result.dashboard.panels;
+    expect(panel?.repeat).toBe('host');
+    expect(panel?.repeatDirection).toBe('v');
+    expect(panel?.maxPerRow).toBe(6);
+    expect(result.warnings).toEqual([]);
+  });
+
+  it('omits repeat for null/empty/absent and defaults direction + maxPerRow', () => {
+    const result = importClassic({
+      ...minimalDashboard,
+      panels: [{ ...makePanel('stat'), repeat: null }, { ...makePanel('stat'), repeat: '' }, makePanel('stat')],
+    });
+
+    expect(result.dashboard.panels).toHaveLength(3);
+    for (const panel of result.dashboard.panels) {
+      expect(panel).not.toHaveProperty('repeat');
+      expect(panel.repeatDirection).toBe('h');
+      expect(panel.maxPerRow).toBe(4);
+    }
+  });
+
+  it('clamps an unknown repeatDirection to h and maxPerRow to a 1–24 int', () => {
+    const result = importClassic({
+      ...minimalDashboard,
+      panels: [
+        { ...makePanel('stat'), repeat: 'a', repeatDirection: 'horizontal', maxPerRow: 0 },
+        { ...makePanel('stat'), repeat: 'a', repeatDirection: 'v', maxPerRow: 99 },
+        { ...makePanel('stat'), repeat: 'a', repeatDirection: 'h', maxPerRow: 2.6 },
+      ],
+    });
+
+    expect(result.dashboard.panels[0]?.repeatDirection).toBe('h');
+    expect(result.dashboard.panels[0]?.maxPerRow).toBe(1);
+    expect(result.dashboard.panels[1]?.maxPerRow).toBe(24);
+    expect(result.dashboard.panels[2]?.maxPerRow).toBe(3);
+  });
+
+  it('skips a legacy repeatPanelId clone with a warning, keeping the source panel', () => {
+    const result = importClassic({
+      ...minimalDashboard,
+      panels: [
+        { ...makePanel('timeseries'), repeat: 'host' },
+        { ...makePanel('timeseries'), repeatPanelId: 2 },
+      ],
+    });
+
+    expect(result.dashboard.panels).toHaveLength(1);
+    expect(result.dashboard.panels[0]?.repeat).toBe('host');
+    expect(result.warnings).toEqual(['Skipped legacy repeat clone of panel 2']);
+  });
+
+  it('skips a legacy clone nested inside a row', () => {
+    const result = importClassic({
+      ...minimalDashboard,
+      panels: [
+        {
+          type: 'row',
+          title: 'Row',
+          panels: [makePanel('timeseries'), { ...makePanel('stat'), repeatPanelId: 7 }],
+          targets: [],
+          gridPos: { x: 0, y: 0, w: 24, h: 1 },
+          fieldConfig: { defaults: { thresholds: { steps: [] } } },
+        },
+      ],
+    });
+
+    expect(result.dashboard.panels).toHaveLength(1);
+    expect(result.dashboard.panels[0]?.type).toBe('timeseries');
+    expect(result.warnings).toEqual(['Skipped legacy repeat clone of panel 7']);
+  });
+
+  it('warn-drops a row-level repeat and still flattens the nested panels', () => {
+    const result = importClassic({
+      ...minimalDashboard,
+      panels: [
+        {
+          type: 'row',
+          title: 'Hosts',
+          repeat: 'host',
+          panels: [makePanel('timeseries')],
+          targets: [],
+          gridPos: { x: 0, y: 0, w: 24, h: 1 },
+          fieldConfig: { defaults: { thresholds: { steps: [] } } },
+        },
+      ],
+    });
+
+    expect(result.dashboard.panels).toHaveLength(1);
+    expect(result.dashboard.panels[0]).not.toHaveProperty('repeat');
+    expect(result.warnings).toEqual(['Row repetition is not supported — row "Hosts" was flattened']);
   });
 });

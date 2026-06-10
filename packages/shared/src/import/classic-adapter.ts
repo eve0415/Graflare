@@ -69,13 +69,20 @@ const mapThresholds = (fc: GrafanaPanel['fieldConfig']) =>
     color: s.color,
   }));
 
+// Grafana's repeatDirection is 'h'|'v' at runtime but a free string in stored JSON; anything
+// that isn't explicitly 'v' lays out horizontally (Grafana's own default).
+const clampRepeatDirection = (dir: string): 'h' | 'v' => (dir === 'v' ? 'v' : 'h');
+
+// maxPerRow is a free number in stored JSON; our schema wants an int in 1–24. Non-finite junk
+// (JSON can't encode it, but be defensive) falls back to the runtime default 4.
+const clampMaxPerRow = (n: number): number => (Number.isFinite(n) ? Math.min(24, Math.max(1, Math.round(n))) : 4);
+
 const mapVariable = (v: GrafanaVariable, warnings: string[]): Variable | null => {
   if (v.name === '') return null;
 
   const type = resolveVariableType(v.type, v.name, warnings);
 
   const query = typeof v.query === 'string' ? v.query : '';
-  const currentValue = typeof v.current.value === 'string' ? v.current.value : Array.isArray(v.current.value) ? v.current.value.join(',') : '';
   const enumerated = v.options.map(o => o.value);
   // Grafana interval variables list their steps in the comma-separated `query`;
   // fall back to that when `options` isn't enumerated so the choices survive import.
@@ -94,16 +101,25 @@ const mapVariable = (v: GrafanaVariable, warnings: string[]): Variable | null =>
     sort: 'disabled',
     multi: v.multi,
     includeAll: v.includeAll,
-    current: currentValue,
-    // The classic `allValue` isn't mapped yet; imported variables fall back to expanding an All
-    // selection over the option list.
-    allValue: '',
+    // A multi/include-all selection arrives as an array; our `current` is string | string[],
+    // so it carries through as-is (the old CSV-join predates multi-value support).
+    current: v.current.value,
+    // Grafana's custom All value, verbatim; null/absent means "expand over the option list".
+    allValue: v.allValue ?? '',
     options,
     filters,
   };
 };
 
 const convertPanel = (gp: GrafanaBasePanel, index: number, warnings: string[]): Panel | null => {
+  // A panel carrying `repeatPanelId` is a legacy BAKED repeat clone (old Grafana persisted the
+  // expanded instances into the dashboard JSON). Importing it would duplicate the source panel,
+  // which imports with its own `repeat` and re-expands at render time — so skip the clone.
+  if (gp.repeatPanelId !== undefined) {
+    warnings.push(`Skipped legacy repeat clone of panel ${String(gp.repeatPanelId)}`);
+    return null;
+  }
+
   const mapped = PANEL_TYPE_MAP[gp.type] ?? gp.type;
   const supported = SUPPORTED_TYPES.has(mapped);
 
@@ -134,7 +150,7 @@ const convertPanel = (gp: GrafanaBasePanel, index: number, warnings: string[]): 
   const displayOptions: Panel['displayOptions'] =
     panelType === 'text' ? { text: { content: gp.options?.content ?? '', mode: clampTextMode(gp.options?.mode ?? 'markdown') } } : {};
 
-  return {
+  const panel: Panel = {
     id: `panel-${String(index)}`,
     type: panelType,
     title: gp.title,
@@ -149,10 +165,13 @@ const convertPanel = (gp: GrafanaBasePanel, index: number, warnings: string[]): 
     // Data transformations, warn-dropping any transform id/option we don't model (same honest-loss
     // approach as the overrides above).
     transformations: mapTransformations(gp.transformations, warnings),
-    // The classic repeat fields aren't mapped yet; imported panels take the no-repeat defaults.
-    repeatDirection: 'h',
-    maxPerRow: 4,
+    repeatDirection: clampRepeatDirection(gp.repeatDirection),
+    maxPerRow: clampMaxPerRow(gp.maxPerRow),
   };
+  // `repeat` is optional on our schema (exactOptionalPropertyTypes): only a real variable name
+  // is set; Grafana's null/'' "no repeat" leaves the key off entirely.
+  if (gp.repeat !== null && gp.repeat !== '') panel.repeat = gp.repeat;
+  return panel;
 };
 
 export const importClassic = (json: Record<string, unknown>): ImportResult => {
@@ -177,6 +196,11 @@ export const importClassic = (json: Record<string, unknown>): ImportResult => {
   const panels: Panel[] = [];
   for (const gp of d.panels) {
     if (gp.type === 'row') {
+      // Graflare has no row concept (rows flatten into their panels), so a repeating row can't
+      // be modeled — warn-drop the repetition but keep the nested panels.
+      if (gp.repeat !== null && gp.repeat !== '') {
+        warnings.push(`Row repetition is not supported — row "${gp.title}" was flattened`);
+      }
       for (const nested of gp.panels) {
         const panel = convertPanel(nested, panels.length, warnings);
         if (panel !== null) panels.push(panel);

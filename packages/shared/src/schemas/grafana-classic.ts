@@ -88,6 +88,16 @@ const grafanaBasePanelSchema = z.object({
   // empty list so a panel that omits the key imports with no transformations.
   transformations: z._default(z.array(grafanaTransformationSchema), []),
   options: z.optional(grafanaPanelOptionsSchema),
+  // Repeating panels. `repeat` names the template variable — Grafana emits `null` for "no
+  // repeat" as often as it omits the key, so both normalize to null here. `repeatDirection` is
+  // a free string (clamped to our h|v enum in the adapter) and `maxPerRow` a free number
+  // (clamped to a 1–24 int there). `repeatPanelId` marks a legacy BAKED repeat clone (old
+  // Grafana persisted the expanded instances); kept optional with no default so the adapter
+  // can tell "absent" from any real id and skip the clones.
+  repeat: z._default(z.nullable(z.string()), null),
+  repeatDirection: z._default(z.string(), 'h'),
+  maxPerRow: z._default(z.number(), 4),
+  repeatPanelId: z.optional(z.number()),
 });
 
 export type GrafanaBasePanel = z.infer<typeof grafanaBasePanelSchema>;
@@ -123,6 +133,9 @@ const grafanaVariableSchema = z.object({
   multi: z._default(z.boolean(), false),
   includeAll: z._default(z.boolean(), false),
   current: z._default(grafanaCurrentSchema, { value: '' }),
+  // Custom "All" value (used verbatim at interpolation time). Grafana emits `null` for "none"
+  // as often as it omits the key; both normalize to null here and map to '' in the adapter.
+  allValue: z._default(z.nullable(z.string()), null),
   options: z._default(z.array(z.object({ value: z._default(z.string(), '') })), []),
   // Adhoc variables only; absent (→ []) on every other type.
   filters: z._default(z.array(grafanaAdhocFilterSchema), []),
