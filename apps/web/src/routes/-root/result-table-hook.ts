@@ -1,4 +1,4 @@
-import type { Row, SortFn, TableState } from '@tanstack/react-table';
+import type { Row, SortFn } from '@tanstack/react-table';
 
 import {
   createPaginatedRowModel,
@@ -16,18 +16,14 @@ import {
 // are small static lists that don't need a table engine.
 
 /** Result rows are positional string arrays — one cell per column (legal `RowData` in v9). */
-export type ResultRow = string[];
+type ResultRow = string[];
 
 const resultTableFeatures = tableFeatures({ rowPaginationFeature, rowSortingFeature });
 
-export type ResultTableFeatures = typeof resultTableFeatures;
+type ResultTableFeatures = typeof resultTableFeatures;
 
-/** Range queries emit one row per series×timestamp, so results run into the thousands. */
+/** Default rows per page: range queries emit one row per series×timestamp, into the thousands. */
 export const RESULT_TABLE_PAGE_SIZE = 100;
-
-export const resultTableInitialState = {
-  pagination: { pageIndex: 0, pageSize: RESULT_TABLE_PAGE_SIZE },
-} satisfies Partial<TableState<ResultTableFeatures>>;
 
 /**
  * Column ids must be stable AND unique, but duplicate header names are legal in query
@@ -40,11 +36,12 @@ const readCell = (row: Row<ResultTableFeatures, ResultRow>, columnId: string): s
   return typeof value === 'string' ? value : '';
 };
 
-/** Sort regimes, in ascending display order: finite numbers, then text, then blanks. */
-const cellRegime = (cell: string): 0 | 1 | 2 => {
+/** Sort key per cell: regime (finite numbers → text → blanks, ascending) + the one parse. */
+const cellSortKey = (cell: string): { regime: 0 | 1 | 2; num: number } => {
   // `Number('')` is 0, so blanks must be classified before the numeric parse.
-  if (cell.trim() === '') return 2;
-  return Number.isFinite(Number(cell)) ? 0 : 1;
+  if (cell.trim() === '') return { regime: 2, num: Number.NaN };
+  const num = Number(cell);
+  return Number.isFinite(num) ? { regime: 0, num } : { regime: 1, num: Number.NaN };
 };
 
 /**
@@ -54,19 +51,19 @@ const cellRegime = (cell: string): 0 | 1 | 2 => {
  * not ("10" < "2x" < "9" < "10" forms a cycle), and a non-transitive comparator makes the
  * sort order algorithm-dependent. The built-in `alphanumeric` sort fn is wrong for metric
  * values: it splits on digit runs and parses with `parseInt`, so decimals and scientific
- * notation ("9.5", "1e3") misorder.
+ * notation ("9.5", "1e3") misorder. Keys are parsed per comparison (one parse per side) —
+ * fine at on-click scales; a precomputed key cache only pays once sorts of ≫10k rows are
+ * a real path.
  */
 export const numericAwareSortFn: SortFn<ResultTableFeatures, ResultRow> = (rowA, rowB, columnId) => {
   const a = readCell(rowA, columnId);
   const b = readCell(rowB, columnId);
-  const regime = cellRegime(a);
-  const regimeDiff = regime - cellRegime(b);
-  if (regimeDiff !== 0) return regimeDiff;
-  if (regime === 0) {
-    const aNum = Number(a);
-    const bNum = Number(b);
-    if (aNum === bNum) return 0;
-    return aNum < bNum ? -1 : 1;
+  const keyA = cellSortKey(a);
+  const keyB = cellSortKey(b);
+  if (keyA.regime !== keyB.regime) return keyA.regime - keyB.regime;
+  if (keyA.regime === 0) {
+    if (keyA.num === keyB.num) return 0;
+    return keyA.num < keyB.num ? -1 : 1;
   }
   if (a === b) return 0;
   return a < b ? -1 : 1;

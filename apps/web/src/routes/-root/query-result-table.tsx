@@ -5,7 +5,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { ArrowDownNarrowWide, ArrowUpNarrowWide, ChevronLeft, ChevronRight, ChevronsUpDown } from 'lucide-react';
 import { useMemo } from 'react';
 
-import { RESULT_TABLE_PAGE_SIZE, numericAwareSortFn, resultColumnHelper, resultColumnId, resultTableInitialState, useResultTable } from './result-table-hook';
+import { RESULT_TABLE_PAGE_SIZE, numericAwareSortFn, resultColumnHelper, resultColumnId, useResultTable } from './result-table-hook';
 
 // Optional per-cell transform: panels use it to format numeric cells and apply
 // value-mapping text/color. Absent = render the raw string (the Explore default).
@@ -16,7 +16,13 @@ interface QueryResultTableProps {
     columns: string[];
     rows: string[][];
   };
+  /**
+   * Must be referentially stable (useMemo/useCallback in the caller) — it's a dependency of
+   * the column defs, so a fresh identity per render rebuilds the table model and re-sorts.
+   */
   renderCell?: CellRenderer;
+  /** Rows per page; seeds the table's pagination state. */
+  pageSize?: number;
   /**
    * Accessible name for the table's horizontal-scroll region (WAI-ARIA scrollable-region pattern,
    * so keyboard users can scroll a wide table). Pass a value UNIQUE per on-screen table — e.g. the
@@ -43,7 +49,9 @@ const SORT_ICONS = {
   none: <ChevronsUpDown className='text-muted-foreground/60 size-3.5 shrink-0' aria-hidden='true' />,
 } as const;
 
-export const QueryResultTable = ({ data, renderCell, scrollRegionLabel }: QueryResultTableProps) => {
+const ARIA_SORT = { asc: 'ascending', desc: 'descending' } as const;
+
+export const QueryResultTable = ({ data, renderCell, scrollRegionLabel, pageSize = RESULT_TABLE_PAGE_SIZE }: QueryResultTableProps) => {
   const { columns, rows } = data;
 
   // Column defs are positional: one accessor per index over the row array (array rows are a
@@ -73,14 +81,15 @@ export const QueryResultTable = ({ data, renderCell, scrollRegionLabel }: QueryR
     [columns, renderCell],
   );
 
-  const table = useResultTable({ columns: columnDefs, data: rows, initialState: resultTableInitialState });
+  const initialState = useMemo(() => ({ pagination: { pageIndex: 0, pageSize } }), [pageSize]);
+  const table = useResultTable({ columns: columnDefs, data: rows, initialState });
 
   if (columns.length === 0) {
     return <p className='text-muted-foreground text-sm'>No data</p>;
   }
 
   const { pageIndex } = table.state.pagination;
-  const showPagination = rows.length > RESULT_TABLE_PAGE_SIZE;
+  const showPagination = rows.length > pageSize;
 
   return (
     <>
@@ -92,7 +101,7 @@ export const QueryResultTable = ({ data, renderCell, scrollRegionLabel }: QueryR
                 {headerGroup.headers.map(header => {
                   const sorted = header.column.getIsSorted();
                   return (
-                    <TableHead key={header.id} aria-sort={sorted === false ? undefined : sorted === 'asc' ? 'ascending' : 'descending'} className='p-0'>
+                    <TableHead key={header.id} aria-sort={sorted === false ? undefined : ARIA_SORT[sorted]} className='p-0'>
                       <button
                         type='button'
                         onClick={header.column.getToggleSortingHandler()}

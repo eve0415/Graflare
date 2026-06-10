@@ -180,6 +180,12 @@ describe('query-result-table pagination', () => {
     expect(bodyRowTexts()[0]).toBe('0|a0');
   });
 
+  it('respects a custom pageSize', () => {
+    render(<QueryResultTable data={sortable} pageSize={2} />);
+    expect(bodyRowTexts()).toHaveLength(2);
+    expect(screen.getByText('Page 1 of 2')).not.toBeNull();
+  });
+
   it('renders no pagination controls for exactly one page of rows', () => {
     render(<QueryResultTable data={bigData(100)} />);
     expect(bodyRowTexts()).toHaveLength(100);
