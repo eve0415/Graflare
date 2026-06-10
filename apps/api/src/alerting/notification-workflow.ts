@@ -7,6 +7,7 @@ import { matchLabels } from '@graflare/shared/alerting/matchers';
 import { isMuted } from '@graflare/shared/alerting/mute-check';
 import { buildSlackPayload } from '@graflare/shared/alerting/slack-payload';
 import { buildWebhookPayload } from '@graflare/shared/alerting/webhook-payload';
+import { chunkRowsForD1 } from '@graflare/shared/db/chunk-rows';
 import { contactPointSettingsSchema, labelMatchersSchema, labelsMapSchema, muteTimeIntervalsSchema, stringListSchema } from '@graflare/shared/schemas/alerting';
 import { WorkflowEntrypoint } from 'cloudflare:workers';
 import { and, eq, gt, inArray, lte, sql } from 'drizzle-orm';
@@ -25,6 +26,11 @@ const parseValue = <T>(schema: { parse: (value: unknown) => T }, value: unknown,
     return fallback;
   }
 };
+
+// The annotations insert binds one row of this many columns per alert; chunkRowsForD1 keeps a
+// multi-row insert under D1's 100-bound-parameter ceiling and drift-guards this count against the
+// row shape (a rule firing across many series collapses to one group, so the row count is unbounded).
+const ANNOTATION_INSERT_COLUMNS = 9;
 
 interface NotificationWorkflowParams {
   orgId: string;
@@ -436,7 +442,11 @@ export class NotificationWorkflow extends WorkflowEntrypoint<Env, NotificationWo
         newState: a.state,
         createdAt: now,
       }));
-      await db.insert(annotations).values(rows);
+      // Chunk under D1's bound-parameter ceiling: an unbounded group (rule × many series) would
+      // otherwise bind rows×9 params in one statement and be rejected whole, losing every annotation.
+      for (const chunk of chunkRowsForD1(rows, ANNOTATION_INSERT_COLUMNS)) {
+        await db.insert(annotations).values(chunk);
+      }
     });
   }
 }

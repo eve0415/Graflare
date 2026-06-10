@@ -2,10 +2,21 @@ import type { ContactPointSettings } from '@graflare/shared/schemas/alerting';
 import type { WorkflowEvent, WorkflowStep, WorkflowStepConfig, WorkflowStepContext } from 'cloudflare:workers';
 
 import { env } from 'cloudflare:workers';
+import { eq } from 'drizzle-orm';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { createDb } from '../db';
-import { alertInstances, alertRuleGroups, alertRules, contactPoints, muteTimings, notificationPolicies, organizations, silences } from '../db/schema';
+import {
+  alertInstances,
+  alertRuleGroups,
+  alertRules,
+  annotations,
+  contactPoints,
+  muteTimings,
+  notificationPolicies,
+  organizations,
+  silences,
+} from '../db/schema';
 
 import { NotificationWorkflow } from './notification-workflow';
 
@@ -234,6 +245,7 @@ describe('notification-workflow per-instance routing (C3)', () => {
   beforeEach(async () => {
     const db = createDb(env.DB);
     await db.delete(alertInstances);
+    await db.delete(annotations);
     await db.delete(silences);
     await db.delete(muteTimings);
     await db.delete(notificationPolicies);
@@ -497,5 +509,28 @@ describe('notification-workflow per-instance routing (C3)', () => {
 
     // Only our org's instance, routed by only our org's policy.
     expect(urlsOf(deliveries)).toEqual(['https://hook.test/mine']);
+  });
+
+  it("persists every annotation when a group exceeds D1's per-statement param ceiling (>11 alerts)", async () => {
+    // Regression: create-annotations inserted one 9-column row per alert in a SINGLE multi-row
+    // INSERT. A rule firing across many series collapses to one group (group_by alertname), so
+    // 12+ alerts bind 12×9 > 100 params and D1 rejects the whole statement ("too many SQL
+    // variables") — delivery had already happened, but every annotation was lost. The fix chunks
+    // the insert under the ceiling.
+    const cp = await seedContactPoint(ORG_ID, 'cp', { type: 'webhook', url: 'https://hook.test/bulk', method: 'POST', username: '', password: '' });
+    await seedPolicy({ orgId: ORG_ID, contactPointId: cp, groupBy: ['alertname'] });
+
+    const COUNT = 13; // > floor(100/9) = 11 ⇒ forces >1 chunk; 13×9 = 117 params unchunked
+    await Promise.all(Array.from({ length: COUNT }, (_, i) => seedInstance(ORG_ID, RULE_ID, `h${String(i)}`, { instance: `node-${String(i)}` })));
+
+    const deliveries = captureFetch();
+    const record = await runWorkflow(baseParams());
+
+    // All 13 share alertname ⇒ one group ⇒ one delivery, and every annotation lands.
+    expect(urlsOf(deliveries)).toEqual(['https://hook.test/bulk']);
+    expect(record.doNames.filter(n => n.startsWith('deliver:'))).toHaveLength(1);
+    const db = createDb(env.DB);
+    const rows = await db.select({ id: annotations.id }).from(annotations).where(eq(annotations.orgId, ORG_ID));
+    expect(rows).toHaveLength(COUNT);
   });
 });
