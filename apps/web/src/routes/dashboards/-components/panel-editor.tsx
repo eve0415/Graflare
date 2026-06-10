@@ -8,12 +8,13 @@ import type {
   ValueMapping,
   ValueMappingType,
 } from '@graflare/shared/schemas/field-config';
-import type { Panel, PanelQuery } from '@graflare/shared/schemas/panel';
+import type { Panel, PanelQuery, PanelType } from '@graflare/shared/schemas/panel';
 import type { FilterFieldsMatch, ReduceCalc, Transformation, TransformationId } from '@graflare/shared/schemas/transformation';
 import type { Variable } from '@graflare/shared/schemas/variable';
 
 import { UNIT_CATALOG } from '@graflare/shared/format/value-format';
 import { FIELD_OVERRIDE_MATCHER_IDS, FIELD_OVERRIDE_PROPERTY_IDS, makeFieldOverrideProperty, makeValueMapping } from '@graflare/shared/schemas/field-config';
+import { PANEL_TYPES, isPanelType } from '@graflare/shared/schemas/panel';
 import { FILTER_FIELDS_MATCH_KINDS, REDUCE_CALCS, TRANSFORMATION_IDS, makeTransformation } from '@graflare/shared/schemas/transformation';
 import { Button } from '@graflare/ui/components/button';
 import { Checkbox } from '@graflare/ui/components/checkbox';
@@ -39,20 +40,24 @@ const QueryCodeEditor = lazy(() => import('../../explore/-components/query-code-
 // Sized to the editor's single-line shell (36px content box) so the swap doesn't jump.
 const EDITOR_FALLBACK = <Skeleton className='h-9 w-full rounded-md' />;
 
-const PANEL_TYPE_OPTIONS = [
-  { value: 'timeseries', label: 'Time Series' },
-  { value: 'stat', label: 'Stat' },
-  { value: 'table', label: 'Table' },
-  { value: 'gauge', label: 'Gauge' },
-  { value: 'bargauge', label: 'Bar Gauge' },
-  { value: 'barchart', label: 'Bar Chart' },
-  { value: 'pie', label: 'Pie Chart' },
-  { value: 'histogram', label: 'Histogram' },
-  { value: 'heatmap', label: 'Heatmap' },
-  { value: 'state-timeline', label: 'State Timeline' },
-  { value: 'status-history', label: 'Status History' },
-  { value: 'text', label: 'Text' },
-] as const;
+// Human labels for each panel type. The type SET is single-sourced from PANEL_TYPES (schema);
+// only the copy lives here — the Record is keyed by PanelType, so a new type forces a label.
+const PANEL_TYPE_LABELS: Record<PanelType, string> = {
+  timeseries: 'Time Series',
+  stat: 'Stat',
+  table: 'Table',
+  gauge: 'Gauge',
+  bargauge: 'Bar Gauge',
+  barchart: 'Bar Chart',
+  pie: 'Pie Chart',
+  histogram: 'Histogram',
+  heatmap: 'Heatmap',
+  'state-timeline': 'State Timeline',
+  'status-history': 'Status History',
+  text: 'Text',
+};
+
+const PANEL_TYPE_OPTIONS = PANEL_TYPES.map(t => ({ value: t, label: PANEL_TYPE_LABELS[t] }));
 
 // Render mode for the text panel's content editor. Single source feeds both the
 // Select's `items` (trigger label) and the dropdown options (base-ui-select rule).
@@ -214,22 +219,7 @@ export const PanelEditor = ({ panel, variables, open, onClose, onSave }: PanelEd
 
   const handleTypeChange = useCallback(
     (val: string | null) => {
-      if (
-        val === 'timeseries' ||
-        val === 'stat' ||
-        val === 'table' ||
-        val === 'gauge' ||
-        val === 'bargauge' ||
-        val === 'barchart' ||
-        val === 'pie' ||
-        val === 'histogram' ||
-        val === 'heatmap' ||
-        val === 'state-timeline' ||
-        val === 'status-history' ||
-        val === 'text'
-      ) {
-        updateField('type', val);
-      }
+      if (isPanelType(val)) updateField('type', val);
     },
     [updateField],
   );

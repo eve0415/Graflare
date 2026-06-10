@@ -5,6 +5,7 @@ import type { Variable } from '../schemas/variable';
 import type { ImportResult } from './types';
 
 import { grafanaV2Schema } from '../schemas/grafana-v2';
+import { isPanelType } from '../schemas/panel';
 
 import { mapOverrides } from './override-mapping';
 import { mapTransformations } from './transformation-mapping';
@@ -22,21 +23,6 @@ const PANEL_KIND_MAP: Record<string, string> = {
   statetimeline: 'state-timeline',
   statushistory: 'status-history',
 };
-
-const SUPPORTED_TYPES = new Set([
-  'timeseries',
-  'stat',
-  'table',
-  'gauge',
-  'bargauge',
-  'barchart',
-  'pie',
-  'histogram',
-  'heatmap',
-  'state-timeline',
-  'status-history',
-  'text',
-]);
 
 // Grafana's text panel `mode` is one of code/text/html/markdown; we render only markdown
 // or sanitized html, so anything other than 'html' clamps to 'markdown'. Mirrors the
@@ -110,28 +96,15 @@ export const importV2 = (json: Record<string, unknown>): ImportResult => {
   let panelIndex = 0;
   for (const [key, element] of Object.entries(spec.elements)) {
     const mapped = PANEL_KIND_MAP[element.kind.toLowerCase()] ?? element.kind.toLowerCase();
-    const supported = SUPPORTED_TYPES.has(mapped);
+    // The schema-exported guard both decides supportedness and narrows `mapped` to PanelType
+    // (aliased condition), so the fallback ternary needs no re-spelled type list.
+    const supported = isPanelType(mapped);
 
     if (!supported) {
       warnings.push(`Unsupported panel type "${element.kind}" (element "${key}") — converted to placeholder stat panel`);
     }
 
     const panelType = supported ? mapped : 'stat';
-    if (
-      panelType !== 'timeseries' &&
-      panelType !== 'stat' &&
-      panelType !== 'table' &&
-      panelType !== 'gauge' &&
-      panelType !== 'bargauge' &&
-      panelType !== 'barchart' &&
-      panelType !== 'pie' &&
-      panelType !== 'histogram' &&
-      panelType !== 'heatmap' &&
-      panelType !== 'state-timeline' &&
-      panelType !== 'status-history' &&
-      panelType !== 'text'
-    )
-      continue;
 
     const layoutItem = layoutMap.get(key);
     const gridPos = {

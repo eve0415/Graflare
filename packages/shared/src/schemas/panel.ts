@@ -4,7 +4,10 @@ import { fieldConfigSchema } from './field-config';
 import { thresholdsSchema } from './threshold';
 import { transformationSchema } from './transformation';
 
-export const panelTypeSchema = z.enum([
+// The canonical panel type list — the import adapters and the editor's type picker all
+// derive from this array (same single-source pattern as FIELD_OVERRIDE_MATCHER_IDS /
+// TRANSFORMATION_IDS), so a new panel type is added exactly once, here.
+export const PANEL_TYPES = [
   'timeseries',
   'stat',
   'table',
@@ -17,9 +20,16 @@ export const panelTypeSchema = z.enum([
   'state-timeline',
   'status-history',
   'text',
-]);
+] as const;
+
+export const panelTypeSchema = z.enum(PANEL_TYPES);
 
 export type PanelType = z.infer<typeof panelTypeSchema>;
+
+const PANEL_TYPE_SET = new Set<string>(PANEL_TYPES);
+
+/** Narrow a raw string (Select value, imported Grafana panel kind) to a PanelType. */
+export const isPanelType = (v: string | null | undefined): v is PanelType => typeof v === 'string' && PANEL_TYPE_SET.has(v);
 
 export const panelQuerySchema = z.object({
   refId: z.string().check(z.minLength(1), z.maxLength(8)),

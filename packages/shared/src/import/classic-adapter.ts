@@ -5,6 +5,7 @@ import type { Variable } from '../schemas/variable';
 import type { ImportResult } from './types';
 
 import { grafanaClassicSchema } from '../schemas/grafana-classic';
+import { isPanelType } from '../schemas/panel';
 
 import { mapOverrides } from './override-mapping';
 import { mapTransformations } from './transformation-mapping';
@@ -27,21 +28,6 @@ const PANEL_TYPE_MAP: Record<string, string> = {
   'status-history': 'status-history',
   text: 'text',
 };
-
-const SUPPORTED_TYPES = new Set([
-  'timeseries',
-  'stat',
-  'table',
-  'gauge',
-  'bargauge',
-  'barchart',
-  'pie',
-  'histogram',
-  'heatmap',
-  'state-timeline',
-  'status-history',
-  'text',
-]);
 
 // Grafana's text panel `mode` is one of code/text/html/markdown. We only render
 // markdown or sanitized html, so anything that isn't explicitly 'html' becomes
@@ -121,29 +107,15 @@ const convertPanel = (gp: GrafanaBasePanel, index: number, warnings: string[]): 
   }
 
   const mapped = PANEL_TYPE_MAP[gp.type] ?? gp.type;
-  const supported = SUPPORTED_TYPES.has(mapped);
+  // The schema-exported guard both decides supportedness and narrows `mapped` to PanelType
+  // (aliased condition), so the fallback ternary needs no re-spelled type list.
+  const supported = isPanelType(mapped);
 
   if (!supported) {
     warnings.push(`Unsupported panel type "${gp.type}" (panel "${gp.title || `Panel ${String(index)}`}") — converted to placeholder stat panel`);
   }
 
   const panelType = supported ? mapped : 'stat';
-  if (
-    panelType !== 'timeseries' &&
-    panelType !== 'stat' &&
-    panelType !== 'table' &&
-    panelType !== 'gauge' &&
-    panelType !== 'bargauge' &&
-    panelType !== 'barchart' &&
-    panelType !== 'pie' &&
-    panelType !== 'histogram' &&
-    panelType !== 'heatmap' &&
-    panelType !== 'state-timeline' &&
-    panelType !== 'status-history' &&
-    panelType !== 'text'
-  ) {
-    return null;
-  }
 
   // Text panels carry their content in displayOptions.text (mapped from Grafana's
   // `options.content` + `options.mode`); every other type imports with empty options.
