@@ -40,6 +40,9 @@ const scopeValues = (values: ReadonlyMap<string, string | string[]>, name: strin
 
 const cloneKey = (id: string, value: string): string => `${id}:repeat:${encodeURIComponent(value)}`;
 
+/** Sort key piece: a horizontal band must be emitted before its row-mates so eviction reaches them. */
+const bandFirst = (p: Panel): number => (p.repeat !== undefined && p.repeatDirection === 'h' ? 0 : 1);
+
 /** The values a repeat panel expands over; empty means "render a single placeholder". */
 const resolveRepeatList = (raw: string | string[] | undefined): readonly string[] => {
   if (raw === undefined) return [];
@@ -60,11 +63,15 @@ const resolveRepeatList = (raw: string | string[] | undefined): readonly string[
  * - 'h' lays the block out on the full 24-wide band below the source y: rows are balanced
  *   (5 values at maxPerRow 4 → 2×3, not 4+1) and integer widths spread the remainder over the
  *   leading columns. 'v' stacks instances, keeping the source x/w.
- * - Panels later in reading order (sorted by y, ties by x) shift down by the height every
- *   expanded block gained, so nothing overlaps.
+ * - 'h' bands EVICT the source's row: the band sorts ahead of its row-mates and every panel at
+ *   or below the source row shifts down by the full band height — same-row siblings included
+ *   (Grafana's w=24 grid item pushes them the same way). The pure output is overlap-free; the
+ *   deliberate gap the eviction opens is closed by the grid's vertical compactor.
+ * - 'v' blocks only grow their own column, so later panels shift by the added height and
+ *   same-row siblings stay put.
  */
 export const expandRepeats = (panels: readonly Panel[], variables: readonly Variable[], values: ReadonlyMap<string, string | string[]>): RepeatedPanel[] => {
-  const ordered = panels.toSorted((a, b) => a.gridPos.y - b.gridPos.y || a.gridPos.x - b.gridPos.x);
+  const ordered = panels.toSorted((a, b) => a.gridPos.y - b.gridPos.y || bandFirst(a) - bandFirst(b) || a.gridPos.x - b.gridPos.x);
   const result: RepeatedPanel[] = [];
   let shift = 0;
 
@@ -138,7 +145,9 @@ export const expandRepeats = (panels: readonly Panel[], variables: readonly Vari
         sourceId: panel.id,
       });
     }
-    shift += (rowCount - 1) * h;
+    // Full band height, not the delta over the source: the band claims its whole row, so
+    // row-mates (which follow in the band-first order) and everything below all move past it.
+    shift += rowCount * h;
   }
 
   return result;

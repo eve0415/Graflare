@@ -107,6 +107,27 @@ describe('expandRepeats — vertical layout', () => {
 });
 
 describe('expandRepeats — y-shifting', () => {
+  it('evicts same-row siblings below the h band (the band claims the entire row)', () => {
+    // The seeded-dashboard topology that scattered in the browser: the repeat source shares
+    // its row with panels on both sides, and a full-width panel sits underneath.
+    const requests = mkPanel('req', pos(0, 0, 12, 8));
+    const src = mkPanel('stat', pos(12, 0, 6, 4), { repeat: 'host' });
+    const load = mkPanel('load', pos(18, 0, 6, 4));
+    const raw = mkPanel('raw', pos(0, 8, 24, 8));
+    const values = new Map<string, string | string[]>([['host', ['host-0', 'host-1']]]);
+    const out = expandRepeats([requests, src, load, raw], [mkVariable('host', { multi: true })], values);
+    const grid = (key: string): GridPos | undefined => out.find(r => r.key === key)?.panel.gridPos;
+    // The band (1 row × 2 cols of w=12) lands at the source row…
+    expect(grid('stat')).toEqual({ x: 0, y: 0, w: 12, h: 4 });
+    expect(grid('stat:repeat:host-1')).toEqual({ x: 12, y: 0, w: 12, h: 4 });
+    // …and EVERY panel at or below the source row drops by the band height (4), including
+    // both same-row siblings — the pure output must be overlap-free (gaps are fine; the
+    // grid's vertical compactor closes them).
+    expect(grid('req')).toEqual({ x: 0, y: 4, w: 12, h: 8 });
+    expect(grid('load')).toEqual({ x: 18, y: 4, w: 6, h: 4 });
+    expect(grid('raw')).toEqual({ x: 0, y: 12, w: 24, h: 8 });
+  });
+
   it('shifts later panels down by the added block height, leaving earlier panels alone', () => {
     const above = mkPanel('above', pos(0, 0, 24, 2));
     const left = mkPanel('left', pos(0, 2, 6, 4));
