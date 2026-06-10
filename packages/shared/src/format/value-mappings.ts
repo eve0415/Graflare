@@ -43,9 +43,8 @@ const matchesMapping = (value: RawValue, mapping: ValueMapping): boolean => {
       return Number.isFinite(n) && n >= mapping.from && n <= mapping.to;
     }
     case 'regex': {
-      // User-authored pattern rendered live — a bad pattern is a no-match, not a crash.
-      const re = getCachedRegex(mapping.pattern);
-      return re !== null && re.test(toStringForm(value));
+      // User-authored pattern rendered live — a bad (null-cached) pattern is a no-match, not a crash.
+      return getCachedRegex(mapping.pattern)?.test(toStringForm(value)) ?? false;
     }
     case 'special':
       return matchesSpecial(value, mapping.match);

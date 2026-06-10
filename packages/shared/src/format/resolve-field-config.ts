@@ -22,11 +22,10 @@ const matcherMatches = (matcher: FieldMatcher, field: FieldDescriptor): boolean 
   switch (matcher.id) {
     case 'byName':
       return field.name === matcher.options;
-    case 'byRegexp': {
-      // Authored pattern — a bad regex is a no-match, not a crash (mirrors applyValueMappings).
-      const re = getCachedRegex(matcher.options);
-      return re !== null && re.test(field.name);
-    }
+    case 'byRegexp':
+      // Authored pattern — a bad (null-cached) regex is a no-match, not a crash (mirrors
+      // applyValueMappings).
+      return getCachedRegex(matcher.options)?.test(field.name) ?? false;
     case 'byType':
       return field.type !== undefined && field.type === matcher.options;
     case 'byFrameRefID':
