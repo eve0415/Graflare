@@ -1,5 +1,7 @@
 import type { FieldConfig, FieldConfigDefaults, FieldMatcher, FieldOverrideProperty } from '../schemas/field-config';
 
+import { getCachedRegex } from './regex-cache';
+
 // A field as seen at render time. `name` is the series/column name (always present);
 // `type` is the field's data type when the source carries one (SQL columns do — see
 // sqlColumnTypeSchema; Prometheus series don't, so it's optional and byType simply
@@ -20,13 +22,11 @@ const matcherMatches = (matcher: FieldMatcher, field: FieldDescriptor): boolean 
   switch (matcher.id) {
     case 'byName':
       return field.name === matcher.options;
-    case 'byRegexp':
-      try {
-        return new RegExp(matcher.options).test(field.name);
-      } catch {
-        // Authored pattern — a bad regex is a no-match, not a crash (mirrors applyValueMappings).
-        return false;
-      }
+    case 'byRegexp': {
+      // Authored pattern — a bad regex is a no-match, not a crash (mirrors applyValueMappings).
+      const re = getCachedRegex(matcher.options);
+      return re !== null && re.test(field.name);
+    }
     case 'byType':
       return field.type !== undefined && field.type === matcher.options;
     case 'byFrameRefID':

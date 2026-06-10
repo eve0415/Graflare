@@ -1,5 +1,7 @@
 import type { MappingResult, ValueMapping } from '../schemas/field-config';
 
+import { getCachedRegex } from './regex-cache';
+
 // The raw value a panel may hold: numeric, the raw string form from Prometheus,
 // or null/undefined when there is no data.
 type RawValue = number | string | null | undefined;
@@ -41,12 +43,9 @@ const matchesMapping = (value: RawValue, mapping: ValueMapping): boolean => {
       return Number.isFinite(n) && n >= mapping.from && n <= mapping.to;
     }
     case 'regex': {
-      try {
-        return new RegExp(mapping.pattern).test(toStringForm(value));
-      } catch {
-        // User-authored pattern rendered live — a bad pattern is a no-match, not a crash.
-        return false;
-      }
+      // User-authored pattern rendered live — a bad pattern is a no-match, not a crash.
+      const re = getCachedRegex(mapping.pattern);
+      return re !== null && re.test(toStringForm(value));
     }
     case 'special':
       return matchesSpecial(value, mapping.match);
