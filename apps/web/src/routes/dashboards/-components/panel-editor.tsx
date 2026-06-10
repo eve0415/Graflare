@@ -278,7 +278,7 @@ export const PanelEditor = ({ panel, variables, open, onClose, onSave }: PanelEd
 
   const handleThresholdChange = useCallback(
     (index: number, field: 'value' | 'color', value: string) => {
-      const updated = draft.thresholds.map((th, j) => (j === index ? Object.assign(th, { [field]: field === 'value' ? Number(value) : value }) : th));
+      const updated = draft.thresholds.map((th, j) => (j === index ? { ...th, [field]: field === 'value' ? Number(value) : value } : th));
       updateField('thresholds', updated);
     },
     [draft.thresholds, updateField],
