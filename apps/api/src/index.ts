@@ -72,6 +72,7 @@ import {
   contactPoints,
   dashboardVersions,
   dashboards,
+  datasourcePublicColumns,
   datasources,
   folders,
   muteTimings,
@@ -228,40 +229,13 @@ export class GraflareAPI extends WorkerEntrypoint<Bindings> {
 
   async listDatasources(jwt: string) {
     const { orgId } = await this.resolveAuth(jwt);
-    return this.db
-      .select({
-        id: datasources.id,
-        orgId: datasources.orgId,
-        name: datasources.name,
-        type: datasources.type,
-        dialect: datasources.dialect,
-        url: datasources.url,
-        authType: datasources.authType,
-        queryTimeoutMs: datasources.queryTimeoutMs,
-        cacheTtl: datasources.cacheTtl,
-        createdAt: datasources.createdAt,
-        updatedAt: datasources.updatedAt,
-      })
-      .from(datasources)
-      .where(eq(datasources.orgId, orgId));
+    return this.db.select(datasourcePublicColumns).from(datasources).where(eq(datasources.orgId, orgId));
   }
 
   private async getDatasourceCore(orgId: string, id: string) {
     datasourceIdSchema.parse(id);
     const rows = await this.db
-      .select({
-        id: datasources.id,
-        orgId: datasources.orgId,
-        name: datasources.name,
-        type: datasources.type,
-        dialect: datasources.dialect,
-        url: datasources.url,
-        authType: datasources.authType,
-        queryTimeoutMs: datasources.queryTimeoutMs,
-        cacheTtl: datasources.cacheTtl,
-        createdAt: datasources.createdAt,
-        updatedAt: datasources.updatedAt,
-      })
+      .select(datasourcePublicColumns)
       .from(datasources)
       .where(and(eq(datasources.id, id), eq(datasources.orgId, orgId)))
       .limit(1);

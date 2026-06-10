@@ -8,7 +8,7 @@ import { Hono } from 'hono';
 
 import { encryptCredentials } from '../../crypto/credentials';
 import { createDb } from '../../db';
-import { datasources } from '../../db/schema';
+import { datasourcePublicColumns, datasources } from '../../db/schema';
 import { onValidationError } from '../../middleware/validate';
 
 const app = new Hono<AppEnv>();
@@ -17,22 +17,7 @@ app.get('/', async c => {
   const db = createDb(c.env.DB);
   const orgId = c.get('orgId');
 
-  const rows = await db
-    .select({
-      id: datasources.id,
-      orgId: datasources.orgId,
-      name: datasources.name,
-      type: datasources.type,
-      dialect: datasources.dialect,
-      url: datasources.url,
-      authType: datasources.authType,
-      queryTimeoutMs: datasources.queryTimeoutMs,
-      cacheTtl: datasources.cacheTtl,
-      createdAt: datasources.createdAt,
-      updatedAt: datasources.updatedAt,
-    })
-    .from(datasources)
-    .where(eq(datasources.orgId, orgId));
+  const rows = await db.select(datasourcePublicColumns).from(datasources).where(eq(datasources.orgId, orgId));
 
   return c.json(rows);
 });
@@ -43,19 +28,7 @@ app.get('/:id', sValidator('param', datasourceIdParamSchema, onValidationError),
   const { id } = c.req.valid('param');
 
   const rows = await db
-    .select({
-      id: datasources.id,
-      orgId: datasources.orgId,
-      name: datasources.name,
-      type: datasources.type,
-      dialect: datasources.dialect,
-      url: datasources.url,
-      authType: datasources.authType,
-      queryTimeoutMs: datasources.queryTimeoutMs,
-      cacheTtl: datasources.cacheTtl,
-      createdAt: datasources.createdAt,
-      updatedAt: datasources.updatedAt,
-    })
+    .select(datasourcePublicColumns)
     .from(datasources)
     .where(and(eq(datasources.id, id), eq(datasources.orgId, orgId)))
     .limit(1);
@@ -134,19 +107,7 @@ app.put('/:id', sValidator('param', datasourceIdParamSchema, onValidationError),
     .where(and(eq(datasources.id, id), eq(datasources.orgId, orgId)));
 
   const updated = await db
-    .select({
-      id: datasources.id,
-      orgId: datasources.orgId,
-      name: datasources.name,
-      type: datasources.type,
-      dialect: datasources.dialect,
-      url: datasources.url,
-      authType: datasources.authType,
-      queryTimeoutMs: datasources.queryTimeoutMs,
-      cacheTtl: datasources.cacheTtl,
-      createdAt: datasources.createdAt,
-      updatedAt: datasources.updatedAt,
-    })
+    .select(datasourcePublicColumns)
     .from(datasources)
     .where(and(eq(datasources.id, id), eq(datasources.orgId, orgId)))
     .limit(1);

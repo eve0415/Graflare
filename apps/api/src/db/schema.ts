@@ -36,6 +36,23 @@ export const datasources = sqliteTable('datasources', {
   updatedAt: integer('updated_at', { mode: 'timestamp_ms' }).notNull(),
 });
 
+// Security invariant: datasource read responses must never carry the encrypted
+// `credentials` column. Every list/get/update read path selects this projection
+// instead of the full row — keep it the single source of that omission.
+export const datasourcePublicColumns = {
+  id: datasources.id,
+  orgId: datasources.orgId,
+  name: datasources.name,
+  type: datasources.type,
+  dialect: datasources.dialect,
+  url: datasources.url,
+  authType: datasources.authType,
+  queryTimeoutMs: datasources.queryTimeoutMs,
+  cacheTtl: datasources.cacheTtl,
+  createdAt: datasources.createdAt,
+  updatedAt: datasources.updatedAt,
+};
+
 export const folders = sqliteTable(
   'folders',
   {
