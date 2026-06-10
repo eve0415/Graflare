@@ -2,10 +2,12 @@ import type { DatasourceRow } from '../../datasources/-api';
 import type { Annotation } from '@graflare/shared/schemas/annotation';
 import type { Panel } from '@graflare/shared/schemas/panel';
 import type { AdhocFilter, Variable } from '@graflare/shared/schemas/variable';
+import type { RepeatedPanel } from '@graflare/shared/variables/repeat';
 
 import { panelSchema } from '@graflare/shared/schemas/panel';
 import { variableSchema } from '@graflare/shared/schemas/variable';
 import { resolveRange } from '@graflare/shared/time/resolve';
+import { expandRepeats } from '@graflare/shared/variables/repeat';
 import { Button } from '@graflare/ui/components/button';
 import { useQuery, useQueryClient, useSuspenseQuery } from '@tanstack/react-query';
 import { createFileRoute } from '@tanstack/react-router';
@@ -117,6 +119,18 @@ const DashboardViewPage = () => {
   // Adhoc variables with their live filters folded in (saved filters under any bar edit). The grid
   // scopes these per-panel by datasource and injects them; the bar renders/edits them.
   const dashboardAdhocVariables = useMemo(() => resolveAdhocVariables(dashboardVariables, adhocFilterValues), [dashboardVariables, adhocFilterValues]);
+
+  // The grid's render items. VIEW mode expands repeat panels into one instance per variable value
+  // (runtime-only clones, each scoped to its value). EDIT mode renders the source panels only —
+  // identity-mapped into the same item shape so the grid has ONE contract — because drag/resize/
+  // save must operate on exactly what's persisted; the unscoped values give a repeat panel a
+  // combined (regex-union) preview.
+  const gridItems = useMemo((): RepeatedPanel[] => {
+    if (editMode) {
+      return dashboardPanels.map(panel => ({ panel, key: panel.id, values: effectiveValues, isRepeatClone: false, sourceId: panel.id }));
+    }
+    return expandRepeats(dashboardPanels, dashboardVariables, effectiveValues);
+  }, [editMode, dashboardPanels, dashboardVariables, effectiveValues]);
 
   // Resolve the visible window to epoch MS once per range change (not every render,
   // or `now` would drift the query key and refetch constantly). One fetch per
@@ -305,12 +319,11 @@ const DashboardViewPage = () => {
         ) : (
           <PanelActionsProvider value={panelActions}>
             <DashboardGrid
-              panels={dashboardPanels}
+              items={gridItems}
               timeRange={timeRange}
               refreshInterval={refetchMs}
               editMode={editMode}
-              onLayoutChange={handleLayoutChange}
-              variables={effectiveValues}
+              onLayoutChange={editMode ? handleLayoutChange : undefined}
               adhocVariables={dashboardAdhocVariables}
               annotations={dashboardAnnotations}
             />

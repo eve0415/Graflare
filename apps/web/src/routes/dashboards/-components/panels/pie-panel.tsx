@@ -117,7 +117,14 @@ export const PiePanel = ({ panel, timeRange, refetchInterval }: PiePanelProps) =
   const chartLabel = `${isDonut ? 'Donut' : 'Pie'} chart, ${panel.title}`;
 
   return (
-    <PanelFrame title={panel.title} panelId={panel.id} loading={isLoading} error={error instanceof Error ? error.message : null} onRetry={handleRetry}>
+    <PanelFrame
+      title={panel.title}
+      panelId={panel.id}
+      repeat={panel.repeat}
+      loading={isLoading}
+      error={error instanceof Error ? error.message : null}
+      onRetry={handleRetry}
+    >
       {slices.length > 0 ? (
         <div className={legendWrapClass(legend)}>
           {/* Decorative: the geometry conveys no information a screen reader can use,

@@ -32,7 +32,7 @@ export const TextPanel = ({ panel }: TextPanelProps) => {
   const plugins = text?.mode === 'html' ? HTML_PLUGINS : MARKDOWN_PLUGINS;
 
   return (
-    <PanelFrame title={panel.title} panelId={panel.id}>
+    <PanelFrame title={panel.title} panelId={panel.id} repeat={panel.repeat}>
       {/* Scoped typographic styles via arbitrary variants keep the panel readable
           without pulling in a typography plugin; the content itself is sanitized. */}
       <div className='[&_pre]:bg-muted h-full overflow-auto text-sm [&_a]:underline [&_code]:text-xs [&_h1]:mb-2 [&_h1]:text-lg [&_h1]:font-semibold [&_h2]:mb-1.5 [&_h2]:text-base [&_h2]:font-semibold [&_li]:ml-4 [&_li]:list-disc [&_p]:mb-2 [&_pre]:overflow-auto [&_pre]:rounded [&_pre]:p-2 [&_ul]:mb-2'>

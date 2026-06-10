@@ -1,6 +1,7 @@
 import type { Annotation } from '@graflare/shared/schemas/annotation';
 import type { Panel } from '@graflare/shared/schemas/panel';
 import type { Variable } from '@graflare/shared/schemas/variable';
+import type { RepeatedPanel } from '@graflare/shared/variables/repeat';
 import type { Layout } from 'react-grid-layout';
 
 import { useMemo } from 'react';
@@ -12,12 +13,18 @@ import { PanelRenderer } from './panels/panel-renderer';
 const GridLayout = RGL;
 
 interface DashboardGridProps {
-  panels: Panel[];
+  /**
+   * The renderable instances — repeat-expanded in view mode, identity-mapped source panels in
+   * edit mode (one contract either way). Each item carries its own scoped variable map; items are
+   * keyed by `item.key` so a clone's React/query identity is stable across re-expansion.
+   */
+  items: readonly RepeatedPanel[];
   timeRange: { from: string; to: string };
   refreshInterval: number | false;
   editMode: boolean;
-  onLayoutChange?: (panels: Panel[]) => void;
-  variables: ReadonlyMap<string, string | string[]>;
+  // `| undefined` so the caller can wire the handler conditionally (edit mode only) without
+  // tripping exactOptionalPropertyTypes on an explicit `undefined` JSX value.
+  onLayoutChange?: ((panels: Panel[]) => void) | undefined;
   adhocVariables: readonly Variable[];
   annotations: readonly Annotation[];
 }
@@ -35,7 +42,7 @@ const GRID_CONFIG = { cols: COLS, rowHeight: ROW_HEIGHT, margin: MARGIN };
 // allocate a fresh style object per panel per render.
 const PANEL_CELL_STYLE = { minWidth: 0 } as const;
 
-export const DashboardGrid = ({ panels, timeRange, refreshInterval, editMode, onLayoutChange, variables, adhocVariables, annotations }: DashboardGridProps) => {
+export const DashboardGrid = ({ items, timeRange, refreshInterval, editMode, onLayoutChange, adhocVariables, annotations }: DashboardGridProps) => {
   // The fork's WidthProvider replacement: a ResizeObserver on `containerRef` that yields the
   // live container width (initialWidth 1280 until measured). `mounted` is false until the
   // first measurement — we gate the grid on it so the 1280 fallback is never painted at a
@@ -44,24 +51,24 @@ export const DashboardGrid = ({ panels, timeRange, refreshInterval, editMode, on
 
   const layout = useMemo(
     () =>
-      panels.map(p => ({
-        i: p.id,
-        x: p.gridPos.x,
-        y: p.gridPos.y,
-        w: p.gridPos.w,
-        h: p.gridPos.h,
+      items.map(({ key, panel }) => ({
+        i: key,
+        x: panel.gridPos.x,
+        y: panel.gridPos.y,
+        w: panel.gridPos.w,
+        h: panel.gridPos.h,
       })),
-    [panels],
+    [items],
   );
 
   // Reserve the grid's vertical box from the row extent so the width-measurement commit
   // (mounted false → true) doesn't change page height — no layout shift on first paint.
   const wrapperStyle = useMemo(() => {
     let maxRow = 0;
-    for (const p of panels) maxRow = Math.max(maxRow, p.gridPos.y + p.gridPos.h);
+    for (const { panel } of items) maxRow = Math.max(maxRow, panel.gridPos.y + panel.gridPos.h);
     const minHeight = maxRow * (ROW_HEIGHT + MARGIN[1]) + MARGIN[1];
     return { minWidth: 0, minHeight };
-  }, [panels]);
+  }, [items]);
 
   // Pixel width of each panel's cell, derived from the measured container with the SAME grid
   // params the layout uses (cols/margin/padding) via the fork's own position math — so the
@@ -69,27 +76,30 @@ export const DashboardGrid = ({ panels, timeRange, refreshInterval, editMode, on
   const panelPixelSize = useMemo(() => {
     const params = { margin: MARGIN, containerPadding: CONTAINER_PADDING, containerWidth: width, cols: COLS, rowHeight: ROW_HEIGHT, maxRows: Infinity };
     const sizes = new Map<string, { width: number; height: number }>();
-    for (const p of panels) {
-      const pos = calcGridItemPosition(params, p.gridPos.x, p.gridPos.y, p.gridPos.w, p.gridPos.h);
-      sizes.set(p.id, { width: pos.width, height: pos.height });
+    for (const { key, panel } of items) {
+      const pos = calcGridItemPosition(params, panel.gridPos.x, panel.gridPos.y, panel.gridPos.w, panel.gridPos.h);
+      sizes.set(key, { width: pos.width, height: pos.height });
     }
     return sizes;
-  }, [panels, width]);
+  }, [items, width]);
 
   const handleLayoutChange = useMemo(
     () => (newLayout: Layout) => {
       if (onLayoutChange === undefined) return;
-      const updated = panels.map(p => {
-        const layoutItem = newLayout.find(l => l.i === p.id);
-        if (layoutItem === undefined) return p;
-        return {
-          ...p,
-          gridPos: { x: layoutItem.x, y: layoutItem.y, w: layoutItem.w, h: layoutItem.h },
-        };
-      });
+      // Map the layout positions back onto the SOURCE panels only. Repeat clones are runtime
+      // render artifacts — they must never flow into the edit-mode panel state or a save. (In
+      // edit mode the items ARE the source panels, so this is exactly the pre-repeat behavior.)
+      const updated: Panel[] = [];
+      for (const item of items) {
+        if (item.isRepeatClone) continue;
+        const layoutItem = newLayout.find(l => l.i === item.key);
+        updated.push(
+          layoutItem === undefined ? item.panel : { ...item.panel, gridPos: { x: layoutItem.x, y: layoutItem.y, w: layoutItem.w, h: layoutItem.h } },
+        );
+      }
       onLayoutChange(updated);
     },
-    [panels, onLayoutChange],
+    [items, onLayoutChange],
   );
 
   const dragConfig = useMemo(() => ({ enabled: editMode }), [editMode]);
@@ -109,17 +119,17 @@ export const DashboardGrid = ({ panels, timeRange, refreshInterval, editMode, on
           resizeConfig={resizeConfig}
           onLayoutChange={handleLayoutChange}
         >
-          {panels.map((panel, index) => {
-            const size = panelPixelSize.get(panel.id);
+          {items.map((item, index) => {
+            const size = panelPixelSize.get(item.key);
             return (
-              <div key={panel.id} data-panel-index={index} style={PANEL_CELL_STYLE}>
+              <div key={item.key} data-panel-index={index} style={PANEL_CELL_STYLE}>
                 <PanelRenderer
-                  panel={panel}
+                  panel={item.panel}
                   timeRange={timeRange}
                   refetchInterval={typeof refreshInterval === 'number' ? refreshInterval : false}
-                  width={size?.width ?? panel.gridPos.w * (ROW_HEIGHT + MARGIN[0])}
-                  height={size?.height ?? panel.gridPos.h * ROW_HEIGHT}
-                  variables={variables}
+                  width={size?.width ?? item.panel.gridPos.w * (ROW_HEIGHT + MARGIN[0])}
+                  height={size?.height ?? item.panel.gridPos.h * ROW_HEIGHT}
+                  variables={item.values}
                   adhocVariables={adhocVariables}
                   annotations={annotations}
                 />

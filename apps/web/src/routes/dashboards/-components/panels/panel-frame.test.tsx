@@ -42,6 +42,40 @@ describe('panel-frame', () => {
     expect(screen.queryByLabelText('Delete panel')).toBeNull();
   });
 
+  it('shows the repeat badge in edit mode when the panel repeats over a variable', () => {
+    render(
+      <PanelActionsProvider value={actions}>
+        <PanelFrame title='CPU' panelId='p1' repeat='job'>
+          <div>body</div>
+        </PanelFrame>
+      </PanelActionsProvider>,
+    );
+
+    expect(screen.getByText('Repeats: $job')).toBeDefined();
+  });
+
+  it('hides the repeat badge in view mode (no provider)', () => {
+    render(
+      <PanelFrame title='CPU' panelId='p1' repeat='job'>
+        <div>body</div>
+      </PanelFrame>,
+    );
+
+    expect(screen.queryByText('Repeats: $job')).toBeNull();
+  });
+
+  it('shows no repeat badge in edit mode for a panel without repeat', () => {
+    render(
+      <PanelActionsProvider value={actions}>
+        <PanelFrame title='CPU' panelId='p1'>
+          <div>body</div>
+        </PanelFrame>
+      </PanelActionsProvider>,
+    );
+
+    expect(screen.queryByText(/^Repeats:/)).toBeNull();
+  });
+
   it('exposes the panel as a region landmark labelled by its title', () => {
     render(
       <PanelFrame title='CPU'>

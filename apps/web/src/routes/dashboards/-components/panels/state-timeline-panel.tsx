@@ -153,7 +153,14 @@ export const StateTimelinePanel = ({ panel, timeRange, refetchInterval }: StateT
   const label = useMemo(() => `State timeline, ${String(lanes.length)} series`, [lanes.length]);
 
   return (
-    <PanelFrame title={panel.title} panelId={panel.id} loading={isLoading} error={error instanceof Error ? error.message : null} onRetry={handleRetry}>
+    <PanelFrame
+      title={panel.title}
+      panelId={panel.id}
+      repeat={panel.repeat}
+      loading={isLoading}
+      error={error instanceof Error ? error.message : null}
+      onRetry={handleRetry}
+    >
       {domain === null ? (
         <p className='text-muted-foreground text-sm'>No data</p>
       ) : (

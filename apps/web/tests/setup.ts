@@ -80,18 +80,28 @@ const MockGrid = ({ children }: { children: ReactNode }): ReactNode => children;
 // already-measured width. `mounted: true` lets width-gated children (e.g. the Explore chart) render.
 const noop = (): void => {};
 const mockUseContainerWidth = () => ({ width: 800, mounted: true, containerRef: createRef<HTMLDivElement>(), measureWidth: noop });
+// The dashboard grid derives each panel's pixel box from the fork's own position math; the mock
+// only needs deterministic non-zero sizes (the unit ~ one grid cell), not the real margin algebra.
+const mockCalcGridItemPosition = (_params: unknown, _x: number, _y: number, w: number, h: number) => ({ top: 0, left: 0, width: w * 30, height: h * 30 });
 vi.mock('react-grid-layout', () => ({
   default: MockGrid,
   Responsive: MockGrid,
   WidthProvider: () => MockGrid,
   useContainerWidth: mockUseContainerWidth,
+  calcGridItemPosition: mockCalcGridItemPosition,
+  // Consumed as an opaque `compactor` prop value by the MockGrid (which ignores it).
+  verticalCompactor: {},
 }));
 
 vi.mock('react-grid-layout/css/styles.css', () => ({}));
 
 vi.mock('../src/routes/dashboards/-queries', () => ({
   dashboardsQueryOptions: () => ({ queryKey: ['dashboards'], queryFn: () => Promise.resolve([]) }),
-  dashboardQueryOptions: () => ({ queryKey: ['dashboard'], queryFn: () => Promise.resolve(null) }),
+  // `vi.fn` so a test can serve a populated dashboard (e.g. the repeat-expansion route test).
+  dashboardQueryOptions: vi.fn<(id: string) => { queryKey: readonly unknown[]; queryFn: () => Promise<unknown> }>((id: string) => ({
+    queryKey: ['dashboard', id],
+    queryFn: () => Promise.resolve(null),
+  })),
   dashboardVersionsQueryOptions: () => ({ queryKey: ['versions'], queryFn: () => Promise.resolve([]) }),
   foldersQueryOptions: () => ({ queryKey: ['folders'], queryFn: () => Promise.resolve([]) }),
   annotationsQueryOptions: () => ({ queryKey: ['annotations'], queryFn: () => Promise.resolve([]) }),

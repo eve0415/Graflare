@@ -29,6 +29,8 @@ const tablePanel = (expr: string, datasourceId?: string): Panel => ({
   maxPerRow: 4,
 });
 
+const titledPanel = (title: string): Panel => ({ ...tablePanel('up'), title });
+
 const adhocVar = (datasourceId: string, filters: Variable['filters']): Variable => ({
   name: 'f',
   type: 'adhoc',
@@ -73,6 +75,40 @@ describe('panel-renderer', () => {
     );
     const props = vi.mocked(TablePanel).mock.calls[0]?.[0];
     expect(props?.panel.queries[0]?.expr).toBe('up{job="node"}');
+  });
+
+  it('interpolates the displayed panel title against the same values map', () => {
+    render(
+      <PanelRenderer
+        panel={titledPanel('CPU $job')}
+        timeRange={timeRange}
+        refetchInterval={false}
+        width={100}
+        height={100}
+        variables={jobVars}
+        adhocVariables={noAdhoc}
+        annotations={noAnnotations}
+      />,
+    );
+    const props = vi.mocked(TablePanel).mock.calls[0]?.[0];
+    expect(props?.panel.title).toBe('CPU node');
+  });
+
+  it('leaves the original panel title raw (display-only interpolation)', () => {
+    const panel = titledPanel('CPU $job');
+    render(
+      <PanelRenderer
+        panel={panel}
+        timeRange={timeRange}
+        refetchInterval={false}
+        width={100}
+        height={100}
+        variables={jobVars}
+        adhocVariables={noAdhoc}
+        annotations={noAnnotations}
+      />,
+    );
+    expect(panel.title).toBe('CPU $job');
   });
 
   it('leaves the original panel queries raw so editing/saving is unaffected', () => {

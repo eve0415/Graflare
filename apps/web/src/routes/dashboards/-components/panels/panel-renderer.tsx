@@ -3,7 +3,7 @@ import type { Panel } from '@graflare/shared/schemas/panel';
 import type { Variable } from '@graflare/shared/schemas/variable';
 
 import { resolveAdhocFilters } from '@graflare/shared/variables/adhoc';
-import { interpolateAndInjectQueries } from '@graflare/shared/variables/interpolate';
+import { interpolateAndInjectQueries, interpolateVariables } from '@graflare/shared/variables/interpolate';
 import { useMemo } from 'react';
 
 import { BarChartPanel } from './bar-chart-panel';
@@ -33,14 +33,15 @@ interface PanelRendererProps {
 }
 
 export const PanelRenderer = ({ panel, timeRange, refetchInterval, width, height, variables, adhocVariables, annotations }: PanelRendererProps) => {
-  // Interpolate dashboard variables into the queries at render time, then inject any adhoc filters
-  // scoped to this panel's datasource. The panel's own queries keep their raw `$var` form
-  // (editing/saving is unaffected); only the copy handed to the data hook is transformed. When no
-  // adhoc filter targets this datasource the injection step is skipped, so the queries are
+  // Interpolate dashboard variables into the queries AND the displayed title at render time, then
+  // inject any adhoc filters scoped to this panel's datasource. The panel's own queries/title keep
+  // their raw `$var` form (editing/saving is unaffected); only the copy handed to the leaf panel
+  // is transformed — so a repeat clone, fed its scoped values map, titles itself per value. When
+  // no adhoc filter targets this datasource the injection step is skipped, so the queries are
   // byte-identical to the interpolation-only result.
   const resolvedPanel = useMemo(() => {
     const adhocFilters = resolveAdhocFilters(adhocVariables, panel.datasourceId);
-    return { ...panel, queries: interpolateAndInjectQueries(panel.queries, variables, adhocFilters) };
+    return { ...panel, title: interpolateVariables(panel.title, variables), queries: interpolateAndInjectQueries(panel.queries, variables, adhocFilters) };
   }, [panel, variables, adhocVariables]);
 
   // Only the time-based chart panels overlay annotations; other panel types ignore them.
@@ -86,7 +87,7 @@ export const PanelRenderer = ({ panel, timeRange, refetchInterval, width, height
       return <TextPanel panel={resolvedPanel} />;
     default:
       return (
-        <PanelFrame title={resolvedPanel.title}>
+        <PanelFrame title={resolvedPanel.title} repeat={resolvedPanel.repeat}>
           <p className='text-muted-foreground text-sm'>Unknown panel type: {resolvedPanel.type}</p>
         </PanelFrame>
       );

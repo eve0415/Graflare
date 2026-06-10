@@ -143,7 +143,14 @@ export const HeatmapPanel = ({ panel, timeRange, refetchInterval }: HeatmapPanel
   const label = useMemo(() => `Heatmap, ${String(grid.cells.length)} cells, peak ${String(grid.maxCount)}`, [grid.cells.length, grid.maxCount]);
 
   return (
-    <PanelFrame title={panel.title} panelId={panel.id} loading={isLoading} error={error instanceof Error ? error.message : null} onRetry={handleRetry}>
+    <PanelFrame
+      title={panel.title}
+      panelId={panel.id}
+      repeat={panel.repeat}
+      loading={isLoading}
+      error={error instanceof Error ? error.message : null}
+      onRetry={handleRetry}
+    >
       {grid.maxCount > 0 ? (
         <HeatmapSvg grid={grid} scheme={scheme} defaults={panel.fieldConfig.defaults} label={label} />
       ) : (

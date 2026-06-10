@@ -161,7 +161,14 @@ export const StatusHistoryPanel = ({ panel, timeRange, refetchInterval }: Status
   const label = useMemo(() => `Status history, ${String(lanes.length)} series`, [lanes.length]);
 
   return (
-    <PanelFrame title={panel.title} panelId={panel.id} loading={isLoading} error={error instanceof Error ? error.message : null} onRetry={handleRetry}>
+    <PanelFrame
+      title={panel.title}
+      panelId={panel.id}
+      repeat={panel.repeat}
+      loading={isLoading}
+      error={error instanceof Error ? error.message : null}
+      onRetry={handleRetry}
+    >
       {layout === null ? (
         <p className='text-muted-foreground text-sm'>No data</p>
       ) : (

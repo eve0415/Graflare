@@ -39,6 +39,7 @@ export const UPlotPanel = ({ panel, data, options, isLoading, error, onRetry, da
     <PanelFrame
       title={panel.title}
       panelId={panel.id}
+      repeat={panel.repeat}
       loading={isLoading}
       error={error instanceof Error ? error.message : null}
       onRetry={onRetry}

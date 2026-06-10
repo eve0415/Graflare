@@ -78,7 +78,14 @@ export const StatPanel = ({ panel, timeRange, refetchInterval }: StatPanelProps)
   }, [colorMode, effectiveColor]);
 
   return (
-    <PanelFrame title={panel.title} panelId={panel.id} loading={isLoading} error={error instanceof Error ? error.message : null} onRetry={handleRetry}>
+    <PanelFrame
+      title={panel.title}
+      panelId={panel.id}
+      repeat={panel.repeat}
+      loading={isLoading}
+      error={error instanceof Error ? error.message : null}
+      onRetry={handleRetry}
+    >
       <output
         className='[container-type:size] flex h-full items-center justify-center rounded'
         style={bgStyle}

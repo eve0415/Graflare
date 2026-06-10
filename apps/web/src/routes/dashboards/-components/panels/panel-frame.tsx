@@ -1,3 +1,4 @@
+import { Badge } from '@graflare/ui/components/badge';
 import { Button } from '@graflare/ui/components/button';
 import { Skeleton } from '@graflare/ui/components/skeleton';
 import { Toggle } from '@graflare/ui/components/toggle';
@@ -14,9 +15,16 @@ interface PanelFrameProps {
   children: React.ReactNode;
   dataTableContent?: React.ReactNode;
   panelId?: string;
+  /**
+   * The repeat variable's name when the panel repeats. Shown as a badge in edit mode only —
+   * view mode renders the expanded clones themselves, so the hint would be noise there.
+   * `| undefined` so call sites can forward the optional `panel.repeat` directly under
+   * exactOptionalPropertyTypes.
+   */
+  repeat?: string | undefined;
 }
 
-export const PanelFrame = ({ title, loading, error, onRetry, children, dataTableContent, panelId }: PanelFrameProps) => {
+export const PanelFrame = ({ title, loading, error, onRetry, children, dataTableContent, panelId, repeat }: PanelFrameProps) => {
   const [showDataTable, setShowDataTable] = useState(false);
   const actions = usePanelActions();
   // Names the panel's region landmark via its visible title so screen-reader users
@@ -38,9 +46,12 @@ export const PanelFrame = ({ title, loading, error, onRetry, children, dataTable
   return (
     <section className='border-border bg-card flex h-full flex-col overflow-hidden rounded-lg border' aria-labelledby={titleId}>
       <div className='flex items-center justify-between border-b px-3 py-1.5'>
-        <h2 id={titleId} className='text-sm font-medium'>
-          {title}
-        </h2>
+        <div className='flex min-w-0 items-center gap-1.5'>
+          <h2 id={titleId} className='truncate text-sm font-medium'>
+            {title}
+          </h2>
+          {actions !== null && repeat !== undefined && <Badge variant='outline'>{`Repeats: $${repeat}`}</Badge>}
+        </div>
         <div className='flex items-center gap-1'>
           {dataTableContent !== undefined && (
             <Toggle className='size-6 min-w-0 p-0' pressed={showDataTable} onPressedChange={setShowDataTable} aria-label='Show data table'>

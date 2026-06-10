@@ -87,7 +87,14 @@ export const TablePanel = ({ panel, timeRange, refetchInterval }: TablePanelProp
   );
 
   return (
-    <PanelFrame title={panel.title} panelId={panel.id} loading={isLoading} error={error instanceof Error ? error.message : null} onRetry={handleRetry}>
+    <PanelFrame
+      title={panel.title}
+      panelId={panel.id}
+      repeat={panel.repeat}
+      loading={isLoading}
+      error={error instanceof Error ? error.message : null}
+      onRetry={handleRetry}
+    >
       <QueryResultTable data={tableData} renderCell={renderCell} scrollRegionLabel={`${panel.title} data table`} />
     </PanelFrame>
   );

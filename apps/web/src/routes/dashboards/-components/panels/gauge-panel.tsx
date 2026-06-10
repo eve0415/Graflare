@@ -103,7 +103,14 @@ export const GaugePanel = ({ panel, timeRange, refetchInterval }: GaugePanelProp
   }, [panel.thresholds, showMarkers, min, max]);
 
   return (
-    <PanelFrame title={panel.title} panelId={panel.id} loading={isLoading} error={error instanceof Error ? error.message : null} onRetry={handleRetry}>
+    <PanelFrame
+      title={panel.title}
+      panelId={panel.id}
+      repeat={panel.repeat}
+      loading={isLoading}
+      error={error instanceof Error ? error.message : null}
+      onRetry={handleRetry}
+    >
       {/* NOT a native <meter>: children of <meter> are fallback content and never render in
           modern browsers, so the SVG arc was invisible behind the UA meter bar. A div with
           role='meter' renders the SVG and keeps the semantics (the role requires

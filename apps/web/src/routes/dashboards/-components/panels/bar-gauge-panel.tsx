@@ -83,7 +83,14 @@ export const BarGaugePanel = ({ panel, timeRange, refetchInterval }: BarGaugePan
   const segments = useMemo(() => barGaugeSegments(data, fieldConfig, queries, transformations), [data, fieldConfig, queries, transformations]);
 
   return (
-    <PanelFrame title={panel.title} panelId={panel.id} loading={isLoading} error={error instanceof Error ? error.message : null} onRetry={handleRetry}>
+    <PanelFrame
+      title={panel.title}
+      panelId={panel.id}
+      repeat={panel.repeat}
+      loading={isLoading}
+      error={error instanceof Error ? error.message : null}
+      onRetry={handleRetry}
+    >
       {segments.length > 0 ? (
         <div className={vertical ? 'flex h-full items-end justify-around gap-3 p-2' : 'flex h-full flex-col justify-center gap-2 p-1'}>
           {segments.map((segment, i) => (
