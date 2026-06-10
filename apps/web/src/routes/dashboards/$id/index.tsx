@@ -331,7 +331,9 @@ const DashboardViewPage = () => {
         )}
       </div>
 
-      {editingPanel !== null && <PanelEditor panel={editingPanel} open onClose={handlePanelEditorClose} onSave={handlePanelSave} />}
+      {editingPanel !== null && (
+        <PanelEditor panel={editingPanel} variables={dashboardVariables} open onClose={handlePanelEditorClose} onSave={handlePanelSave} />
+      )}
 
       <DashboardSettings
         open={settingsOpen}

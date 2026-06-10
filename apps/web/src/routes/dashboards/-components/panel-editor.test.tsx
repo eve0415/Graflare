@@ -1,4 +1,5 @@
 import type { Panel } from '@graflare/shared/schemas/panel';
+import type { Variable } from '@graflare/shared/schemas/variable';
 
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { cleanup, fireEvent, render, screen, within } from '@testing-library/react';
@@ -33,11 +34,28 @@ const basePanel = (): Panel => ({
   maxPerRow: 4,
 });
 
-const renderEditor = (panel: Panel, onSave: (p: Panel) => void) => {
+const makeVariable = (name: string): Variable => ({
+  name,
+  type: 'custom',
+  label: '',
+  query: '',
+  regex: '',
+  sort: 'disabled',
+  multi: false,
+  includeAll: false,
+  current: '',
+  allValue: '',
+  options: [],
+  filters: [],
+});
+
+const NO_VARIABLES: readonly Variable[] = [];
+
+const renderEditor = (panel: Panel, onSave: (p: Panel) => void, variables: readonly Variable[] = NO_VARIABLES) => {
   const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   return render(
     <QueryClientProvider client={queryClient}>
-      <PanelEditor panel={panel} open onClose={vi.fn<() => void>()} onSave={onSave} />
+      <PanelEditor panel={panel} variables={variables} open onClose={vi.fn<() => void>()} onSave={onSave} />
     </QueryClientProvider>,
   );
 };
@@ -441,5 +459,76 @@ describe('panel-editor text content', () => {
     fireEvent.change(textarea, { target: { value: '<i>bye</i>' } });
     fireEvent.click(screen.getByRole('button', { name: 'Apply' }));
     expect(onSave.mock.calls[0]?.[0].displayOptions.text).toEqual({ content: '<i>bye</i>', mode: 'html' });
+  });
+});
+
+describe('panel-editor repeat options', () => {
+  it('lists None plus the dashboard variables and shows the view-mode hint', () => {
+    renderEditor(basePanel(), vi.fn<(p: Panel) => void>(), [makeVariable('host'), makeVariable('job')]);
+
+    expect(screen.getByText('Repeat options')).toBeDefined();
+    expect(screen.getByText(/Repeats render in view mode/)).toBeDefined();
+
+    fireEvent.click(screen.getByLabelText('Repeat by variable'));
+    expect(screen.getByRole('option', { name: 'None' })).toBeDefined();
+    expect(screen.getByRole('option', { name: 'host' })).toBeDefined();
+    expect(screen.getByRole('option', { name: 'job' })).toBeDefined();
+  });
+
+  it('sets repeat when a variable is selected', () => {
+    const onSave = vi.fn<(p: Panel) => void>();
+    renderEditor(basePanel(), onSave, [makeVariable('host')]);
+
+    selectOption(screen.getByLabelText('Repeat by variable'), 'host');
+    fireEvent.click(screen.getByRole('button', { name: 'Apply' }));
+    expect(onSave.mock.calls[0]?.[0].repeat).toBe('host');
+  });
+
+  it('removes the repeat key entirely when None is selected', () => {
+    const panel: Panel = { ...basePanel(), repeat: 'host' };
+    const onSave = vi.fn<(p: Panel) => void>();
+    renderEditor(panel, onSave, [makeVariable('host')]);
+
+    selectOption(screen.getByLabelText('Repeat by variable'), 'None');
+    fireEvent.click(screen.getByRole('button', { name: 'Apply' }));
+
+    const saved = onSave.mock.calls[0]?.[0];
+    expect(saved).toBeDefined();
+    // Dropped, not written as `undefined` — the saved panel must round-trip the schema cleanly.
+    expect(saved).not.toHaveProperty('repeat');
+  });
+
+  it('hides direction and max-per-row until a repeat variable is set', () => {
+    renderEditor(basePanel(), vi.fn<(p: Panel) => void>(), [makeVariable('host')]);
+
+    expect(screen.queryByRole('toolbar', { name: 'Repeat direction' })).toBeNull();
+    expect(screen.queryByLabelText('Max per row')).toBeNull();
+
+    selectOption(screen.getByLabelText('Repeat by variable'), 'host');
+    expect(screen.getByRole('toolbar', { name: 'Repeat direction' })).toBeDefined();
+    // The default direction is 'h', so max-per-row appears with it.
+    expect(screen.getByLabelText('Max per row')).toBeDefined();
+  });
+
+  it('writes a vertical direction and hides max-per-row (h-only option)', () => {
+    const panel: Panel = { ...basePanel(), repeat: 'host' };
+    const onSave = vi.fn<(p: Panel) => void>();
+    renderEditor(panel, onSave, [makeVariable('host')]);
+
+    fireEvent.click(screen.getByRole('button', { name: 'Vertical' }));
+    expect(screen.queryByLabelText('Max per row')).toBeNull();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Apply' }));
+    expect(onSave.mock.calls[0]?.[0].repeatDirection).toBe('v');
+  });
+
+  it('writes max per row for a horizontal repeat', () => {
+    const panel: Panel = { ...basePanel(), repeat: 'host' };
+    const onSave = vi.fn<(p: Panel) => void>();
+    renderEditor(panel, onSave, [makeVariable('host')]);
+
+    selectOption(screen.getByLabelText('Max per row'), '6');
+    fireEvent.click(screen.getByRole('button', { name: 'Apply' }));
+    expect(onSave.mock.calls[0]?.[0].maxPerRow).toBe(6);
   });
 });

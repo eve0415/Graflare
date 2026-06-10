@@ -10,6 +10,7 @@ import type {
 } from '@graflare/shared/schemas/field-config';
 import type { Panel, PanelQuery } from '@graflare/shared/schemas/panel';
 import type { FilterFieldsMatch, ReduceCalc, Transformation, TransformationId } from '@graflare/shared/schemas/transformation';
+import type { Variable } from '@graflare/shared/schemas/variable';
 
 import { UNIT_CATALOG } from '@graflare/shared/format/value-format';
 import { FIELD_OVERRIDE_MATCHER_IDS, FIELD_OVERRIDE_PROPERTY_IDS, makeFieldOverrideProperty, makeValueMapping } from '@graflare/shared/schemas/field-config';
@@ -21,9 +22,10 @@ import { Label } from '@graflare/ui/components/label';
 import { Select, SelectContent, SelectGroup, SelectItem, SelectLabel, SelectTrigger, SelectValue } from '@graflare/ui/components/select';
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@graflare/ui/components/sheet';
 import { Textarea } from '@graflare/ui/components/textarea';
+import { ToggleGroup, ToggleGroupItem } from '@graflare/ui/components/toggle-group';
 import { useQuery } from '@tanstack/react-query';
 import { ChevronDown, ChevronUp, Plus, Trash2, X } from 'lucide-react';
-import { useCallback, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 
 import { databaseSchemaQueryOptions } from '../../-root/introspection-queries';
 import { datasourcesQueryOptions } from '../../datasources/-queries';
@@ -158,8 +160,21 @@ const isSortBy = (v: string | null): v is 'name' | 'value' => v === 'name' || v 
 
 const isTransformationId = (v: string | null): v is TransformationId => TRANSFORMATION_IDS.some(id => id === v);
 
+// maxPerRow choices for a horizontal repeat — the even 24-column divisors Grafana offers. The
+// Select carries string values; the handler parses back to the schema's int.
+const MAX_PER_ROW_OPTIONS = [
+  { value: '2', label: '2' },
+  { value: '3', label: '3' },
+  { value: '4', label: '4' },
+  { value: '6', label: '6' },
+  { value: '8', label: '8' },
+  { value: '12', label: '12' },
+] as const;
+
 interface PanelEditorProps {
   panel: Panel;
+  /** The dashboard's saved variables — the candidates a panel can repeat by. */
+  variables: readonly Variable[];
   open: boolean;
   onClose: () => void;
   onSave: (panel: Panel) => void;
@@ -168,7 +183,7 @@ interface PanelEditorProps {
 const VALID_DIALECTS = new Set<string>(['postgres', 'sqlite']);
 const isValidDialect = (value: string | null | undefined): value is DatasourceDialect => typeof value === 'string' && VALID_DIALECTS.has(value);
 
-export const PanelEditor = ({ panel, open, onClose, onSave }: PanelEditorProps) => {
+export const PanelEditor = ({ panel, variables, open, onClose, onSave }: PanelEditorProps) => {
   const [draft, setDraft] = useState<Panel>(panel);
   const dsQuery = useQuery(datasourcesQueryOptions());
   const selectedDs = dsQuery.data?.find(d => d.id === draft.datasourceId);
@@ -372,6 +387,49 @@ export const PanelEditor = ({ panel, open, onClose, onSave }: PanelEditorProps) 
     [updateField],
   );
 
+  // "None" + the dashboard's variable names. None uses the empty-string sentinel — it can never
+  // collide with a real variable (the schema requires names of length ≥ 1), and '' is the
+  // codebase's established no-selection Select value (unit select, SQL builder).
+  const repeatItems = useMemo(() => [{ value: '', label: 'None' }, ...variables.map(v => ({ value: v.name, label: v.name }))], [variables]);
+
+  const handleRepeatChange = useCallback(
+    (val: string | null) => {
+      if (val === null) return;
+      if (val === '') {
+        // None — drop the key entirely (exactOptionalPropertyTypes forbids writing `undefined`;
+        // the rest-destructure keeps the removal static, no dynamic delete).
+        setDraft(prev => {
+          const { repeat: _repeat, ...rest } = prev;
+          return rest;
+        });
+        return;
+      }
+      updateField('repeat', val);
+    },
+    [updateField],
+  );
+
+  const repeatDirectionValue = useMemo(() => [draft.repeatDirection], [draft.repeatDirection]);
+
+  const handleRepeatDirectionChange = useCallback(
+    (values: string[]) => {
+      // Single-select ToggleGroup: Base UI hands back an array and lets the active item deselect
+      // to an empty one. Direction always has a value, so ignore empty/invalid results.
+      const [next] = values;
+      if (next === 'h' || next === 'v') updateField('repeatDirection', next);
+    },
+    [updateField],
+  );
+
+  const handleMaxPerRowChange = useCallback(
+    (val: string | null) => {
+      if (val === null) return;
+      const parsed = Number(val);
+      if (Number.isInteger(parsed) && parsed >= 1 && parsed <= 24) updateField('maxPerRow', parsed);
+    },
+    [updateField],
+  );
+
   return (
     <Sheet open={open} onOpenChange={handleOpenChange}>
       <SheetContent className='overflow-y-auto sm:max-w-[600px]'>
@@ -517,6 +575,60 @@ export const PanelEditor = ({ panel, open, onClose, onSave }: PanelEditorProps) 
           <FieldOverridesEditor overrides={draft.fieldConfig.overrides} onChange={setOverrides} />
 
           <TransformationsEditor transformations={draft.transformations} onChange={setTransformations} />
+
+          <div className='space-y-3'>
+            <Label>Repeat options</Label>
+
+            <div className='space-y-2'>
+              <Label htmlFor='panel-repeat' className='text-muted-foreground text-xs font-normal'>
+                Repeat by variable
+              </Label>
+              <Select value={draft.repeat ?? ''} onValueChange={handleRepeatChange} items={repeatItems}>
+                <SelectTrigger id='panel-repeat'>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {repeatItems.map(o => (
+                    <SelectItem key={o.value} value={o.value}>
+                      {o.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            {draft.repeat !== undefined && (
+              <div className='space-y-2'>
+                <Label className='text-muted-foreground text-xs font-normal'>Direction</Label>
+                <ToggleGroup size='sm' value={repeatDirectionValue} onValueChange={handleRepeatDirectionChange} aria-label='Repeat direction'>
+                  <ToggleGroupItem value='h'>Horizontal</ToggleGroupItem>
+                  <ToggleGroupItem value='v'>Vertical</ToggleGroupItem>
+                </ToggleGroup>
+              </div>
+            )}
+
+            {draft.repeat !== undefined && draft.repeatDirection === 'h' && (
+              <div className='space-y-2'>
+                <Label htmlFor='panel-repeat-max-per-row' className='text-muted-foreground text-xs font-normal'>
+                  Max per row
+                </Label>
+                <Select value={String(draft.maxPerRow)} onValueChange={handleMaxPerRowChange} items={MAX_PER_ROW_OPTIONS}>
+                  <SelectTrigger id='panel-repeat-max-per-row'>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {MAX_PER_ROW_OPTIONS.map(o => (
+                      <SelectItem key={o.value} value={o.value}>
+                        {o.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
+
+            <p className='text-muted-foreground text-xs'>Repeats render in view mode — edit mode shows only the source panel.</p>
+          </div>
 
           <div className='flex justify-end gap-2'>
             <Button variant='outline' onClick={onClose}>

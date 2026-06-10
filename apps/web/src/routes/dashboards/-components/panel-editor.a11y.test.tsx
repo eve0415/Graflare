@@ -1,4 +1,5 @@
 import type { Panel } from '@graflare/shared/schemas/panel';
+import type { Variable } from '@graflare/shared/schemas/variable';
 
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { cleanup, render } from '@testing-library/react';
@@ -12,11 +13,30 @@ afterEach(cleanup);
 
 const noop = (): void => {};
 
+// One variable so the Repeat-options section renders its full surface (variable Select with a
+// real option, direction toggle-group, max-per-row Select) instead of the trivial None-only state.
+const VARIABLES: readonly Variable[] = [
+  {
+    name: 'host',
+    type: 'custom',
+    label: '',
+    query: '',
+    regex: '',
+    sort: 'disabled',
+    multi: false,
+    includeAll: false,
+    current: '',
+    allValue: '',
+    options: [],
+    filters: [],
+  },
+];
+
 const renderEditor = (panel: Panel) => {
   const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   return render(
     <QueryClientProvider client={queryClient}>
-      <PanelEditor panel={panel} open onClose={noop} onSave={noop} />
+      <PanelEditor panel={panel} variables={VARIABLES} open onClose={noop} onSave={noop} />
     </QueryClientProvider>,
   );
 };
@@ -69,6 +89,9 @@ const populatedPanel = (): Panel => ({
     { id: 'limit', options: { count: 5 } },
     { id: 'reduce', options: { calc: 'last' } },
   ],
+  // A horizontal repeat so the Repeat-options section renders all three controls (variable
+  // Select, direction toggle-group, max-per-row Select) under axe.
+  repeat: 'host',
   repeatDirection: 'h',
   maxPerRow: 4,
 });
