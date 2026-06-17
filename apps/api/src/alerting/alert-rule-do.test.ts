@@ -84,6 +84,9 @@ describe('alert-rule DO no-data/error notifications', () => {
       // ...and that escalation must fire a notification (recorded via last_notified_at),
       // just like the normal-evaluation firing path. Before the fix this stayed null.
       expect(inst?.last_notified_at).not.toBeNull();
+      // ...and the next evaluation must always be rescheduled, even on the error path
+      // (the alarm is set in `finally`, so a throwing handler can't strand the rule).
+      expect(await state.storage.getAlarm()).not.toBeNull();
     });
   });
 

@@ -145,17 +145,18 @@ export class AlertRuleDO extends DurableObject<Env> {
     const config = configParsed;
     const now = Date.now();
 
+    // The next evaluation is scheduled in `finally`, so a throw anywhere in the body —
+    // including inside the error handler — can never leave the rule without an alarm.
+    // The early returns below all fall through to `finally`.
     try {
       const query = config.queries.find(q => q.refId === config.condition.refId);
       if (query === undefined) {
-        await this.ctx.storage.setAlarm(now + config.evalIntervalS * 1000);
         return;
       }
 
       const client = await createPrometheusClient(this.env.DB, this.env.ENCRYPTION_KEY, config.orgId, query.datasourceId);
       if (client === null) {
         await this.handleError(config, now);
-        await this.ctx.storage.setAlarm(now + config.evalIntervalS * 1000);
         return;
       }
 
@@ -163,20 +164,17 @@ export class AlertRuleDO extends DurableObject<Env> {
 
       if (response.status === 'error') {
         await this.handleError(config, now);
-        await this.ctx.storage.setAlarm(now + config.evalIntervalS * 1000);
         return;
       }
 
       if (response.data === undefined) {
         await this.handleNoData(config, now);
-        await this.ctx.storage.setAlarm(now + config.evalIntervalS * 1000);
         return;
       }
 
       const { data } = response;
       if (typeof data !== 'object' || data === null || !('resultType' in data)) {
         await this.handleNoData(config, now);
-        await this.ctx.storage.setAlarm(now + config.evalIntervalS * 1000);
         return;
       }
 
@@ -185,7 +183,6 @@ export class AlertRuleDO extends DurableObject<Env> {
 
       if (results.length === 0) {
         await this.handleNoData(config, now);
-        await this.ctx.storage.setAlarm(now + config.evalIntervalS * 1000);
         return;
       }
 
@@ -257,9 +254,15 @@ export class AlertRuleDO extends DurableObject<Env> {
       }
 
       await Promise.all(pending);
-      await this.ctx.storage.setAlarm(now + config.evalIntervalS * 1000);
     } catch {
-      await this.handleError(config, now);
+      // A failure mid-evaluation still reschedules (via finally). Guard the error handler
+      // itself so its own throw can't escape and skip the reschedule.
+      try {
+        await this.handleError(config, now);
+      } catch (handlerError) {
+        console.error('alarm error handler failed:', handlerError);
+      }
+    } finally {
       await this.ctx.storage.setAlarm(now + config.evalIntervalS * 1000);
     }
   }
