@@ -4,7 +4,7 @@ import { runInDurableObject } from 'cloudflare:test';
 import { env } from 'cloudflare:workers';
 import { eq } from 'drizzle-orm';
 import { drizzle } from 'drizzle-orm/durable-sqlite';
-import { beforeEach, describe, expect, it } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { createDb } from '../db';
 import { alertInstances, alertRuleGroups, alertRules, organizations } from '../db/schema';
@@ -105,5 +105,34 @@ describe('alert-rule DO no-data/error notifications', () => {
       expect(inst?.state).toBe('Firing');
       expect(inst?.last_notified_at).toBeNull();
     });
+  });
+
+  it('triggers the notification workflow once when many instances escalate in one cycle', async () => {
+    const createSpy = vi.spyOn(env.NOTIFICATION_WORKFLOW, 'create');
+    const id = env.ALERT_RULE.idFromName('c2-trigger-once');
+    const stub = env.ALERT_RULE.get(id);
+
+    await runInDurableObject<AlertRuleDO, void>(stub, async (instance, state) => {
+      const db = drizzle(state.storage, { schema: { instances, config: configTable } });
+      db.insert(configTable)
+        .values({ key: 'rule_config', value: JSON.stringify(errorRuleConfig) })
+        .run();
+      // Two Normal instances the error path escalates to Firing in one cycle — both want notify.
+      db.insert(instances)
+        .values([
+          { labelsHash: 'inst-a', labels: JSON.stringify({ alertname: 'C2', n: 'a' }), state: 'Normal', value: 1, lastEvalAt: 1000 },
+          { labelsHash: 'inst-b', labels: JSON.stringify({ alertname: 'C2', n: 'b' }), state: 'Normal', value: 1, lastEvalAt: 1000 },
+        ])
+        .run();
+
+      await instance.alarm();
+
+      expect(instance.getState().filter(s => s.state === 'Firing')).toHaveLength(2);
+      // Both escalations collapse into ONE workflow run — before the fix each fired its own,
+      // and each run drains and re-notifies every instance (N× duplicate notifications).
+      expect(createSpy).toHaveBeenCalledTimes(1);
+    });
+
+    createSpy.mockRestore();
   });
 });

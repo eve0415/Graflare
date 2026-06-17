@@ -188,7 +188,7 @@ export class AlertRuleDO extends DurableObject<Env> {
       }
 
       const seenHashes = new Set<string>();
-      const pending: Promise<void>[] = [];
+      const pending: Promise<boolean>[] = [];
 
       for (const result of results) {
         seenHashes.add(result.labelsHash);
@@ -231,7 +231,7 @@ export class AlertRuleDO extends DurableObject<Env> {
         if (prevState !== newState.state) {
           const notify = newState.state === 'Firing' || newState.state === 'Resolved';
           pending.push(
-            this.syncAndNotify(
+            this.syncInstance(
               config,
               result.labelsHash,
               result.labels,
@@ -265,11 +265,15 @@ export class AlertRuleDO extends DurableObject<Env> {
 
         if (transition.notify) {
           const labels = labelsMapSchema.parse(JSON.parse(inst.labels));
-          pending.push(this.syncAndNotify(config, inst.labelsHash, labels, transition.state, String(inst.value ?? 0), inst.firedAt, now, true));
+          pending.push(this.syncInstance(config, inst.labelsHash, labels, transition.state, String(inst.value ?? 0), inst.firedAt, now, true));
         }
       }
 
-      await Promise.all(pending);
+      // One workflow run per evaluation, after every instance has synced to D1.
+      const notified = await Promise.all(pending);
+      if (notified.some(Boolean)) {
+        await this.triggerNotification(config);
+      }
     } catch {
       // A failure mid-evaluation still reschedules (via finally). Guard the error handler
       // itself so its own throw can't escape and skip the reschedule.
@@ -331,7 +335,7 @@ export class AlertRuleDO extends DurableObject<Env> {
   private async handleNoData(config: AlertRuleConfig, now: number): Promise<void> {
     const allInstances = this.db.select().from(instances).all();
 
-    const pending: Promise<void>[] = [];
+    const pending: Promise<boolean>[] = [];
     for (const inst of allInstances) {
       const currentState: AlertInstanceState = isAlertInstanceState(inst.state) ? inst.state : 'Normal';
       const transition = noDataTransition(config.noDataState, currentState);
@@ -343,9 +347,13 @@ export class AlertRuleDO extends DurableObject<Env> {
         .where(eq(instances.labelsHash, inst.labelsHash))
         .run();
       const labels = labelsMapSchema.parse(JSON.parse(inst.labels));
-      pending.push(this.syncAndNotify(config, inst.labelsHash, labels, transition.state, String(inst.value ?? 0), inst.firedAt, now, transition.notify));
+      pending.push(this.syncInstance(config, inst.labelsHash, labels, transition.state, String(inst.value ?? 0), inst.firedAt, now, transition.notify));
     }
-    await Promise.all(pending);
+    // One workflow run per no-data/error evaluation, regardless of how many instances transitioned.
+    const notified = await Promise.all(pending);
+    if (notified.some(Boolean)) {
+      await this.triggerNotification(config);
+    }
   }
 
   private async handleError(config: AlertRuleConfig, now: number): Promise<void> {
@@ -353,8 +361,14 @@ export class AlertRuleDO extends DurableObject<Env> {
     await this.handleNoData({ ...config, noDataState: 'Alerting' }, now);
   }
 
-  /** Sync one instance to D1, then optionally fire its notification — kept sequential per instance, parallel across instances. */
-  private async syncAndNotify(
+  /**
+   * Sync one instance to D1 and mark it notified when applicable. Returns whether it wants a
+   * notification so the caller can trigger the workflow ONCE per evaluation: each workflow run
+   * drains and re-notifies every firing/resolved instance, so triggering per-instance fans N
+   * transitions out into N duplicate notification runs. Triggering after all syncs also means the
+   * workflow drains a complete instance set, not a partially-synced one.
+   */
+  private async syncInstance(
     config: AlertRuleConfig,
     labelsHash: string,
     labels: Record<string, string>,
@@ -363,12 +377,12 @@ export class AlertRuleDO extends DurableObject<Env> {
     activeAt: number | null,
     evalAt: number,
     notify: boolean,
-  ): Promise<void> {
+  ): Promise<boolean> {
     await this.syncInstanceToD1(config, labelsHash, labels, state, value, activeAt, evalAt);
     if (notify) {
-      await this.triggerNotification(config);
       this.db.update(instances).set({ lastNotifiedAt: evalAt }).where(eq(instances.labelsHash, labelsHash)).run();
     }
+    return notify;
   }
 
   private async syncInstanceToD1(
