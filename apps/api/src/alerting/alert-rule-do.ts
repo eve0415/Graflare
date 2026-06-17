@@ -13,6 +13,7 @@ import { createDb } from '../db';
 import { alertInstances } from '../db/schema';
 import { createPrometheusClient } from '../prometheus/factory';
 
+import { cleanupTransition } from './cleanup-transition';
 import { config as configTable, instances } from './do-schema';
 import * as doSchema from './do-schema';
 import { noDataTransition } from './no-data-transition';
@@ -246,10 +247,25 @@ export class AlertRuleDO extends DurableObject<Env> {
 
       const allInstances = this.db.select().from(instances).all();
       for (const inst of allInstances) {
-        if (!seenHashes.has(inst.labelsHash) && (inst.state === 'Firing' || inst.state === 'Pending')) {
-          this.db.update(instances).set({ state: 'Resolved', resolvedAt: now, lastEvalAt: now }).where(eq(instances.labelsHash, inst.labelsHash)).run();
+        if (seenHashes.has(inst.labelsHash)) continue;
+        const currentState: AlertInstanceState = isAlertInstanceState(inst.state) ? inst.state : 'Normal';
+        const transition = cleanupTransition(currentState);
+        if (transition === null) continue;
+
+        this.db
+          .update(instances)
+          .set({
+            state: transition.state,
+            resolvedAt: transition.state === 'Resolved' ? now : inst.resolvedAt,
+            pendingSince: transition.state === 'Normal' ? null : inst.pendingSince,
+            lastEvalAt: now,
+          })
+          .where(eq(instances.labelsHash, inst.labelsHash))
+          .run();
+
+        if (transition.notify) {
           const labels = labelsMapSchema.parse(JSON.parse(inst.labels));
-          pending.push(this.syncAndNotify(config, inst.labelsHash, labels, 'Resolved', String(inst.value ?? 0), inst.firedAt, now, true));
+          pending.push(this.syncAndNotify(config, inst.labelsHash, labels, transition.state, String(inst.value ?? 0), inst.firedAt, now, true));
         }
       }
 
