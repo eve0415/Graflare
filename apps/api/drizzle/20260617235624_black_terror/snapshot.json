@@ -1,0 +1,2030 @@
+{
+  "version": "7",
+  "dialect": "sqlite",
+  "id": "4cc1dd7f-f37a-4276-856b-d8417c28b36c",
+  "prevIds": [
+    "ba25f1a6-a631-472b-9854-66c0530f2a2a"
+  ],
+  "ddl": [
+    {
+      "name": "access_service_tokens",
+      "entityType": "tables"
+    },
+    {
+      "name": "alert_instances",
+      "entityType": "tables"
+    },
+    {
+      "name": "alert_rule_groups",
+      "entityType": "tables"
+    },
+    {
+      "name": "alert_rules",
+      "entityType": "tables"
+    },
+    {
+      "name": "annotations",
+      "entityType": "tables"
+    },
+    {
+      "name": "contact_points",
+      "entityType": "tables"
+    },
+    {
+      "name": "dashboard_versions",
+      "entityType": "tables"
+    },
+    {
+      "name": "dashboards",
+      "entityType": "tables"
+    },
+    {
+      "name": "datasources",
+      "entityType": "tables"
+    },
+    {
+      "name": "folders",
+      "entityType": "tables"
+    },
+    {
+      "name": "mute_timings",
+      "entityType": "tables"
+    },
+    {
+      "name": "notification_policies",
+      "entityType": "tables"
+    },
+    {
+      "name": "organizations",
+      "entityType": "tables"
+    },
+    {
+      "name": "silences",
+      "entityType": "tables"
+    },
+    {
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "name": "id",
+      "entityType": "columns",
+      "table": "access_service_tokens"
+    },
+    {
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "name": "org_id",
+      "entityType": "columns",
+      "table": "access_service_tokens"
+    },
+    {
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "name": "cf_token_id",
+      "entityType": "columns",
+      "table": "access_service_tokens"
+    },
+    {
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "name": "client_id",
+      "entityType": "columns",
+      "table": "access_service_tokens"
+    },
+    {
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "name": "name",
+      "entityType": "columns",
+      "table": "access_service_tokens"
+    },
+    {
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "name": "created_at",
+      "entityType": "columns",
+      "table": "access_service_tokens"
+    },
+    {
+      "type": "integer",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "name": "expires_at",
+      "entityType": "columns",
+      "table": "access_service_tokens"
+    },
+    {
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "name": "id",
+      "entityType": "columns",
+      "table": "alert_instances"
+    },
+    {
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "name": "org_id",
+      "entityType": "columns",
+      "table": "alert_instances"
+    },
+    {
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "name": "rule_id",
+      "entityType": "columns",
+      "table": "alert_instances"
+    },
+    {
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "name": "labels_hash",
+      "entityType": "columns",
+      "table": "alert_instances"
+    },
+    {
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": "'{}'",
+      "generated": null,
+      "name": "labels",
+      "entityType": "columns",
+      "table": "alert_instances"
+    },
+    {
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": "'Normal'",
+      "generated": null,
+      "name": "state",
+      "entityType": "columns",
+      "table": "alert_instances"
+    },
+    {
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": "''",
+      "generated": null,
+      "name": "value",
+      "entityType": "columns",
+      "table": "alert_instances"
+    },
+    {
+      "type": "integer",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "name": "active_at",
+      "entityType": "columns",
+      "table": "alert_instances"
+    },
+    {
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "name": "last_eval_at",
+      "entityType": "columns",
+      "table": "alert_instances"
+    },
+    {
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "name": "id",
+      "entityType": "columns",
+      "table": "alert_rule_groups"
+    },
+    {
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "name": "org_id",
+      "entityType": "columns",
+      "table": "alert_rule_groups"
+    },
+    {
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "name": "folder_id",
+      "entityType": "columns",
+      "table": "alert_rule_groups"
+    },
+    {
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "name": "name",
+      "entityType": "columns",
+      "table": "alert_rule_groups"
+    },
+    {
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": "60",
+      "generated": null,
+      "name": "eval_interval_s",
+      "entityType": "columns",
+      "table": "alert_rule_groups"
+    },
+    {
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "name": "created_at",
+      "entityType": "columns",
+      "table": "alert_rule_groups"
+    },
+    {
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "name": "updated_at",
+      "entityType": "columns",
+      "table": "alert_rule_groups"
+    },
+    {
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "name": "id",
+      "entityType": "columns",
+      "table": "alert_rules"
+    },
+    {
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "name": "org_id",
+      "entityType": "columns",
+      "table": "alert_rules"
+    },
+    {
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "name": "group_id",
+      "entityType": "columns",
+      "table": "alert_rules"
+    },
+    {
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "name": "title",
+      "entityType": "columns",
+      "table": "alert_rules"
+    },
+    {
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": "'[]'",
+      "generated": null,
+      "name": "queries",
+      "entityType": "columns",
+      "table": "alert_rules"
+    },
+    {
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "name": "condition",
+      "entityType": "columns",
+      "table": "alert_rules"
+    },
+    {
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": "'{}'",
+      "generated": null,
+      "name": "labels",
+      "entityType": "columns",
+      "table": "alert_rules"
+    },
+    {
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": "'{}'",
+      "generated": null,
+      "name": "annotations",
+      "entityType": "columns",
+      "table": "alert_rules"
+    },
+    {
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": "0",
+      "generated": null,
+      "name": "for_duration_s",
+      "entityType": "columns",
+      "table": "alert_rules"
+    },
+    {
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": "'Alerting'",
+      "generated": null,
+      "name": "no_data_state",
+      "entityType": "columns",
+      "table": "alert_rules"
+    },
+    {
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": "'Alerting'",
+      "generated": null,
+      "name": "exec_err_state",
+      "entityType": "columns",
+      "table": "alert_rules"
+    },
+    {
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": "false",
+      "generated": null,
+      "name": "is_paused",
+      "entityType": "columns",
+      "table": "alert_rules"
+    },
+    {
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "name": "created_at",
+      "entityType": "columns",
+      "table": "alert_rules"
+    },
+    {
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "name": "updated_at",
+      "entityType": "columns",
+      "table": "alert_rules"
+    },
+    {
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "name": "id",
+      "entityType": "columns",
+      "table": "annotations"
+    },
+    {
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "name": "org_id",
+      "entityType": "columns",
+      "table": "annotations"
+    },
+    {
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "name": "dashboard_id",
+      "entityType": "columns",
+      "table": "annotations"
+    },
+    {
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "name": "panel_id",
+      "entityType": "columns",
+      "table": "annotations"
+    },
+    {
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "name": "alert_rule_id",
+      "entityType": "columns",
+      "table": "annotations"
+    },
+    {
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "name": "time",
+      "entityType": "columns",
+      "table": "annotations"
+    },
+    {
+      "type": "integer",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "name": "time_end",
+      "entityType": "columns",
+      "table": "annotations"
+    },
+    {
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "name": "text",
+      "entityType": "columns",
+      "table": "annotations"
+    },
+    {
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": "'[]'",
+      "generated": null,
+      "name": "tags",
+      "entityType": "columns",
+      "table": "annotations"
+    },
+    {
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "name": "prev_state",
+      "entityType": "columns",
+      "table": "annotations"
+    },
+    {
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "name": "new_state",
+      "entityType": "columns",
+      "table": "annotations"
+    },
+    {
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "name": "created_at",
+      "entityType": "columns",
+      "table": "annotations"
+    },
+    {
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "name": "id",
+      "entityType": "columns",
+      "table": "contact_points"
+    },
+    {
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "name": "org_id",
+      "entityType": "columns",
+      "table": "contact_points"
+    },
+    {
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "name": "name",
+      "entityType": "columns",
+      "table": "contact_points"
+    },
+    {
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "name": "type",
+      "entityType": "columns",
+      "table": "contact_points"
+    },
+    {
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "name": "settings",
+      "entityType": "columns",
+      "table": "contact_points"
+    },
+    {
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "name": "created_at",
+      "entityType": "columns",
+      "table": "contact_points"
+    },
+    {
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "name": "updated_at",
+      "entityType": "columns",
+      "table": "contact_points"
+    },
+    {
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "name": "id",
+      "entityType": "columns",
+      "table": "dashboard_versions"
+    },
+    {
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "name": "dashboard_id",
+      "entityType": "columns",
+      "table": "dashboard_versions"
+    },
+    {
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "name": "version",
+      "entityType": "columns",
+      "table": "dashboard_versions"
+    },
+    {
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "name": "data",
+      "entityType": "columns",
+      "table": "dashboard_versions"
+    },
+    {
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": "''",
+      "generated": null,
+      "name": "message",
+      "entityType": "columns",
+      "table": "dashboard_versions"
+    },
+    {
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": "''",
+      "generated": null,
+      "name": "created_by",
+      "entityType": "columns",
+      "table": "dashboard_versions"
+    },
+    {
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "name": "created_at",
+      "entityType": "columns",
+      "table": "dashboard_versions"
+    },
+    {
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "name": "id",
+      "entityType": "columns",
+      "table": "dashboards"
+    },
+    {
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "name": "org_id",
+      "entityType": "columns",
+      "table": "dashboards"
+    },
+    {
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "name": "folder_id",
+      "entityType": "columns",
+      "table": "dashboards"
+    },
+    {
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "name": "title",
+      "entityType": "columns",
+      "table": "dashboards"
+    },
+    {
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "name": "slug",
+      "entityType": "columns",
+      "table": "dashboards"
+    },
+    {
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": "''",
+      "generated": null,
+      "name": "description",
+      "entityType": "columns",
+      "table": "dashboards"
+    },
+    {
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": "'[]'",
+      "generated": null,
+      "name": "tags",
+      "entityType": "columns",
+      "table": "dashboards"
+    },
+    {
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": "'[]'",
+      "generated": null,
+      "name": "panels",
+      "entityType": "columns",
+      "table": "dashboards"
+    },
+    {
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": "'[]'",
+      "generated": null,
+      "name": "variables",
+      "entityType": "columns",
+      "table": "dashboards"
+    },
+    {
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": "'{\"from\":\"now-1h\",\"to\":\"now\",\"refresh\":null}'",
+      "generated": null,
+      "name": "time_range",
+      "entityType": "columns",
+      "table": "dashboards"
+    },
+    {
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": "1",
+      "generated": null,
+      "name": "version",
+      "entityType": "columns",
+      "table": "dashboards"
+    },
+    {
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "name": "created_at",
+      "entityType": "columns",
+      "table": "dashboards"
+    },
+    {
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "name": "updated_at",
+      "entityType": "columns",
+      "table": "dashboards"
+    },
+    {
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "name": "id",
+      "entityType": "columns",
+      "table": "datasources"
+    },
+    {
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "name": "org_id",
+      "entityType": "columns",
+      "table": "datasources"
+    },
+    {
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "name": "name",
+      "entityType": "columns",
+      "table": "datasources"
+    },
+    {
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "name": "type",
+      "entityType": "columns",
+      "table": "datasources"
+    },
+    {
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "name": "dialect",
+      "entityType": "columns",
+      "table": "datasources"
+    },
+    {
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "name": "url",
+      "entityType": "columns",
+      "table": "datasources"
+    },
+    {
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": "'none'",
+      "generated": null,
+      "name": "auth_type",
+      "entityType": "columns",
+      "table": "datasources"
+    },
+    {
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "name": "credentials",
+      "entityType": "columns",
+      "table": "datasources"
+    },
+    {
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": "30000",
+      "generated": null,
+      "name": "query_timeout_ms",
+      "entityType": "columns",
+      "table": "datasources"
+    },
+    {
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": "0",
+      "generated": null,
+      "name": "cache_ttl",
+      "entityType": "columns",
+      "table": "datasources"
+    },
+    {
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "name": "created_at",
+      "entityType": "columns",
+      "table": "datasources"
+    },
+    {
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "name": "updated_at",
+      "entityType": "columns",
+      "table": "datasources"
+    },
+    {
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "name": "id",
+      "entityType": "columns",
+      "table": "folders"
+    },
+    {
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "name": "org_id",
+      "entityType": "columns",
+      "table": "folders"
+    },
+    {
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "name": "parent_id",
+      "entityType": "columns",
+      "table": "folders"
+    },
+    {
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "name": "title",
+      "entityType": "columns",
+      "table": "folders"
+    },
+    {
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "name": "slug",
+      "entityType": "columns",
+      "table": "folders"
+    },
+    {
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "name": "created_at",
+      "entityType": "columns",
+      "table": "folders"
+    },
+    {
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "name": "updated_at",
+      "entityType": "columns",
+      "table": "folders"
+    },
+    {
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "name": "id",
+      "entityType": "columns",
+      "table": "mute_timings"
+    },
+    {
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "name": "org_id",
+      "entityType": "columns",
+      "table": "mute_timings"
+    },
+    {
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "name": "name",
+      "entityType": "columns",
+      "table": "mute_timings"
+    },
+    {
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": "'[]'",
+      "generated": null,
+      "name": "intervals",
+      "entityType": "columns",
+      "table": "mute_timings"
+    },
+    {
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "name": "created_at",
+      "entityType": "columns",
+      "table": "mute_timings"
+    },
+    {
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "name": "updated_at",
+      "entityType": "columns",
+      "table": "mute_timings"
+    },
+    {
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "name": "id",
+      "entityType": "columns",
+      "table": "notification_policies"
+    },
+    {
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "name": "org_id",
+      "entityType": "columns",
+      "table": "notification_policies"
+    },
+    {
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "name": "parent_id",
+      "entityType": "columns",
+      "table": "notification_policies"
+    },
+    {
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "name": "contact_point_id",
+      "entityType": "columns",
+      "table": "notification_policies"
+    },
+    {
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": "'[\"alertname\"]'",
+      "generated": null,
+      "name": "group_by",
+      "entityType": "columns",
+      "table": "notification_policies"
+    },
+    {
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": "'[]'",
+      "generated": null,
+      "name": "matchers",
+      "entityType": "columns",
+      "table": "notification_policies"
+    },
+    {
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": "'[]'",
+      "generated": null,
+      "name": "mute_timing_ids",
+      "entityType": "columns",
+      "table": "notification_policies"
+    },
+    {
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": "30",
+      "generated": null,
+      "name": "group_wait_s",
+      "entityType": "columns",
+      "table": "notification_policies"
+    },
+    {
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": "300",
+      "generated": null,
+      "name": "group_interval_s",
+      "entityType": "columns",
+      "table": "notification_policies"
+    },
+    {
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": "14400",
+      "generated": null,
+      "name": "repeat_interval_s",
+      "entityType": "columns",
+      "table": "notification_policies"
+    },
+    {
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": "false",
+      "generated": null,
+      "name": "continue_matching",
+      "entityType": "columns",
+      "table": "notification_policies"
+    },
+    {
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "name": "created_at",
+      "entityType": "columns",
+      "table": "notification_policies"
+    },
+    {
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "name": "updated_at",
+      "entityType": "columns",
+      "table": "notification_policies"
+    },
+    {
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "name": "id",
+      "entityType": "columns",
+      "table": "organizations"
+    },
+    {
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "name": "name",
+      "entityType": "columns",
+      "table": "organizations"
+    },
+    {
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "name": "created_at",
+      "entityType": "columns",
+      "table": "organizations"
+    },
+    {
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "name": "updated_at",
+      "entityType": "columns",
+      "table": "organizations"
+    },
+    {
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "name": "id",
+      "entityType": "columns",
+      "table": "silences"
+    },
+    {
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "name": "org_id",
+      "entityType": "columns",
+      "table": "silences"
+    },
+    {
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "name": "matchers",
+      "entityType": "columns",
+      "table": "silences"
+    },
+    {
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "name": "starts_at",
+      "entityType": "columns",
+      "table": "silences"
+    },
+    {
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "name": "ends_at",
+      "entityType": "columns",
+      "table": "silences"
+    },
+    {
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": "''",
+      "generated": null,
+      "name": "comment",
+      "entityType": "columns",
+      "table": "silences"
+    },
+    {
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": "''",
+      "generated": null,
+      "name": "created_by",
+      "entityType": "columns",
+      "table": "silences"
+    },
+    {
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "name": "created_at",
+      "entityType": "columns",
+      "table": "silences"
+    },
+    {
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "name": "updated_at",
+      "entityType": "columns",
+      "table": "silences"
+    },
+    {
+      "columns": [
+        "org_id"
+      ],
+      "tableTo": "organizations",
+      "columnsTo": [
+        "id"
+      ],
+      "onUpdate": "NO ACTION",
+      "onDelete": "NO ACTION",
+      "nameExplicit": false,
+      "name": "access_service_tokens_org_id_organizations_id_fk",
+      "entityType": "fks",
+      "table": "access_service_tokens"
+    },
+    {
+      "columns": [
+        "org_id"
+      ],
+      "tableTo": "organizations",
+      "columnsTo": [
+        "id"
+      ],
+      "onUpdate": "NO ACTION",
+      "onDelete": "NO ACTION",
+      "nameExplicit": false,
+      "name": "alert_instances_org_id_organizations_id_fk",
+      "entityType": "fks",
+      "table": "alert_instances"
+    },
+    {
+      "columns": [
+        "rule_id"
+      ],
+      "tableTo": "alert_rules",
+      "columnsTo": [
+        "id"
+      ],
+      "onUpdate": "NO ACTION",
+      "onDelete": "CASCADE",
+      "nameExplicit": false,
+      "name": "alert_instances_rule_id_alert_rules_id_fk",
+      "entityType": "fks",
+      "table": "alert_instances"
+    },
+    {
+      "columns": [
+        "org_id"
+      ],
+      "tableTo": "organizations",
+      "columnsTo": [
+        "id"
+      ],
+      "onUpdate": "NO ACTION",
+      "onDelete": "NO ACTION",
+      "nameExplicit": false,
+      "name": "alert_rule_groups_org_id_organizations_id_fk",
+      "entityType": "fks",
+      "table": "alert_rule_groups"
+    },
+    {
+      "columns": [
+        "folder_id"
+      ],
+      "tableTo": "folders",
+      "columnsTo": [
+        "id"
+      ],
+      "onUpdate": "NO ACTION",
+      "onDelete": "NO ACTION",
+      "nameExplicit": false,
+      "name": "alert_rule_groups_folder_id_folders_id_fk",
+      "entityType": "fks",
+      "table": "alert_rule_groups"
+    },
+    {
+      "columns": [
+        "org_id"
+      ],
+      "tableTo": "organizations",
+      "columnsTo": [
+        "id"
+      ],
+      "onUpdate": "NO ACTION",
+      "onDelete": "NO ACTION",
+      "nameExplicit": false,
+      "name": "alert_rules_org_id_organizations_id_fk",
+      "entityType": "fks",
+      "table": "alert_rules"
+    },
+    {
+      "columns": [
+        "group_id"
+      ],
+      "tableTo": "alert_rule_groups",
+      "columnsTo": [
+        "id"
+      ],
+      "onUpdate": "NO ACTION",
+      "onDelete": "CASCADE",
+      "nameExplicit": false,
+      "name": "alert_rules_group_id_alert_rule_groups_id_fk",
+      "entityType": "fks",
+      "table": "alert_rules"
+    },
+    {
+      "columns": [
+        "org_id"
+      ],
+      "tableTo": "organizations",
+      "columnsTo": [
+        "id"
+      ],
+      "onUpdate": "NO ACTION",
+      "onDelete": "NO ACTION",
+      "nameExplicit": false,
+      "name": "annotations_org_id_organizations_id_fk",
+      "entityType": "fks",
+      "table": "annotations"
+    },
+    {
+      "columns": [
+        "dashboard_id"
+      ],
+      "tableTo": "dashboards",
+      "columnsTo": [
+        "id"
+      ],
+      "onUpdate": "NO ACTION",
+      "onDelete": "NO ACTION",
+      "nameExplicit": false,
+      "name": "annotations_dashboard_id_dashboards_id_fk",
+      "entityType": "fks",
+      "table": "annotations"
+    },
+    {
+      "columns": [
+        "alert_rule_id"
+      ],
+      "tableTo": "alert_rules",
+      "columnsTo": [
+        "id"
+      ],
+      "onUpdate": "NO ACTION",
+      "onDelete": "CASCADE",
+      "nameExplicit": false,
+      "name": "annotations_alert_rule_id_alert_rules_id_fk",
+      "entityType": "fks",
+      "table": "annotations"
+    },
+    {
+      "columns": [
+        "org_id"
+      ],
+      "tableTo": "organizations",
+      "columnsTo": [
+        "id"
+      ],
+      "onUpdate": "NO ACTION",
+      "onDelete": "NO ACTION",
+      "nameExplicit": false,
+      "name": "contact_points_org_id_organizations_id_fk",
+      "entityType": "fks",
+      "table": "contact_points"
+    },
+    {
+      "columns": [
+        "dashboard_id"
+      ],
+      "tableTo": "dashboards",
+      "columnsTo": [
+        "id"
+      ],
+      "onUpdate": "NO ACTION",
+      "onDelete": "CASCADE",
+      "nameExplicit": false,
+      "name": "dashboard_versions_dashboard_id_dashboards_id_fk",
+      "entityType": "fks",
+      "table": "dashboard_versions"
+    },
+    {
+      "columns": [
+        "org_id"
+      ],
+      "tableTo": "organizations",
+      "columnsTo": [
+        "id"
+      ],
+      "onUpdate": "NO ACTION",
+      "onDelete": "NO ACTION",
+      "nameExplicit": false,
+      "name": "dashboards_org_id_organizations_id_fk",
+      "entityType": "fks",
+      "table": "dashboards"
+    },
+    {
+      "columns": [
+        "folder_id"
+      ],
+      "tableTo": "folders",
+      "columnsTo": [
+        "id"
+      ],
+      "onUpdate": "NO ACTION",
+      "onDelete": "NO ACTION",
+      "nameExplicit": false,
+      "name": "dashboards_folder_id_folders_id_fk",
+      "entityType": "fks",
+      "table": "dashboards"
+    },
+    {
+      "columns": [
+        "org_id"
+      ],
+      "tableTo": "organizations",
+      "columnsTo": [
+        "id"
+      ],
+      "onUpdate": "NO ACTION",
+      "onDelete": "NO ACTION",
+      "nameExplicit": false,
+      "name": "datasources_org_id_organizations_id_fk",
+      "entityType": "fks",
+      "table": "datasources"
+    },
+    {
+      "columns": [
+        "org_id"
+      ],
+      "tableTo": "organizations",
+      "columnsTo": [
+        "id"
+      ],
+      "onUpdate": "NO ACTION",
+      "onDelete": "NO ACTION",
+      "nameExplicit": false,
+      "name": "folders_org_id_organizations_id_fk",
+      "entityType": "fks",
+      "table": "folders"
+    },
+    {
+      "columns": [
+        "parent_id"
+      ],
+      "tableTo": "folders",
+      "columnsTo": [
+        "id"
+      ],
+      "onUpdate": "NO ACTION",
+      "onDelete": "NO ACTION",
+      "nameExplicit": false,
+      "name": "folders_parent_id_folders_id_fk",
+      "entityType": "fks",
+      "table": "folders"
+    },
+    {
+      "columns": [
+        "org_id"
+      ],
+      "tableTo": "organizations",
+      "columnsTo": [
+        "id"
+      ],
+      "onUpdate": "NO ACTION",
+      "onDelete": "NO ACTION",
+      "nameExplicit": false,
+      "name": "mute_timings_org_id_organizations_id_fk",
+      "entityType": "fks",
+      "table": "mute_timings"
+    },
+    {
+      "columns": [
+        "org_id"
+      ],
+      "tableTo": "organizations",
+      "columnsTo": [
+        "id"
+      ],
+      "onUpdate": "NO ACTION",
+      "onDelete": "NO ACTION",
+      "nameExplicit": false,
+      "name": "notification_policies_org_id_organizations_id_fk",
+      "entityType": "fks",
+      "table": "notification_policies"
+    },
+    {
+      "columns": [
+        "contact_point_id"
+      ],
+      "tableTo": "contact_points",
+      "columnsTo": [
+        "id"
+      ],
+      "onUpdate": "NO ACTION",
+      "onDelete": "NO ACTION",
+      "nameExplicit": false,
+      "name": "notification_policies_contact_point_id_contact_points_id_fk",
+      "entityType": "fks",
+      "table": "notification_policies"
+    },
+    {
+      "columns": [
+        "org_id"
+      ],
+      "tableTo": "organizations",
+      "columnsTo": [
+        "id"
+      ],
+      "onUpdate": "NO ACTION",
+      "onDelete": "NO ACTION",
+      "nameExplicit": false,
+      "name": "silences_org_id_organizations_id_fk",
+      "entityType": "fks",
+      "table": "silences"
+    },
+    {
+      "columns": [
+        "id"
+      ],
+      "nameExplicit": false,
+      "name": "access_service_tokens_pk",
+      "table": "access_service_tokens",
+      "entityType": "pks"
+    },
+    {
+      "columns": [
+        "id"
+      ],
+      "nameExplicit": false,
+      "name": "alert_instances_pk",
+      "table": "alert_instances",
+      "entityType": "pks"
+    },
+    {
+      "columns": [
+        "id"
+      ],
+      "nameExplicit": false,
+      "name": "alert_rule_groups_pk",
+      "table": "alert_rule_groups",
+      "entityType": "pks"
+    },
+    {
+      "columns": [
+        "id"
+      ],
+      "nameExplicit": false,
+      "name": "alert_rules_pk",
+      "table": "alert_rules",
+      "entityType": "pks"
+    },
+    {
+      "columns": [
+        "id"
+      ],
+      "nameExplicit": false,
+      "name": "annotations_pk",
+      "table": "annotations",
+      "entityType": "pks"
+    },
+    {
+      "columns": [
+        "id"
+      ],
+      "nameExplicit": false,
+      "name": "contact_points_pk",
+      "table": "contact_points",
+      "entityType": "pks"
+    },
+    {
+      "columns": [
+        "id"
+      ],
+      "nameExplicit": false,
+      "name": "dashboard_versions_pk",
+      "table": "dashboard_versions",
+      "entityType": "pks"
+    },
+    {
+      "columns": [
+        "id"
+      ],
+      "nameExplicit": false,
+      "name": "dashboards_pk",
+      "table": "dashboards",
+      "entityType": "pks"
+    },
+    {
+      "columns": [
+        "id"
+      ],
+      "nameExplicit": false,
+      "name": "datasources_pk",
+      "table": "datasources",
+      "entityType": "pks"
+    },
+    {
+      "columns": [
+        "id"
+      ],
+      "nameExplicit": false,
+      "name": "folders_pk",
+      "table": "folders",
+      "entityType": "pks"
+    },
+    {
+      "columns": [
+        "id"
+      ],
+      "nameExplicit": false,
+      "name": "mute_timings_pk",
+      "table": "mute_timings",
+      "entityType": "pks"
+    },
+    {
+      "columns": [
+        "id"
+      ],
+      "nameExplicit": false,
+      "name": "notification_policies_pk",
+      "table": "notification_policies",
+      "entityType": "pks"
+    },
+    {
+      "columns": [
+        "id"
+      ],
+      "nameExplicit": false,
+      "name": "organizations_pk",
+      "table": "organizations",
+      "entityType": "pks"
+    },
+    {
+      "columns": [
+        "id"
+      ],
+      "nameExplicit": false,
+      "name": "silences_pk",
+      "table": "silences",
+      "entityType": "pks"
+    },
+    {
+      "columns": [
+        {
+          "value": "org_id",
+          "isExpression": false
+        }
+      ],
+      "isUnique": false,
+      "where": null,
+      "origin": "manual",
+      "name": "access_service_tokens_org_idx",
+      "entityType": "indexes",
+      "table": "access_service_tokens"
+    },
+    {
+      "columns": [
+        {
+          "value": "client_id",
+          "isExpression": false
+        }
+      ],
+      "isUnique": true,
+      "where": null,
+      "origin": "manual",
+      "name": "access_service_tokens_client_idx",
+      "entityType": "indexes",
+      "table": "access_service_tokens"
+    },
+    {
+      "columns": [
+        {
+          "value": "rule_id",
+          "isExpression": false
+        },
+        {
+          "value": "labels_hash",
+          "isExpression": false
+        }
+      ],
+      "isUnique": true,
+      "where": null,
+      "origin": "manual",
+      "name": "alert_instances_rule_labels_idx",
+      "entityType": "indexes",
+      "table": "alert_instances"
+    },
+    {
+      "columns": [
+        {
+          "value": "org_id",
+          "isExpression": false
+        },
+        {
+          "value": "folder_id",
+          "isExpression": false
+        },
+        {
+          "value": "name",
+          "isExpression": false
+        }
+      ],
+      "isUnique": true,
+      "where": null,
+      "origin": "manual",
+      "name": "alert_rule_groups_org_folder_name_idx",
+      "entityType": "indexes",
+      "table": "alert_rule_groups"
+    },
+    {
+      "columns": [
+        {
+          "value": "org_id",
+          "isExpression": false
+        },
+        {
+          "value": "group_id",
+          "isExpression": false
+        },
+        {
+          "value": "title",
+          "isExpression": false
+        }
+      ],
+      "isUnique": true,
+      "where": null,
+      "origin": "manual",
+      "name": "alert_rules_org_group_title_idx",
+      "entityType": "indexes",
+      "table": "alert_rules"
+    },
+    {
+      "columns": [
+        {
+          "value": "org_id",
+          "isExpression": false
+        },
+        {
+          "value": "dashboard_id",
+          "isExpression": false
+        }
+      ],
+      "isUnique": false,
+      "where": null,
+      "origin": "manual",
+      "name": "annotations_org_dashboard_idx",
+      "entityType": "indexes",
+      "table": "annotations"
+    },
+    {
+      "columns": [
+        {
+          "value": "org_id",
+          "isExpression": false
+        },
+        {
+          "value": "alert_rule_id",
+          "isExpression": false
+        }
+      ],
+      "isUnique": false,
+      "where": null,
+      "origin": "manual",
+      "name": "annotations_org_rule_idx",
+      "entityType": "indexes",
+      "table": "annotations"
+    },
+    {
+      "columns": [
+        {
+          "value": "org_id",
+          "isExpression": false
+        },
+        {
+          "value": "name",
+          "isExpression": false
+        }
+      ],
+      "isUnique": true,
+      "where": null,
+      "origin": "manual",
+      "name": "contact_points_org_name_idx",
+      "entityType": "indexes",
+      "table": "contact_points"
+    },
+    {
+      "columns": [
+        {
+          "value": "dashboard_id",
+          "isExpression": false
+        },
+        {
+          "value": "version",
+          "isExpression": false
+        }
+      ],
+      "isUnique": true,
+      "where": null,
+      "origin": "manual",
+      "name": "dashboard_versions_dashboard_version_idx",
+      "entityType": "indexes",
+      "table": "dashboard_versions"
+    },
+    {
+      "columns": [
+        {
+          "value": "org_id",
+          "isExpression": false
+        },
+        {
+          "value": "slug",
+          "isExpression": false
+        }
+      ],
+      "isUnique": true,
+      "where": null,
+      "origin": "manual",
+      "name": "dashboards_org_slug_idx",
+      "entityType": "indexes",
+      "table": "dashboards"
+    },
+    {
+      "columns": [
+        {
+          "value": "org_id",
+          "isExpression": false
+        },
+        {
+          "value": "parent_id",
+          "isExpression": false
+        },
+        {
+          "value": "slug",
+          "isExpression": false
+        }
+      ],
+      "isUnique": true,
+      "where": null,
+      "origin": "manual",
+      "name": "folders_org_parent_slug_idx",
+      "entityType": "indexes",
+      "table": "folders"
+    },
+    {
+      "columns": [
+        {
+          "value": "org_id",
+          "isExpression": false
+        },
+        {
+          "value": "name",
+          "isExpression": false
+        }
+      ],
+      "isUnique": true,
+      "where": null,
+      "origin": "manual",
+      "name": "mute_timings_org_name_idx",
+      "entityType": "indexes",
+      "table": "mute_timings"
+    },
+    {
+      "columns": [
+        {
+          "value": "org_id",
+          "isExpression": false
+        }
+      ],
+      "isUnique": false,
+      "where": null,
+      "origin": "manual",
+      "name": "notification_policies_org_idx",
+      "entityType": "indexes",
+      "table": "notification_policies"
+    },
+    {
+      "columns": [
+        {
+          "value": "org_id",
+          "isExpression": false
+        },
+        {
+          "value": "ends_at",
+          "isExpression": false
+        }
+      ],
+      "isUnique": false,
+      "where": null,
+      "origin": "manual",
+      "name": "silences_org_ends_idx",
+      "entityType": "indexes",
+      "table": "silences"
+    }
+  ],
+  "renames": []
+}

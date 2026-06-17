@@ -171,23 +171,28 @@ export const contactPoints = sqliteTable(
   table => [uniqueIndex('contact_points_org_name_idx').on(table.orgId, table.name)],
 );
 
-export const notificationPolicies = sqliteTable('notification_policies', {
-  id: text('id').primaryKey(),
-  orgId: text('org_id')
-    .notNull()
-    .references(() => organizations.id),
-  parentId: text('parent_id'),
-  contactPointId: text('contact_point_id').references(() => contactPoints.id),
-  groupBy: text('group_by', { mode: 'json' }).notNull().$type<string[]>().default(['alertname']),
-  matchers: text('matchers', { mode: 'json' }).notNull().$type<LabelMatcher[]>().default([]),
-  muteTimingIds: text('mute_timing_ids', { mode: 'json' }).notNull().$type<string[]>().default([]),
-  groupWaitS: integer('group_wait_s').notNull().default(30),
-  groupIntervalS: integer('group_interval_s').notNull().default(300),
-  repeatIntervalS: integer('repeat_interval_s').notNull().default(14400),
-  continueMatching: integer('continue_matching', { mode: 'boolean' }).notNull().default(false),
-  createdAt: integer('created_at', { mode: 'timestamp_ms' }).notNull(),
-  updatedAt: integer('updated_at', { mode: 'timestamp_ms' }).notNull(),
-});
+export const notificationPolicies = sqliteTable(
+  'notification_policies',
+  {
+    id: text('id').primaryKey(),
+    orgId: text('org_id')
+      .notNull()
+      .references(() => organizations.id),
+    parentId: text('parent_id'),
+    contactPointId: text('contact_point_id').references(() => contactPoints.id),
+    groupBy: text('group_by', { mode: 'json' }).notNull().$type<string[]>().default(['alertname']),
+    matchers: text('matchers', { mode: 'json' }).notNull().$type<LabelMatcher[]>().default([]),
+    muteTimingIds: text('mute_timing_ids', { mode: 'json' }).notNull().$type<string[]>().default([]),
+    groupWaitS: integer('group_wait_s').notNull().default(30),
+    groupIntervalS: integer('group_interval_s').notNull().default(300),
+    repeatIntervalS: integer('repeat_interval_s').notNull().default(14400),
+    continueMatching: integer('continue_matching', { mode: 'boolean' }).notNull().default(false),
+    createdAt: integer('created_at', { mode: 'timestamp_ms' }).notNull(),
+    updatedAt: integer('updated_at', { mode: 'timestamp_ms' }).notNull(),
+  },
+  // Loaded by orgId on every notification-workflow run; without this it's a full-table scan.
+  table => [index('notification_policies_org_idx').on(table.orgId)],
+);
 
 export const silences = sqliteTable(
   'silences',

@@ -1,0 +1,1 @@
+CREATE INDEX `notification_policies_org_idx` ON `notification_policies` (`org_id`);
