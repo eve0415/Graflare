@@ -284,6 +284,27 @@ describe('notification-workflow per-instance routing (C3)', () => {
     expect(urlsOf(deliveries)).toEqual(['https://hook.test/child']);
   });
 
+  it('routes across MULTIPLE top-level policies instead of dropping all but the first', async () => {
+    // The UI's "Root (default policy)" parent option sets parentId=null, so an org can have
+    // several top-level policies. Before the fix, buildPolicyTree kept only the first and
+    // silently dropped the rest — alerts matching only a later top-level policy never delivered.
+    const cpA = await seedContactPoint(ORG_ID, 'cp-a', { type: 'webhook', url: 'https://hook.test/a', method: 'POST', username: '', password: '' });
+    const cpB = await seedContactPoint(ORG_ID, 'cp-b', { type: 'webhook', url: 'https://hook.test/b', method: 'POST', username: '', password: '' });
+    // Two top-level policies (both parentId=null): a catch-all and a warning-only one.
+    await seedPolicy({ orgId: ORG_ID, contactPointId: cpA });
+    await seedPolicy({ orgId: ORG_ID, contactPointId: cpB, matchers: [{ name: 'severity', operator: '=', value: 'warning' }] });
+
+    await seedInstance(ORG_ID, RULE_ID, 'h-crit', { severity: 'critical' });
+    await seedInstance(ORG_ID, RULE_ID, 'h-warn', { severity: 'warning' });
+
+    const deliveries = captureFetch();
+    await runWorkflow(baseParams());
+
+    // The warning instance must reach the second top-level policy's contact point — not be dropped.
+    expect(new Set(urlsOf(deliveries))).toEqual(new Set(['https://hook.test/a', 'https://hook.test/b']));
+    expect(urlsOf(deliveries)).toHaveLength(2);
+  });
+
   it('routes two instances of one rule with different labels to DIFFERENT contact points', async () => {
     const critCp = await seedContactPoint(ORG_ID, 'crit-cp', { type: 'webhook', url: 'https://hook.test/crit', method: 'POST', username: '', password: '' });
     const warnCp = await seedContactPoint(ORG_ID, 'warn-cp', { type: 'webhook', url: 'https://hook.test/warn', method: 'POST', username: '', password: '' });

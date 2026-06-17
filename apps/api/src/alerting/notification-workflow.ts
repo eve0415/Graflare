@@ -121,19 +121,24 @@ const buildPolicyTree = (rows: PolicyRow[]): PolicyNode | null => {
     });
   }
 
+  // A node is "top-level" when it has no parent (parentId === null) or its parent is missing
+  // (orphaned — deleted, or in another org). The UI exposes a "Root (default policy)" parent
+  // option that sets parentId === null, so an org legitimately has SEVERAL top-level policies.
+  // The first becomes the canonical root; the rest attach under it so their subtrees still
+  // route. (Previously only the first was kept and every other top-level subtree was silently
+  // dropped, so alerts matching only those policies were never delivered.)
   let root: PolicyNode | null = null;
   for (const node of nodes.values()) {
-    if (node.parentId === null) {
-      root ??= node;
+    const parent = node.parentId === null ? undefined : nodes.get(node.parentId);
+    if (parent !== undefined) {
+      parent.children.push(node);
       continue;
     }
-    const parent = nodes.get(node.parentId);
-    if (parent === undefined) {
-      // Orphaned (parent missing / another org) — treat as a top-level fallback under root.
-      root ??= node;
-      continue;
+    if (root === null) {
+      root = node;
+    } else {
+      root.children.push(node);
     }
-    parent.children.push(node);
   }
   return root;
 };
