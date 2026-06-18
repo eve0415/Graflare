@@ -167,6 +167,31 @@ app.onError(onHttpError);
 
 export default app;
 
+/** A SQL introspection result's rows mapped to {name, schema?} table descriptors. */
+const parseTableRows = (result: SqlResponse): { name: string; schema?: string }[] => {
+  const nameIdx = result.columns.findIndex(c => c.name === 'name');
+  const schemaIdx = result.columns.findIndex(c => c.name === 'schema');
+  return result.rows.map(row => ({
+    name: String(row[nameIdx] ?? ''),
+    ...(schemaIdx !== -1 && row[schemaIdx] !== null ? { schema: String(row[schemaIdx]) } : {}),
+  }));
+};
+
+/** A SQL introspection result's rows mapped to {name, type, nullable} column descriptors. */
+const parseColumnRows = (result: SqlResponse): { name: string; type: string; nullable: boolean }[] => {
+  const nameIdx = result.columns.findIndex(c => c.name === 'name');
+  const typeIdx = result.columns.findIndex(c => c.name === 'type');
+  const nullableIdx = result.columns.findIndex(c => c.name === 'nullable');
+  return result.rows.map(row => ({
+    name: String(row[nameIdx] ?? ''),
+    type: String(row[typeIdx] ?? ''),
+    nullable: Number(row[nullableIdx]) === 1,
+  }));
+};
+
+/** Narrow a Prometheus label/metric response payload to a string[]. */
+const isStringArray = (d: unknown): d is string[] => Array.isArray(d) && d.every((x): x is string => typeof x === 'string');
+
 export class GraflareAPI extends WorkerEntrypoint<Bindings> {
   // Memoized: `drizzle()` walks the whole relational schema config on every
   // call, and a single RPC method can touch `this.db` five times.
@@ -427,37 +452,38 @@ export class GraflareAPI extends WorkerEntrypoint<Bindings> {
     });
   }
 
+  // Single place the SQL/introspection methods load a datasource: fetch (org-scoped), require a
+  // SQL type, resolve the dialect, and build the client. Returns an error string otherwise.
+  private async loadSqlClient(orgId: string, datasourceId: string): Promise<{ client: SqlClient; dialect: 'postgres' | 'sqlite' } | { error: string }> {
+    const rows = await this.db
+      .select()
+      .from(datasources)
+      .where(and(eq(datasources.id, datasourceId), eq(datasources.orgId, orgId)))
+      .limit(1);
+    const [ds] = rows;
+    if (ds === undefined) return { error: 'Data source not found' };
+    if (ds.type !== 'sql') return { error: 'Data source is not a SQL type' };
+    const dialect = ds.dialect === 'postgres' ? 'postgres' : 'sqlite';
+    const client = await createSqlClient(ds, this.env.ENCRYPTION_KEY, this.bridgeFetch);
+    return { client, dialect };
+  }
+
   // --- SQL RPC ---
 
   async sqlQuery(jwt: string, datasourceId: string, rawSql: string, _format: SqlFormat, timeRange?: { from: string; to: string }): Promise<SqlResponse> {
     const { orgId } = await this.resolveAuth(jwt);
     datasourceIdSchema.parse(datasourceId);
 
-    const rows = await this.db
-      .select()
-      .from(datasources)
-      .where(and(eq(datasources.id, datasourceId), eq(datasources.orgId, orgId)))
-      .limit(1);
-
-    const [ds] = rows;
-    if (ds === undefined) {
-      return { columns: [], rows: [], error: 'Data source not found' };
-    }
-
-    if (ds.type !== 'sql') {
-      return { columns: [], rows: [], error: 'Data source is not a SQL type' };
-    }
-
-    const dialect = ds.dialect === 'postgres' ? 'postgres' : 'sqlite';
+    const sqlClient = await this.loadSqlClient(orgId, datasourceId);
+    if ('error' in sqlClient) return { columns: [], rows: [], error: sqlClient.error };
 
     const resolvedTimeRange = timeRange
       ? resolveRange(timeRange.from, timeRange.to)
       : { from: Math.floor(Date.now() / 1000) - 3600, to: Math.floor(Date.now() / 1000) };
 
-    const { sql: expandedSql, params } = expandSqlMacros(rawSql, dialect, resolvedTimeRange);
+    const { sql: expandedSql, params } = expandSqlMacros(rawSql, sqlClient.dialect, resolvedTimeRange);
 
-    const client = await createSqlClient(ds, this.env.ENCRYPTION_KEY, this.bridgeFetch);
-    return client.query(expandedSql, params);
+    return sqlClient.client.query(expandedSql, params);
   }
 
   // --- Introspection RPC ---
@@ -467,32 +493,14 @@ export class GraflareAPI extends WorkerEntrypoint<Bindings> {
       const { orgId } = await this.resolveAuth(jwt);
       datasourceIdSchema.parse(datasourceId);
 
-      const rows = await this.db
-        .select()
-        .from(datasources)
-        .where(and(eq(datasources.id, datasourceId), eq(datasources.orgId, orgId)))
-        .limit(1);
+      const sqlClient = await this.loadSqlClient(orgId, datasourceId);
+      if ('error' in sqlClient) return { tables: [], error: sqlClient.error };
 
-      const [ds] = rows;
-      if (ds === undefined) return { tables: [], error: 'Data source not found' };
-      if (ds.type !== 'sql') return { tables: [], error: 'Data source is not a SQL type' };
-
-      const dialect = ds.dialect === 'postgres' ? 'postgres' : 'sqlite';
-      const client = await createSqlClient(ds, this.env.ENCRYPTION_KEY, this.bridgeFetch);
-
-      const q = listTablesQuery(dialect);
-      const result = await client.query(q.sql, q.params);
+      const q = listTablesQuery(sqlClient.dialect);
+      const result = await sqlClient.client.query(q.sql, q.params);
       if (result.error !== undefined) return { tables: [], error: result.error };
 
-      const nameIdx = result.columns.findIndex(c => c.name === 'name');
-      const schemaIdx = result.columns.findIndex(c => c.name === 'schema');
-
-      const tables = result.rows.map(row => ({
-        name: String(row[nameIdx] ?? ''),
-        ...(schemaIdx !== -1 && row[schemaIdx] !== null ? { schema: String(row[schemaIdx]) } : {}),
-      }));
-
-      return { tables };
+      return { tables: parseTableRows(result) };
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Failed to list tables';
       return { tables: [], error: message };
@@ -504,34 +512,14 @@ export class GraflareAPI extends WorkerEntrypoint<Bindings> {
       const { orgId } = await this.resolveAuth(jwt);
       datasourceIdSchema.parse(datasourceId);
 
-      const rows = await this.db
-        .select()
-        .from(datasources)
-        .where(and(eq(datasources.id, datasourceId), eq(datasources.orgId, orgId)))
-        .limit(1);
+      const sqlClient = await this.loadSqlClient(orgId, datasourceId);
+      if ('error' in sqlClient) return { columns: [], error: sqlClient.error };
 
-      const [ds] = rows;
-      if (ds === undefined) return { columns: [], error: 'Data source not found' };
-      if (ds.type !== 'sql') return { columns: [], error: 'Data source is not a SQL type' };
-
-      const dialect = ds.dialect === 'postgres' ? 'postgres' : 'sqlite';
-      const client = await createSqlClient(ds, this.env.ENCRYPTION_KEY, this.bridgeFetch);
-
-      const q = describeTableQuery(dialect, tableName, schema);
-      const result = await client.query(q.sql, q.params);
+      const q = describeTableQuery(sqlClient.dialect, tableName, schema);
+      const result = await sqlClient.client.query(q.sql, q.params);
       if (result.error !== undefined) return { columns: [], error: result.error };
 
-      const nameIdx = result.columns.findIndex(c => c.name === 'name');
-      const typeIdx = result.columns.findIndex(c => c.name === 'type');
-      const nullableIdx = result.columns.findIndex(c => c.name === 'nullable');
-
-      const columns = result.rows.map(row => ({
-        name: String(row[nameIdx] ?? ''),
-        type: String(row[typeIdx] ?? ''),
-        nullable: Number(row[nullableIdx]) === 1,
-      }));
-
-      return { columns };
+      return { columns: parseColumnRows(result) };
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Failed to describe table';
       return { columns: [], error: message };
@@ -543,46 +531,19 @@ export class GraflareAPI extends WorkerEntrypoint<Bindings> {
       const { orgId } = await this.resolveAuth(jwt);
       datasourceIdSchema.parse(datasourceId);
 
-      const rows = await this.db
-        .select()
-        .from(datasources)
-        .where(and(eq(datasources.id, datasourceId), eq(datasources.orgId, orgId)))
-        .limit(1);
+      const sqlClient = await this.loadSqlClient(orgId, datasourceId);
+      if ('error' in sqlClient) return { tables: {}, error: sqlClient.error };
 
-      const [ds] = rows;
-      if (ds === undefined) return { tables: {}, error: 'Data source not found' };
-      if (ds.type !== 'sql') return { tables: {}, error: 'Data source is not a SQL type' };
-
-      const dialect = ds.dialect === 'postgres' ? 'postgres' : 'sqlite';
-      const client = await createSqlClient(ds, this.env.ENCRYPTION_KEY, this.bridgeFetch);
-
-      const tq = listTablesQuery(dialect);
-      const tablesResult = await client.query(tq.sql, tq.params);
+      const tq = listTablesQuery(sqlClient.dialect);
+      const tablesResult = await sqlClient.client.query(tq.sql, tq.params);
       if (tablesResult.error !== undefined) return { tables: {}, error: tablesResult.error };
 
-      const nameIdx = tablesResult.columns.findIndex(c => c.name === 'name');
-      const schemaIdx = tablesResult.columns.findIndex(c => c.name === 'schema');
-      const tableList = tablesResult.rows.map(row => ({
-        name: String(row[nameIdx] ?? ''),
-        ...(schemaIdx !== -1 && row[schemaIdx] !== null ? { schema: String(row[schemaIdx]) } : {}),
-      }));
-
       const describedTables = await Promise.all(
-        tableList.map(async table => {
-          const dq = describeTableQuery(dialect, table.name, table.schema);
-          const result = await client.query(dq.sql, dq.params);
+        parseTableRows(tablesResult).map(async table => {
+          const dq = describeTableQuery(sqlClient.dialect, table.name, table.schema);
+          const result = await sqlClient.client.query(dq.sql, dq.params);
           if (result.error !== undefined) return null;
-
-          const colNameIdx = result.columns.findIndex(c => c.name === 'name');
-          const typeIdx = result.columns.findIndex(c => c.name === 'type');
-          const nullableIdx = result.columns.findIndex(c => c.name === 'nullable');
-
-          const columns = result.rows.map(row => ({
-            name: String(row[colNameIdx] ?? ''),
-            type: String(row[typeIdx] ?? ''),
-            nullable: Number(row[nullableIdx]) === 1,
-          }));
-          return { name: table.name, columns };
+          return { name: table.name, columns: parseColumnRows(result) };
         }),
       );
 
@@ -610,7 +571,7 @@ export class GraflareAPI extends WorkerEntrypoint<Bindings> {
       if (res.status === 'error') return { metrics: [], error: res.error ?? 'Failed to fetch metrics' };
 
       const d = res.data;
-      if (Array.isArray(d) && d.every((x): x is string => typeof x === 'string')) {
+      if (isStringArray(d)) {
         return { metrics: d };
       }
       return { metrics: [] };
@@ -633,7 +594,7 @@ export class GraflareAPI extends WorkerEntrypoint<Bindings> {
       if (res.status === 'error') return { labels: [], error: res.error ?? 'Failed to fetch labels' };
 
       const d = res.data;
-      if (Array.isArray(d) && d.every((x): x is string => typeof x === 'string')) {
+      if (isStringArray(d)) {
         return { labels: d };
       }
       return { labels: [] };
@@ -656,7 +617,7 @@ export class GraflareAPI extends WorkerEntrypoint<Bindings> {
       if (res.status === 'error') return { values: [], error: res.error ?? 'Failed to fetch label values' };
 
       const d = res.data;
-      if (Array.isArray(d) && d.every((x): x is string => typeof x === 'string')) {
+      if (isStringArray(d)) {
         return { values: d };
       }
       return { values: [] };
