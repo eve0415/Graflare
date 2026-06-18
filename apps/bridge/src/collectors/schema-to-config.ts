@@ -2,7 +2,15 @@ import type { IntrospectedFields } from '../cf-graphql/introspection';
 import type { DatasetOverride } from './overrides';
 import type { DatasetConfig } from './registry';
 
+import { REGISTRY } from './registry';
+
 export const MAX_FIELDS = 25;
+
+// REGISTRY is the hand-curated source of truth for dataset names. A schema-derived config for a
+// node REGISTRY also knows must reuse that curated name — otherwise the name flips (e.g.
+// 'd1' → 'd1analytics') when discovery replaces the REGISTRY fallback, orphaning every metric row
+// stored under the old name. Nodes REGISTRY doesn't know fall back to the derived name.
+const REGISTRY_DATASET_NAMES: ReadonlyMap<string, string> = new Map(REGISTRY.map(c => [c.nodeName, c.datasetName]));
 
 const TIME_DIM_PRIORITY = ['datetimeMinute', 'datetimeFiveMinutes', 'datetimeFiveMinute', 'datetimeFifteenMinutes', 'datetimeHour', 'datetime', 'date'];
 
@@ -99,7 +107,7 @@ export const schemaToConfig = (
 
   return {
     nodeName,
-    datasetName: toDatasetName(nodeName),
+    datasetName: REGISTRY_DATASET_NAMES.get(nodeName) ?? toDatasetName(nodeName),
     scope,
     time: timeDim === undefined ? { kind: 'fromSeconds' } : isDateFilter ? { kind: 'dateDimension', field: timeDim } : { kind: 'dimension', field: timeDim },
     filter: {

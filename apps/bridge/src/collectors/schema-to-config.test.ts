@@ -62,6 +62,9 @@ describe('schemaToConfig', () => {
     };
 
     const config = schemaToConfig('d1AnalyticsAdaptiveGroups', 'account', fields, OVERRIDES['d1AnalyticsAdaptiveGroups']);
+    // Reuses the curated REGISTRY name ('d1'), NOT the derived toDatasetName ('d1analytics'), so
+    // discovery replacing the REGISTRY fallback doesn't orphan rows under a changed name.
+    expect(config?.datasetName).toBe('d1');
     expect(config?.time.kind).toBe('dateDimension');
     expect(config?.filter.kind).toBe('date');
     expect(config?.filter.filterField).toBe('date');
