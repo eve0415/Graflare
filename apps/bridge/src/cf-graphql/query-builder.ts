@@ -1,15 +1,15 @@
 import type { GraphQLCollector } from '../collectors/types';
 
+import { SCOPE_CONFIG } from './scope';
+
 export const buildBatchedQuery = (scope: 'account' | 'zone', collectors: readonly GraphQLCollector[]): string => {
   if (collectors.length === 0) return '';
 
   const needsTime = collectors.some(c => c.timeVarType === 'Time');
   const needsDate = collectors.some(c => c.timeVarType === 'Date');
 
-  const scopeIdVar = scope === 'account' ? '$accountId' : '$zoneId';
+  const { idVar: scopeIdVar, filterKey, node: scopeNode } = SCOPE_CONFIG[scope];
   const scopeIdType = 'String!';
-  const filterKey = scope === 'account' ? 'accountTag' : 'zoneTag';
-  const scopeNode = scope === 'account' ? 'accounts' : 'zones';
   const queryName = scope === 'account' ? 'AccountMetrics' : 'ZoneMetrics';
 
   const varDecls = [`${scopeIdVar}: ${scopeIdType}`];

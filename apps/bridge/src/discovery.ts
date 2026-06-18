@@ -7,6 +7,7 @@ import { sql } from 'drizzle-orm';
 
 import { cfGraphQL } from './cf-graphql/client';
 import { discoverScopeDatasets, introspectDatasetFields } from './cf-graphql/introspection';
+import { SCOPE_CONFIG } from './cf-graphql/scope';
 import { OVERRIDES } from './collectors/overrides';
 import { schemaToConfig } from './collectors/schema-to-config';
 import { discoveryCache, schemaCache } from './db/schema';
@@ -21,9 +22,7 @@ const SCHEMA_REFRESH_SECONDS = 7 * 24 * 3600;
 export const buildDiscoveryQuery = (nodeNames: readonly string[], scope: 'account' | 'zone'): string => {
   if (nodeNames.length === 0) return '';
 
-  const scopeIdVar = scope === 'account' ? '$accountId' : '$zoneId';
-  const filterKey = scope === 'account' ? 'accountTag' : 'zoneTag';
-  const scopeNode = scope === 'account' ? 'accounts' : 'zones';
+  const { idVar: scopeIdVar, filterKey, node: scopeNode } = SCOPE_CONFIG[scope];
 
   const datasetFields = nodeNames.map(n => `${n} { enabled maxPageSize notOlderThan }`);
 
@@ -107,8 +106,7 @@ const processSettingsScope = async (
     const { viewer } = response.data;
     if (!isRecord(viewer)) continue;
 
-    const scopeNode = scope === 'account' ? 'accounts' : 'zones';
-    const scopeArray: unknown = viewer[scopeNode];
+    const scopeArray: unknown = viewer[SCOPE_CONFIG[scope].node];
     if (!Array.isArray(scopeArray) || scopeArray.length === 0) continue;
 
     const narrowed: unknown[] = scopeArray;
