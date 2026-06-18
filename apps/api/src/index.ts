@@ -34,8 +34,7 @@ import { createAlertRuleGroupSchema } from '@graflare/shared/schemas/alert-rule-
 import { annotationListQuerySchema, createAnnotationSchema } from '@graflare/shared/schemas/annotation';
 import { createDashboardSchema, importDashboardSchema, updateDashboardSchema } from '@graflare/shared/schemas/dashboard';
 import { createDatasourceSchema, testConnectionInlineSchema, updateDatasourceSchema } from '@graflare/shared/schemas/datasource';
-import { annotationIdSchema, dashboardIdSchema, datasourceIdSchema, notificationPolicyIdSchema } from '@graflare/shared/schemas/ids';
-import { createNotificationPolicySchema, updateNotificationPolicySchema } from '@graflare/shared/schemas/notification-policy';
+import { annotationIdSchema, dashboardIdSchema, datasourceIdSchema } from '@graflare/shared/schemas/ids';
 import { prometheusResponseSchema } from '@graflare/shared/schemas/prometheus';
 import { createServiceTokenSchema, serviceTokenIdParamSchema } from '@graflare/shared/schemas/service-token';
 import { expandSqlMacros } from '@graflare/shared/sql/macros';
@@ -60,7 +59,6 @@ import {
   dashboards,
   datasourcePublicColumns,
   datasources,
-  notificationPolicies,
 } from './db/schema';
 import { accessMiddleware, subjectFromPayload, subjectLabel, verifyJwt } from './middleware/access';
 import { orgMiddleware, resolveOrgId } from './middleware/org';
@@ -76,6 +74,7 @@ import { contactPointRoutes } from './routes/alerting/contact-points';
 import * as muteTimingOps from './routes/alerting/mute-timing-ops';
 import { muteTimingRoutes } from './routes/alerting/mute-timings';
 import { notificationPolicyRoutes } from './routes/alerting/notification-policies';
+import * as notificationPolicyOps from './routes/alerting/notification-policy-ops';
 import * as silenceOps from './routes/alerting/silence-ops';
 import { silenceRoutes } from './routes/alerting/silences';
 import { dashboardImportRoutes } from './routes/dashboards/dashboard-import';
@@ -1121,84 +1120,22 @@ export class GraflareAPI extends WorkerEntrypoint<Bindings> {
 
   async listNotificationPolicies(jwt: string) {
     const { orgId } = await this.resolveAuth(jwt);
-    return this.db.select().from(notificationPolicies).where(eq(notificationPolicies.orgId, orgId));
+    return notificationPolicyOps.listNotificationPolicies(this.db, orgId);
   }
 
   async createNotificationPolicy(jwt: string, input: CreateNotificationPolicy) {
     const { orgId } = await this.resolveAuth(jwt);
-    const parsed = createNotificationPolicySchema.parse(input);
-    const id = crypto.randomUUID();
-    const now = new Date();
-
-    try {
-      await this.db.insert(notificationPolicies).values({
-        id,
-        orgId,
-        parentId: parsed.parentId ?? null,
-        contactPointId: parsed.contactPointId ?? null,
-        groupBy: parsed.groupBy ?? ['alertname'],
-        matchers: parsed.matchers ?? [],
-        muteTimingIds: parsed.muteTimingIds ?? [],
-        groupWaitS: parsed.groupWaitS ?? 30,
-        groupIntervalS: parsed.groupIntervalS ?? 300,
-        repeatIntervalS: parsed.repeatIntervalS ?? 14400,
-        continueMatching: parsed.continueMatching ?? false,
-        createdAt: now,
-        updatedAt: now,
-      });
-    } catch (error) {
-      console.error('createNotificationPolicy failed:', error);
-      throw new Error('Failed to create notification policy', { cause: error });
-    }
-
-    const rows = await this.db.select().from(notificationPolicies).where(eq(notificationPolicies.id, id)).limit(1);
-    return rows[0] ?? null;
+    return notificationPolicyOps.createNotificationPolicy(this.db, orgId, input);
   }
 
   async updateNotificationPolicy(jwt: string, id: string, input: UpdateNotificationPolicy) {
     const { orgId } = await this.resolveAuth(jwt);
-    notificationPolicyIdSchema.parse(id);
-    const parsed = updateNotificationPolicySchema.parse(input);
-    const now = new Date();
-
-    const setData: Record<string, unknown> = { updatedAt: now };
-    if (parsed.parentId !== undefined) setData['parentId'] = parsed.parentId;
-    if (parsed.contactPointId !== undefined) setData['contactPointId'] = parsed.contactPointId;
-    if (parsed.groupBy !== undefined) setData['groupBy'] = parsed.groupBy;
-    if (parsed.matchers !== undefined) setData['matchers'] = parsed.matchers;
-    if (parsed.muteTimingIds !== undefined) setData['muteTimingIds'] = parsed.muteTimingIds;
-    if (parsed.groupWaitS !== undefined) setData['groupWaitS'] = parsed.groupWaitS;
-    if (parsed.groupIntervalS !== undefined) setData['groupIntervalS'] = parsed.groupIntervalS;
-    if (parsed.repeatIntervalS !== undefined) setData['repeatIntervalS'] = parsed.repeatIntervalS;
-    if (parsed.continueMatching !== undefined) setData['continueMatching'] = parsed.continueMatching;
-
-    try {
-      await this.db
-        .update(notificationPolicies)
-        .set(setData)
-        .where(and(eq(notificationPolicies.id, id), eq(notificationPolicies.orgId, orgId)));
-    } catch (error) {
-      console.error('updateNotificationPolicy failed:', error);
-      throw new Error('Failed to update notification policy', { cause: error });
-    }
-
-    const rows = await this.db
-      .select()
-      .from(notificationPolicies)
-      .where(and(eq(notificationPolicies.id, id), eq(notificationPolicies.orgId, orgId)))
-      .limit(1);
-    return rows[0] ?? null;
+    return notificationPolicyOps.updateNotificationPolicy(this.db, orgId, id, input);
   }
 
   async deleteNotificationPolicy(jwt: string, id: string): Promise<void> {
     const { orgId } = await this.resolveAuth(jwt);
-    notificationPolicyIdSchema.parse(id);
-    try {
-      await this.db.delete(notificationPolicies).where(and(eq(notificationPolicies.id, id), eq(notificationPolicies.orgId, orgId)));
-    } catch (error) {
-      console.error('deleteNotificationPolicy failed:', error);
-      throw new Error('Failed to delete notification policy', { cause: error });
-    }
+    await notificationPolicyOps.deleteNotificationPolicy(this.db, orgId, id);
   }
 
   // --- Silence RPC ---
