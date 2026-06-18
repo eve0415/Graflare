@@ -11,13 +11,13 @@ const matchSingle = (matcher: LabelMatcher, labels: Record<string, string>): boo
     case '!=':
       return value !== matcher.value;
     case '=~':
-      return safeRegex(matcher.value).test(value);
+      return compileAnchoredRegex(matcher.value).test(value);
     case '!~':
-      return !safeRegex(matcher.value).test(value);
+      return !compileAnchoredRegex(matcher.value).test(value);
   }
 };
 
-const safeRegex = (pattern: string): RegExp => {
+const compileAnchoredRegex = (pattern: string): RegExp => {
   try {
     return new RegExp(`^(?:${pattern})$`);
   } catch {
