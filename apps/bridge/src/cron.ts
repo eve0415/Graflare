@@ -60,8 +60,14 @@ interface DatasetStatusRow {
   attemptCount: number;
 }
 
-const isSkipped = (statuses: DatasetStatusRow[], name: string, scope: string, scopeId: string, nowSeconds: number): boolean =>
-  statuses.some(s => s.dataset === name && s.scope === scope && s.scopeId === scopeId && s.retryAfter > nowSeconds);
+// Status rows are keyed by `${dataset}|${scope}|${scopeId}` (syncKey) so per-collector/per-zone
+// skip and attempt-count lookups are O(1) instead of a linear scan of every status row.
+const syncKey = (dataset: string, scope: string, scopeId: string): string => `${dataset}|${scope}|${scopeId}`;
+
+const isSkipped = (statusByKey: ReadonlyMap<string, DatasetStatusRow>, name: string, scope: string, scopeId: string, nowSeconds: number): boolean => {
+  const s = statusByKey.get(syncKey(name, scope, scopeId));
+  return s !== undefined && s.retryAfter > nowSeconds;
+};
 
 const insertMetricRows = async (db: ReturnType<typeof drizzle>, rows: MetricRow[]): Promise<void> => {
   if (rows.length === 0) return;
@@ -111,8 +117,8 @@ export const updateSyncState = async (db: ReturnType<typeof drizzle>, dataset: s
     });
 };
 
-const getAttemptCount = (statuses: readonly DatasetStatusRow[], name: string, scope: string, scopeId: string): number =>
-  statuses.find(s => s.dataset === name && s.scope === scope && s.scopeId === scopeId)?.attemptCount ?? 0;
+const getAttemptCount = (statusByKey: ReadonlyMap<string, DatasetStatusRow>, name: string, scope: string, scopeId: string): number =>
+  statusByKey.get(syncKey(name, scope, scopeId))?.attemptCount ?? 0;
 
 const markDatasetStatus = async (
   db: ReturnType<typeof drizzle>,
@@ -216,7 +222,7 @@ const processCollectorResult = async (
   scopeId: string,
   nowSeconds: number,
   fromSeconds: number,
-  statuses: readonly DatasetStatusRow[],
+  statusByKey: ReadonlyMap<string, DatasetStatusRow>,
 ): Promise<CollectResult> => {
   const aliasErrors = matchErrorsToAlias(batchErrors, collector.alias);
   if (aliasErrors.length > 0) {
@@ -234,7 +240,7 @@ const processCollectorResult = async (
         }
       }
 
-      const attempts = getAttemptCount(statuses, collector.name, scope, scopeId) + 1;
+      const attempts = getAttemptCount(statusByKey, collector.name, scope, scopeId) + 1;
       await markDatasetStatus(db, collector.name, scope, scopeId, STATUS_LABELS[errClass], errorMsg, nowSeconds, attempts);
       return { dataset: collector.name, scope, scopeId, status: 'error', rowCount: 0, error: errorMsg };
     }
@@ -298,7 +304,7 @@ const processGraphQLBatch = async (
   fromDate: string,
   toDate: string,
   nowSeconds: number,
-  statuses: readonly DatasetStatusRow[],
+  statusByKey: ReadonlyMap<string, DatasetStatusRow>,
 ): Promise<CollectResult[]> => {
   if (collectors.length === 0) return [];
 
@@ -342,7 +348,7 @@ const processGraphQLBatch = async (
       });
       const singletonResults = await Promise.all(
         collectors.map(c =>
-          processGraphQLBatch(db, env, [c], scope, scopeId, fromTime, toTime, fromDate, toDate, nowSeconds, statuses).then(
+          processGraphQLBatch(db, env, [c], scope, scopeId, fromTime, toTime, fromDate, toDate, nowSeconds, statusByKey).then(
             results => results[0] ?? fallback(c),
           ),
         ),
@@ -362,7 +368,7 @@ const processGraphQLBatch = async (
               }
             }
           }
-          const attempts = getAttemptCount(statuses, c.name, scope, scopeId) + 1;
+          const attempts = getAttemptCount(statusByKey, c.name, scope, scopeId) + 1;
           await markDatasetStatus(db, c.name, scope, scopeId, STATUS_LABELS[errClass], errorMsg, nowSeconds, attempts);
         } catch {
           /* best-effort status update */
@@ -392,7 +398,7 @@ const processGraphQLBatch = async (
   const results: CollectResult[] = [];
   for (const collector of collectors) {
     try {
-      results.push(await processCollectorResult(db, collector, scopeData, batchErrors, scope, scopeId, nowSeconds, fromSeconds, statuses));
+      results.push(await processCollectorResult(db, collector, scopeData, batchErrors, scope, scopeId, nowSeconds, fromSeconds, statusByKey));
     } catch (error: unknown) {
       const errorMsg = error instanceof Error ? error.message : String(error);
       console.error(
@@ -418,12 +424,12 @@ const processOneRESTCollector = async (
   fromTime: string,
   toTime: string,
   nowSeconds: number,
-  statuses: DatasetStatusRow[],
+  statusByKey: ReadonlyMap<string, DatasetStatusRow>,
   syncTimes: ReadonlyMap<string, number>,
 ): Promise<CollectResult> => {
   const scopeId = env.CF_ACCOUNT_ID;
 
-  if (isSkipped(statuses, collector.name, collector.scope, scopeId, nowSeconds)) {
+  if (isSkipped(statusByKey, collector.name, collector.scope, scopeId, nowSeconds)) {
     return { dataset: collector.name, scope: collector.scope, scopeId, status: 'skipped', rowCount: 0, error: '' };
   }
 
@@ -445,7 +451,7 @@ const processOneRESTCollector = async (
     const errorMsg = error instanceof Error ? error.message : String(error);
     const errClass = classifyError({ message: errorMsg });
     try {
-      const attempts = getAttemptCount(statuses, collector.name, collector.scope, scopeId) + 1;
+      const attempts = getAttemptCount(statusByKey, collector.name, collector.scope, scopeId) + 1;
       await markDatasetStatus(db, collector.name, collector.scope, scopeId, STATUS_LABELS[errClass], errorMsg, nowSeconds, attempts);
     } catch {
       /* best-effort status update */
@@ -470,11 +476,9 @@ const processRESTCollectors = async (
   fromTime: string,
   toTime: string,
   nowSeconds: number,
-  statuses: DatasetStatusRow[],
+  statusByKey: ReadonlyMap<string, DatasetStatusRow>,
   syncTimes: ReadonlyMap<string, number>,
-): Promise<CollectResult[]> => Promise.all(collectors.map(c => processOneRESTCollector(db, env, c, fromTime, toTime, nowSeconds, statuses, syncTimes)));
-
-const syncKey = (dataset: string, scope: string, scopeId: string): string => `${dataset}|${scope}|${scopeId}`;
+): Promise<CollectResult[]> => Promise.all(collectors.map(c => processOneRESTCollector(db, env, c, fromTime, toTime, nowSeconds, statusByKey, syncTimes)));
 
 // One read of the whole (small) sync_state table per cron run, replacing a
 // point SELECT per collector per chunk. The snapshot is taken before tasks
@@ -568,11 +572,12 @@ export const collectMetrics = async (env: BridgeEnv, scheduledTime: number): Pro
   const accountCollectors = enabledDatasets.filter(c => c.scope === 'account').map(c => toCollector(c));
   const zoneCollectors = enabledDatasets.filter(c => c.scope === 'zone').map(c => toCollector(c));
 
-  const statuses: DatasetStatusRow[] = await db.select().from(datasetStatus);
+  const statusRows = await db.select().from(datasetStatus);
+  const statusByKey = new Map(statusRows.map(s => [syncKey(s.dataset, s.scope, s.scopeId), s]));
   const syncTimes = await loadSyncTimes(db);
 
-  const activeAccountCollectors = accountCollectors.filter(c => !isSkipped(statuses, c.name, 'account', env.CF_ACCOUNT_ID, nowSeconds));
-  const activeZoneCollectors = zoneCollectors.filter(c => !zoneIds.every(zid => isSkipped(statuses, c.name, 'zone', zid, nowSeconds)));
+  const activeAccountCollectors = accountCollectors.filter(c => !isSkipped(statusByKey, c.name, 'account', env.CF_ACCOUNT_ID, nowSeconds));
+  const activeZoneCollectors = zoneCollectors.filter(c => !zoneIds.every(zid => isSkipped(statusByKey, c.name, 'zone', zid, nowSeconds)));
 
   const toTime = new Date(scheduledTime).toISOString();
 
@@ -581,21 +586,21 @@ export const collectMetrics = async (env: BridgeEnv, scheduledTime: number): Pro
   for (let i = 0; i < activeAccountCollectors.length; i += BATCH_CHUNK_SIZE) {
     const chunk = activeAccountCollectors.slice(i, i + BATCH_CHUNK_SIZE);
     const tv = buildTimeVars(syncTimes, chunk, 'account', env.CF_ACCOUNT_ID, nowSeconds, toTime);
-    tasks.push(processGraphQLBatch(db, env, chunk, 'account', env.CF_ACCOUNT_ID, tv.fromTime, tv.toTime, tv.fromDate, tv.toDate, nowSeconds, statuses));
+    tasks.push(processGraphQLBatch(db, env, chunk, 'account', env.CF_ACCOUNT_ID, tv.fromTime, tv.toTime, tv.fromDate, tv.toDate, nowSeconds, statusByKey));
   }
 
   for (const zid of zoneIds) {
-    const perZone = activeZoneCollectors.filter(c => !isSkipped(statuses, c.name, 'zone', zid, nowSeconds));
+    const perZone = activeZoneCollectors.filter(c => !isSkipped(statusByKey, c.name, 'zone', zid, nowSeconds));
     for (let i = 0; i < perZone.length; i += BATCH_CHUNK_SIZE) {
       const chunk = perZone.slice(i, i + BATCH_CHUNK_SIZE);
       const tv = buildTimeVars(syncTimes, chunk, 'zone', zid, nowSeconds, toTime);
-      tasks.push(processGraphQLBatch(db, env, chunk, 'zone', zid, tv.fromTime, tv.toTime, tv.fromDate, tv.toDate, nowSeconds, statuses));
+      tasks.push(processGraphQLBatch(db, env, chunk, 'zone', zid, tv.fromTime, tv.toTime, tv.fromDate, tv.toDate, nowSeconds, statusByKey));
     }
   }
 
   if (REST_COLLECTORS.length > 0) {
     const fromTime = new Date((nowSeconds - 86400) * 1000).toISOString();
-    tasks.push(processRESTCollectors(db, env, REST_COLLECTORS, fromTime, toTime, nowSeconds, statuses, syncTimes));
+    tasks.push(processRESTCollectors(db, env, REST_COLLECTORS, fromTime, toTime, nowSeconds, statusByKey, syncTimes));
   }
 
   const batchResults = await Promise.allSettled(tasks);
