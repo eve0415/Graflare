@@ -5,19 +5,12 @@ import { env } from 'cloudflare:workers';
 
 import { getAccessJwt } from '../../lib/auth';
 
-export interface DatasourceRow {
-  id: string;
-  orgId: string;
-  name: string;
-  type: string;
-  dialect: string | null;
-  url: string;
-  authType: string;
-  queryTimeoutMs: number;
-  cacheTtl: number;
-  createdAt: Date;
-  updatedAt: Date;
-}
+// The RPC return is branded Disposable (and tuple-widened), which createServerFn's serialization
+// rejects, so we rebuild a plain object below. Derive the row shape from the RPC return itself
+// (minus the Disposable symbol key) so a new public datasource column is a compile error in
+// toDatasourceRow until it's mapped — instead of being silently dropped.
+type RpcDatasourceRow = Awaited<ReturnType<typeof env.API.listDatasources>>[number];
+export type DatasourceRow = { [K in keyof RpcDatasourceRow as K extends string ? K : never]: RpcDatasourceRow[K] };
 
 interface TestConnectionResult {
   success: boolean;
@@ -25,19 +18,7 @@ interface TestConnectionResult {
   error?: string;
 }
 
-const toDatasourceRow = (ds: {
-  id: string;
-  orgId: string;
-  name: string;
-  type: string;
-  dialect: string | null;
-  url: string;
-  authType: string;
-  queryTimeoutMs: number;
-  cacheTtl: number;
-  createdAt: Date;
-  updatedAt: Date;
-}): DatasourceRow => ({
+const toDatasourceRow = (ds: RpcDatasourceRow): DatasourceRow => ({
   id: ds.id,
   orgId: ds.orgId,
   name: ds.name,
