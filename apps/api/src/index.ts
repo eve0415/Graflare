@@ -35,15 +35,7 @@ import { annotationListQuerySchema, createAnnotationSchema } from '@graflare/sha
 import { createContactPointSchema, updateContactPointSchema } from '@graflare/shared/schemas/contact-point';
 import { createDashboardSchema, importDashboardSchema, updateDashboardSchema } from '@graflare/shared/schemas/dashboard';
 import { createDatasourceSchema, testConnectionInlineSchema, updateDatasourceSchema } from '@graflare/shared/schemas/datasource';
-import { createFolderSchema, updateFolderSchema } from '@graflare/shared/schemas/folder';
-import {
-  annotationIdSchema,
-  contactPointIdSchema,
-  dashboardIdSchema,
-  datasourceIdSchema,
-  folderIdSchema,
-  notificationPolicyIdSchema,
-} from '@graflare/shared/schemas/ids';
+import { annotationIdSchema, contactPointIdSchema, dashboardIdSchema, datasourceIdSchema, notificationPolicyIdSchema } from '@graflare/shared/schemas/ids';
 import { createNotificationPolicySchema, updateNotificationPolicySchema } from '@graflare/shared/schemas/notification-policy';
 import { prometheusResponseSchema } from '@graflare/shared/schemas/prometheus';
 import { createServiceTokenSchema, serviceTokenIdParamSchema } from '@graflare/shared/schemas/service-token';
@@ -71,7 +63,6 @@ import {
   dashboards,
   datasourcePublicColumns,
   datasources,
-  folders,
   notificationPolicies,
 } from './db/schema';
 import { accessMiddleware, subjectFromPayload, subjectLabel, verifyJwt } from './middleware/access';
@@ -95,6 +86,7 @@ import { dashboardRoutes } from './routes/dashboards/dashboards';
 import { datasourceRoutes } from './routes/datasources/datasources';
 import { datasourceTestRoutes } from './routes/datasources/datasources-test';
 import { proxyRoutes } from './routes/datasources/proxy';
+import * as folderOps from './routes/folders/folder-ops';
 import { folderRoutes } from './routes/folders/folders';
 import { serviceTokenRoutes } from './routes/service-tokens/service-tokens';
 import { slugify } from './slugify';
@@ -650,98 +642,22 @@ export class GraflareAPI extends WorkerEntrypoint<Bindings> {
 
   async listFolders(jwt: string) {
     const { orgId } = await this.resolveAuth(jwt);
-    return this.db.select().from(folders).where(eq(folders.orgId, orgId));
+    return folderOps.listFolders(this.db, orgId);
   }
 
   async createFolder(jwt: string, input: CreateFolder) {
     const { orgId } = await this.resolveAuth(jwt);
-    const parsed = createFolderSchema.parse(input);
-    const id = crypto.randomUUID();
-    const now = new Date();
-    const slug = slugify(parsed.title);
-
-    try {
-      await this.db.insert(folders).values({
-        id,
-        orgId,
-        parentId: parsed.parentId ?? null,
-        title: parsed.title,
-        slug,
-        createdAt: now,
-        updatedAt: now,
-      });
-    } catch (error) {
-      console.error('createFolder failed:', error);
-      throw new Error('Failed to create folder', { cause: error });
-    }
-
-    return { id, orgId, parentId: parsed.parentId ?? null, title: parsed.title, slug, createdAt: now, updatedAt: now };
+    return folderOps.createFolder(this.db, orgId, input);
   }
 
   async updateFolder(jwt: string, id: string, input: UpdateFolder) {
     const { orgId } = await this.resolveAuth(jwt);
-    folderIdSchema.parse(id);
-    const parsed = updateFolderSchema.parse(input);
-    const now = new Date();
-
-    const setData: Record<string, unknown> = { updatedAt: now };
-    if (parsed.title !== undefined) {
-      setData['title'] = parsed.title;
-      setData['slug'] = slugify(parsed.title);
-    }
-    if (parsed.parentId !== undefined) setData['parentId'] = parsed.parentId;
-
-    try {
-      await this.db
-        .update(folders)
-        .set(setData)
-        .where(and(eq(folders.id, id), eq(folders.orgId, orgId)));
-    } catch (error) {
-      console.error('updateFolder failed:', error);
-      throw new Error('Failed to update folder', { cause: error });
-    }
-
-    const rows = await this.db
-      .select()
-      .from(folders)
-      .where(and(eq(folders.id, id), eq(folders.orgId, orgId)))
-      .limit(1);
-    return rows[0] ?? null;
+    return folderOps.updateFolder(this.db, orgId, id, input);
   }
 
   async deleteFolder(jwt: string, id: string): Promise<void> {
     const { orgId } = await this.resolveAuth(jwt);
-    folderIdSchema.parse(id);
-    const existing = await this.db
-      .select()
-      .from(folders)
-      .where(and(eq(folders.id, id), eq(folders.orgId, orgId)))
-      .limit(1);
-
-    const [found] = existing;
-    if (found !== undefined) {
-      try {
-        const { parentId: parentFolderId } = found;
-        await this.db.batch([
-          this.db
-            .update(folders)
-            .set({ parentId: parentFolderId })
-            .where(and(eq(folders.parentId, id), eq(folders.orgId, orgId))),
-          this.db
-            .update(dashboards)
-            .set({ folderId: parentFolderId })
-            .where(and(eq(dashboards.folderId, id), eq(dashboards.orgId, orgId))),
-          this.db
-            .update(alertRuleGroups)
-            .set({ folderId: parentFolderId })
-            .where(and(eq(alertRuleGroups.folderId, id), eq(alertRuleGroups.orgId, orgId))),
-          this.db.delete(folders).where(and(eq(folders.id, id), eq(folders.orgId, orgId))),
-        ]);
-      } catch (error) {
-        console.error('deleteFolder failed:', error);
-        throw new Error('Failed to delete folder', { cause: error });
-      }
-    }
+    await folderOps.deleteFolder(this.db, orgId, id);
   }
 
   // --- Dashboard RPC ---
