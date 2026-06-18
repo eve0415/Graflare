@@ -1,6 +1,6 @@
 export type LabelMatchOperator = '=' | '!=' | '=~' | '!~';
 
-export interface LabelMatcher {
+export interface PromQLLabelMatcher {
   id: string;
   label: string;
   operator: LabelMatchOperator;
@@ -20,6 +20,6 @@ export interface FunctionApplication {
 
 export interface PromQLBuilderState {
   metric: string;
-  labels: LabelMatcher[];
+  labels: PromQLLabelMatcher[];
   functions: FunctionApplication[];
 }

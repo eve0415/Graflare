@@ -1,4 +1,4 @@
-import type { FunctionApplication, FunctionParam, LabelMatcher, PromQLBuilderState } from '@graflare/shared/promql/types';
+import type { FunctionApplication, FunctionParam, PromQLBuilderState, PromQLLabelMatcher } from '@graflare/shared/promql/types';
 import type { Dispatch } from 'react';
 
 import { catalogByName } from '@graflare/shared/promql/catalog';
@@ -16,7 +16,7 @@ export type PromqlBuilderAction =
   | { type: 'SET_METRIC'; metric: string }
   | { type: 'ADD_LABEL'; id: string }
   | { type: 'REMOVE_LABEL'; index: number }
-  | { type: 'UPDATE_LABEL'; index: number; matcher: LabelMatcher }
+  | { type: 'UPDATE_LABEL'; index: number; matcher: PromQLLabelMatcher }
   | { type: 'ADD_FUNCTION'; name: string; id: string }
   | { type: 'REMOVE_FUNCTION'; index: number }
   | { type: 'REORDER_FUNCTION'; fromIndex: number; toIndex: number }
@@ -115,7 +115,7 @@ export const PromqlBuilder = ({ datasourceId, state, dispatch }: PromqlBuilderPr
   );
 
   const handleChangeLabel = useCallback(
-    (index: number, matcher: LabelMatcher) => {
+    (index: number, matcher: PromQLLabelMatcher) => {
       dispatch({ type: 'UPDATE_LABEL', index, matcher });
     },
     [dispatch],

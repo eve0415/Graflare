@@ -1,4 +1,4 @@
-import type { LabelMatchOperator, LabelMatcher } from '@graflare/shared/promql/types';
+import type { LabelMatchOperator, PromQLLabelMatcher } from '@graflare/shared/promql/types';
 
 import { Button } from '@graflare/ui/components/button';
 import { Input } from '@graflare/ui/components/input';
@@ -19,8 +19,8 @@ const OPERATOR_ITEMS = OPERATORS.map(op => ({ value: op, label: op }));
 interface LabelRowProps {
   datasourceId: string;
   metric: string;
-  matcher: LabelMatcher;
-  onChange: (matcher: LabelMatcher) => void;
+  matcher: PromQLLabelMatcher;
+  onChange: (matcher: PromQLLabelMatcher) => void;
   onRemove: () => void;
 }
 
@@ -133,14 +133,14 @@ interface IndexedLabelRowProps {
   index: number;
   datasourceId: string;
   metric: string;
-  matcher: LabelMatcher;
-  onChange: (index: number, matcher: LabelMatcher) => void;
+  matcher: PromQLLabelMatcher;
+  onChange: (index: number, matcher: PromQLLabelMatcher) => void;
   onRemove: (index: number) => void;
 }
 
 const IndexedLabelRow = ({ index, datasourceId, metric, matcher, onChange, onRemove }: IndexedLabelRowProps) => {
   const handleChange = useCallback(
-    (m: LabelMatcher) => {
+    (m: PromQLLabelMatcher) => {
       onChange(index, m);
     },
     [index, onChange],
@@ -156,10 +156,10 @@ const IndexedLabelRow = ({ index, datasourceId, metric, matcher, onChange, onRem
 interface PromqlLabelFiltersProps {
   datasourceId: string;
   metric: string;
-  labels: LabelMatcher[];
+  labels: PromQLLabelMatcher[];
   onAdd: () => void;
   onRemove: (index: number) => void;
-  onChange: (index: number, matcher: LabelMatcher) => void;
+  onChange: (index: number, matcher: PromQLLabelMatcher) => void;
 }
 
 export const PromqlLabelFilters = ({ datasourceId, metric, labels, onAdd, onRemove, onChange }: PromqlLabelFiltersProps) => (
