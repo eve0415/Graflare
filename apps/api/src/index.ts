@@ -176,6 +176,14 @@ export class GraflareAPI extends WorkerEntrypoint<Bindings> {
     return (this.#db ??= createDb(this.env.DB));
   }
 
+  // `caches.default` is the same global Cache object every call; memoize the wrapper so each
+  // proxyQuery doesn't reallocate it.
+  #cacheStore: CacheApiStore | undefined;
+
+  private get cacheStore(): CacheApiStore {
+    return (this.#cacheStore ??= new CacheApiStore(caches.default));
+  }
+
   private get bridgeFetch(): typeof fetch {
     if (this.env.BRIDGE) {
       return this.env.BRIDGE.fetch.bind(this.env.BRIDGE);
@@ -414,7 +422,7 @@ export class GraflareAPI extends WorkerEntrypoint<Bindings> {
       }
     };
 
-    return cachedProxyQuery(new CacheApiStore(caches.default), { orgId, datasourceId, endpoint, params, cacheTtl: ds.cacheTtl }, runLive, work => {
+    return cachedProxyQuery(this.cacheStore, { orgId, datasourceId, endpoint, params, cacheTtl: ds.cacheTtl }, runLive, work => {
       this.ctx.waitUntil(work);
     });
   }
