@@ -2,9 +2,9 @@ import type { AppEnv } from '../index';
 
 import { env } from 'cloudflare:workers';
 import { Hono } from 'hono';
-import { describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { accessMiddleware, subjectFromPayload, verifyJwt } from './access';
+import { accessMiddleware, resetKeyCache, subjectFromPayload, verifyJwt } from './access';
 
 const createApp = () => {
   const app = new Hono<AppEnv>();
@@ -168,5 +168,74 @@ describe('verifyJwt issuer normalization', () => {
     const err = await verifyJwt(jwt, 'test-team', 'wrong-aud').catch((error: unknown) => error);
     expect(err).toBeInstanceOf(Error);
     expect(asError(err).message).toBe('Bad audience: expected wrong-aud, got ["test-aud"]');
+  });
+});
+
+const b64url = (bytes: Uint8Array): string =>
+  btoa(String.fromCodePoint(...bytes))
+    .replaceAll('+', '-')
+    .replaceAll('/', '_')
+    .replaceAll('=', '');
+const b64urlJson = (obj: unknown): string => b64url(new TextEncoder().encode(JSON.stringify(obj)));
+
+const signJwt = async (privateKey: CryptoKey, header: string, payload: string): Promise<Uint8Array> =>
+  new Uint8Array(await crypto.subtle.sign('RSASSA-PKCS1-v1_5', privateKey, new TextEncoder().encode(`${header}.${payload}`)));
+
+// Drive the real RS256 verification path (crypto.subtle.verify), which the other tests never reach
+// because they stop at the cert fetch. Generate a key pair, serve its public JWK as the Access
+// certs, and sign a genuine token — so a regression that weakened/removed signature checking fails.
+describe('verifyJwt signature verification', () => {
+  beforeEach(() => {
+    resetKeyCache();
+  });
+
+  afterEach(() => {
+    resetKeyCache();
+    vi.restoreAllMocks();
+  });
+
+  const setup = async (): Promise<{ privateKey: CryptoKey; header: string; payload: string }> => {
+    const pair = await crypto.subtle.generateKey(
+      { name: 'RSASSA-PKCS1-v1_5', modulusLength: 2048, publicExponent: new Uint8Array([1, 0, 1]), hash: 'SHA-256' },
+      true,
+      ['sign', 'verify'],
+    );
+    if (!('publicKey' in pair)) throw new Error('expected an RSA key pair');
+    const { publicKey, privateKey } = pair;
+    const jwk = await crypto.subtle.exportKey('jwk', publicKey);
+    if (!('n' in jwk) || !('e' in jwk) || !('kty' in jwk)) throw new Error('expected an RSA public JWK');
+    vi.spyOn(globalThis, 'fetch').mockResolvedValue(
+      new Response(JSON.stringify({ keys: [{ kid: 'test-kid', kty: jwk.kty, n: jwk.n, e: jwk.e, alg: 'RS256', use: 'sig' }] }), { status: 200 }),
+    );
+    const now = Math.floor(Date.now() / 1000);
+    const header = b64urlJson({ alg: 'RS256', kid: 'test-kid' });
+    const payload = b64urlJson({
+      email: 'u@example.com',
+      sub: 's',
+      iss: 'https://test-team.cloudflareaccess.com',
+      aud: ['test-aud'],
+      exp: now + 3600,
+      iat: now,
+    });
+    return { privateKey, header, payload };
+  };
+
+  it('accepts a token signed by the published key', async () => {
+    const { privateKey, header, payload } = await setup();
+    const token = `${header}.${payload}.${b64url(await signJwt(privateKey, header, payload))}`;
+
+    const result = await verifyJwt(token, 'test-team', 'test-aud');
+
+    expect(result.email).toBe('u@example.com');
+  });
+
+  it('rejects a token whose signature does not match its header/payload', async () => {
+    const { privateKey, header, payload } = await setup();
+    // A well-formed RS256 signature, but over DIFFERENT bytes — it must fail verification of the
+    // real header.payload (proving the signature is actually checked, not just decoded).
+    const wrongSig = await signJwt(privateKey, header, `${payload}-tampered`);
+    const token = `${header}.${payload}.${b64url(wrongSig)}`;
+
+    await expect(verifyJwt(token, 'test-team', 'test-aud')).rejects.toThrow('Invalid signature');
   });
 });

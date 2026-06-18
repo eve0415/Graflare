@@ -123,6 +123,12 @@ const parseCertsResponse = (raw: unknown): AccessJwk[] => {
 
 let cachedKeys: { keys: Map<string, CryptoKey>; expiresAt: number } | null = null;
 
+// Test hook: the key cache is module state that persists across tests in an isolate; clear it so a
+// signature test's mocked certs don't leak into other tests (mirrors resetOrgBootstrapCache).
+export const resetKeyCache = (): void => {
+  cachedKeys = null;
+};
+
 const getPublicKeys = async (teamDomain: string): Promise<Map<string, CryptoKey>> => {
   if (cachedKeys && Date.now() < cachedKeys.expiresAt) {
     return cachedKeys.keys;
