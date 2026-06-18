@@ -42,11 +42,9 @@ import {
   dashboardIdSchema,
   datasourceIdSchema,
   folderIdSchema,
-  muteTimingIdSchema,
   notificationPolicyIdSchema,
   silenceIdSchema,
 } from '@graflare/shared/schemas/ids';
-import { createMuteTimingSchema, updateMuteTimingSchema } from '@graflare/shared/schemas/mute-timing';
 import { createNotificationPolicySchema, updateNotificationPolicySchema } from '@graflare/shared/schemas/notification-policy';
 import { prometheusResponseSchema } from '@graflare/shared/schemas/prometheus';
 import { createServiceTokenSchema, serviceTokenIdParamSchema } from '@graflare/shared/schemas/service-token';
@@ -76,7 +74,6 @@ import {
   datasourcePublicColumns,
   datasources,
   folders,
-  muteTimings,
   notificationPolicies,
   silences,
 } from './db/schema';
@@ -90,6 +87,7 @@ import { alertRuleGroupRoutes } from './routes/alerting/alert-rule-groups';
 import { alertRuleRoutes } from './routes/alerting/alert-rules';
 import { annotationRoutes } from './routes/alerting/annotations';
 import { contactPointRoutes } from './routes/alerting/contact-points';
+import * as muteTimingOps from './routes/alerting/mute-timing-ops';
 import { muteTimingRoutes } from './routes/alerting/mute-timings';
 import { notificationPolicyRoutes } from './routes/alerting/notification-policies';
 import { silenceRoutes } from './routes/alerting/silences';
@@ -1450,79 +1448,27 @@ export class GraflareAPI extends WorkerEntrypoint<Bindings> {
 
   async listMuteTimings(jwt: string) {
     const { orgId } = await this.resolveAuth(jwt);
-    return this.db.select().from(muteTimings).where(eq(muteTimings.orgId, orgId));
-  }
-
-  private async getMuteTimingCore(orgId: string, id: string) {
-    muteTimingIdSchema.parse(id);
-    const rows = await this.db
-      .select()
-      .from(muteTimings)
-      .where(and(eq(muteTimings.id, id), eq(muteTimings.orgId, orgId)))
-      .limit(1);
-    return rows[0] ?? null;
+    return muteTimingOps.listMuteTimings(this.db, orgId);
   }
 
   async getMuteTiming(jwt: string, id: string) {
     const { orgId } = await this.resolveAuth(jwt);
-    return this.getMuteTimingCore(orgId, id);
+    return muteTimingOps.getMuteTiming(this.db, orgId, id);
   }
 
   async createMuteTiming(jwt: string, input: CreateMuteTiming) {
     const { orgId } = await this.resolveAuth(jwt);
-    const parsed = createMuteTimingSchema.parse(input);
-    const id = crypto.randomUUID();
-    const now = new Date();
-
-    try {
-      await this.db.insert(muteTimings).values({
-        id,
-        orgId,
-        name: parsed.name,
-        intervals: parsed.intervals ?? [],
-        createdAt: now,
-        updatedAt: now,
-      });
-    } catch (error) {
-      console.error('createMuteTiming failed:', error);
-      throw new Error('Failed to create mute timing', { cause: error });
-    }
-
-    return this.getMuteTimingCore(orgId, id);
+    return muteTimingOps.createMuteTiming(this.db, orgId, input);
   }
 
   async updateMuteTiming(jwt: string, id: string, input: UpdateMuteTiming) {
     const { orgId } = await this.resolveAuth(jwt);
-    muteTimingIdSchema.parse(id);
-    const parsed = updateMuteTimingSchema.parse(input);
-    const now = new Date();
-
-    const setData: Record<string, unknown> = { updatedAt: now };
-    if (parsed.name !== undefined) setData['name'] = parsed.name;
-    if (parsed.intervals !== undefined) setData['intervals'] = parsed.intervals;
-
-    try {
-      await this.db
-        .update(muteTimings)
-        .set(setData)
-        .where(and(eq(muteTimings.id, id), eq(muteTimings.orgId, orgId)));
-    } catch (error) {
-      console.error('updateMuteTiming failed:', error);
-      throw new Error('Failed to update mute timing', { cause: error });
-    }
-
-    return this.getMuteTimingCore(orgId, id);
+    return muteTimingOps.updateMuteTiming(this.db, orgId, id, input);
   }
 
   async deleteMuteTiming(jwt: string, id: string): Promise<void> {
     const { orgId } = await this.resolveAuth(jwt);
-    muteTimingIdSchema.parse(id);
-    try {
-      await this.db.delete(muteTimings).where(and(eq(muteTimings.id, id), eq(muteTimings.orgId, orgId)));
-    } catch (error) {
-      console.error('deleteMuteTiming failed:', error);
-      throw new Error('Failed to delete mute timing', { cause: error });
-    }
+    await muteTimingOps.deleteMuteTiming(this.db, orgId, id);
   }
 
   // --- Annotation RPC ---
