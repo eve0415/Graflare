@@ -242,24 +242,20 @@ export const getIntrospectedConfigs = async (db: ReturnType<typeof drizzle>): Pr
   return configs;
 };
 
-export const shouldRunSettingsDiscovery = async (db: ReturnType<typeof drizzle>, nowSeconds: number): Promise<boolean> => {
-  const rows = await db.select({ lastCheckedAt: discoveryCache.lastCheckedAt }).from(discoveryCache).limit(1);
-
-  if (rows.length === 0) return true;
-
+// A cache is stale (discovery should run) when it's empty or its most recent entry is older than
+// the refresh window. The single most-recent timestamp stands in for the whole cache.
+const isCacheStale = (rows: readonly { lastCheckedAt: number }[], refreshSeconds: number, nowSeconds: number): boolean => {
   const [latest] = rows;
   if (latest === undefined) return true;
+  return nowSeconds - latest.lastCheckedAt > refreshSeconds;
+};
 
-  return nowSeconds - latest.lastCheckedAt > SETTINGS_REFRESH_SECONDS;
+export const shouldRunSettingsDiscovery = async (db: ReturnType<typeof drizzle>, nowSeconds: number): Promise<boolean> => {
+  const rows = await db.select({ lastCheckedAt: discoveryCache.lastCheckedAt }).from(discoveryCache).limit(1);
+  return isCacheStale(rows, SETTINGS_REFRESH_SECONDS, nowSeconds);
 };
 
 export const shouldRunSchemaDiscovery = async (db: ReturnType<typeof drizzle>, nowSeconds: number): Promise<boolean> => {
   const rows = await db.select({ lastCheckedAt: schemaCache.lastCheckedAt }).from(schemaCache).limit(1);
-
-  if (rows.length === 0) return true;
-
-  const [latest] = rows;
-  if (latest === undefined) return true;
-
-  return nowSeconds - latest.lastCheckedAt > SCHEMA_REFRESH_SECONDS;
+  return isCacheStale(rows, SCHEMA_REFRESH_SECONDS, nowSeconds);
 };
