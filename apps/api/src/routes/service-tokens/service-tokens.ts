@@ -16,7 +16,7 @@ import { onValidationError } from '../../middleware/validate';
 
 const app = new Hono<AppEnv>();
 
-const cfClient = (env: AppEnv['Bindings']) => createServiceTokenClient({ apiToken: env.CF_API_TOKEN, accountId: env.CF_ACCOUNT_ID });
+const createCfClient = (env: AppEnv['Bindings']) => createServiceTokenClient({ apiToken: env.CF_API_TOKEN, accountId: env.CF_ACCOUNT_ID });
 
 app.get('/', async c => {
   const db = createDb(c.env.DB);
@@ -53,7 +53,7 @@ app.post('/', sValidator('json', createServiceTokenSchema, onValidationError), a
 
   let created;
   try {
-    created = await cfClient(c.env).create(data);
+    created = await createCfClient(c.env).create(data);
   } catch (error) {
     if (error instanceof CloudflareApiError) {
       return c.json({ error: 'Cloudflare API error creating service token' }, 502);
@@ -82,7 +82,7 @@ app.post('/', sValidator('json', createServiceTokenSchema, onValidationError), a
     // the RPC createServiceToken path so the two don't drift.
     console.error('POST /service-tokens: link insert failed; rolling back CF token', created.id, error);
     try {
-      await cfClient(c.env).delete(created.id);
+      await createCfClient(c.env).delete(created.id);
     } catch (rollbackError) {
       console.error('POST /service-tokens: rollback of orphaned CF token failed; manual cleanup needed for', created.id, rollbackError);
     }
@@ -121,7 +121,7 @@ app.delete('/:id', sValidator('param', serviceTokenIdParamSchema, onValidationEr
   }
 
   try {
-    await cfClient(c.env).delete(row.cfTokenId);
+    await createCfClient(c.env).delete(row.cfTokenId);
   } catch (error) {
     if (error instanceof CloudflareApiError) {
       return c.json({ error: 'Cloudflare API error revoking service token' }, 502);
