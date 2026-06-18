@@ -1,5 +1,7 @@
 import type { AlertForPayload } from './webhook-payload';
 
+import { alertBody, alertSummary, alertTitle, isFiring } from './alert-summary';
+
 /** Slack attachment colors (hex) — red for firing, green for resolved. */
 const SLACK_COLOR_FIRING = '#D32F2F';
 const SLACK_COLOR_RESOLVED = '#388E3C';
@@ -34,34 +36,16 @@ export interface SlackPayloadOptions {
   username?: string;
 }
 
-const isFiring = (state: string): boolean => state === 'Firing';
-
 const labelFields = (labels: Record<string, string>): SlackField[] => Object.entries(labels).map(([title, value]) => ({ title, value, short: true }));
 
-const alertTitle = (alert: AlertForPayload): string => {
-  const name = alert.labels['alertname'];
-  const prefix = isFiring(alert.state) ? '[FIRING]' : '[RESOLVED]';
-  return name !== undefined && name.length > 0 ? `${prefix} ${name}` : prefix;
-};
-
-const alertText = (alert: AlertForPayload): string => {
-  const summary = alert.annotations['summary'] ?? alert.annotations['description'] ?? '';
-  return summary.length > 0 ? `${summary}\nValue: ${alert.value}` : `Value: ${alert.value}`;
-};
-
 export const buildSlackPayload = (alerts: AlertForPayload[], receiver: string, externalURL: string, opts: SlackPayloadOptions = {}): SlackPayload => {
-  const hasFiring = alerts.some(a => isFiring(a.state));
-  const firingCount = alerts.filter(a => isFiring(a.state)).length;
-  const resolvedCount = alerts.length - firingCount;
-
-  const statusWord = hasFiring ? 'FIRING' : 'RESOLVED';
-  const counts = `${firingCount} firing, ${resolvedCount} resolved`;
+  const { hasFiring, statusWord, counts } = alertSummary(alerts);
   const text = `[${statusWord}] ${receiver} — ${counts}${externalURL.length > 0 ? ` (${externalURL})` : ''}`;
 
   const attachments: SlackAttachment[] = alerts.slice(0, MAX_ATTACHMENTS).map(alert => ({
     color: isFiring(alert.state) ? SLACK_COLOR_FIRING : SLACK_COLOR_RESOLVED,
     title: alertTitle(alert),
-    text: alertText(alert),
+    text: alertBody(alert),
     fields: labelFields(alert.labels),
   }));
 
