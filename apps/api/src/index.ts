@@ -804,7 +804,7 @@ export class GraflareAPI extends WorkerEntrypoint<Bindings> {
     return this.getDashboardCore(orgId, id);
   }
 
-  private async createDashboardCore(orgId: string, input: CreateDashboard, createdBy: string) {
+  private async insertDashboardWithVersion(orgId: string, input: CreateDashboard, createdBy: string) {
     const parsed = createDashboardSchema.parse(input);
     const id = crypto.randomUUID();
     const now = new Date();
@@ -847,7 +847,7 @@ export class GraflareAPI extends WorkerEntrypoint<Bindings> {
 
   async createDashboard(jwt: string, input: CreateDashboard) {
     const { orgId, subject } = await this.resolveAuth(jwt);
-    return this.createDashboardCore(orgId, input, subjectLabel(subject));
+    return this.insertDashboardWithVersion(orgId, input, subjectLabel(subject));
   }
 
   async updateDashboard(jwt: string, id: string, input: UpdateDashboard) {
@@ -1047,7 +1047,7 @@ export class GraflareAPI extends WorkerEntrypoint<Bindings> {
     const format = parsed.format ?? detectFormat(parsed.json);
     const { dashboard: imported, warnings } = importDashboardFn(parsed.json, format);
 
-    const dashboard = await this.createDashboardCore(
+    const dashboard = await this.insertDashboardWithVersion(
       orgId,
       {
         title: imported.title,
