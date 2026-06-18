@@ -49,11 +49,9 @@ const ContactPointsPage = () => {
     <div className='space-y-4'>
       <div className='flex items-center justify-between'>
         <h2 className='text-lg font-semibold'>Contact Points</h2>
-        <Link to='/alerting/notifications/contact-points/new'>
-          <Button size='sm'>
-            <Plus className='mr-2 h-4 w-4' />
-            New Contact Point
-          </Button>
+        <Link to='/alerting/notifications/contact-points/new' className={buttonVariants({ size: 'sm' })}>
+          <Plus className='mr-2 h-4 w-4' />
+          New Contact Point
         </Link>
       </div>
 

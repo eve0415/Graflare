@@ -1,5 +1,5 @@
 import { Badge } from '@graflare/ui/components/badge';
-import { Button } from '@graflare/ui/components/button';
+import { Button, buttonVariants } from '@graflare/ui/components/button';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@graflare/ui/components/table';
 import { useSuspenseQuery } from '@tanstack/react-query';
 import { Link, createFileRoute, useRouter } from '@tanstack/react-router';
@@ -43,8 +43,8 @@ const DatasourceListPage = () => {
     <div className='space-y-4'>
       <div className='flex items-center justify-between'>
         <h1 className='text-xl font-semibold'>Data Sources</h1>
-        <Link to='/datasources/new'>
-          <Button size='sm'>Add data source</Button>
+        <Link to='/datasources/new' className={buttonVariants({ size: 'sm' })}>
+          Add data source
         </Link>
       </div>
 
@@ -72,15 +72,11 @@ const DatasourceListPage = () => {
                 <TableCell>{row.authType}</TableCell>
                 <TableCell>
                   <div className='flex gap-1'>
-                    <Link to='/datasources/$id' params={row.params}>
-                      <Button variant='ghost' size='xs'>
-                        Edit
-                      </Button>
+                    <Link to='/datasources/$id' params={row.params} className={buttonVariants({ variant: 'ghost', size: 'xs' })}>
+                      Edit
                     </Link>
-                    <Link to='/datasources/$id/test' params={row.params}>
-                      <Button variant='ghost' size='xs'>
-                        Test
-                      </Button>
+                    <Link to='/datasources/$id/test' params={row.params} className={buttonVariants({ variant: 'ghost', size: 'xs' })}>
+                      Test
                     </Link>
                     <Button variant='ghost' size='xs' onClick={row.onDelete} disabled={deleting === row.id}>
                       Delete

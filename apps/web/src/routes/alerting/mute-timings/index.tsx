@@ -1,5 +1,5 @@
 import { Badge } from '@graflare/ui/components/badge';
-import { Button } from '@graflare/ui/components/button';
+import { Button, buttonVariants } from '@graflare/ui/components/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@graflare/ui/components/card';
 import { Skeleton } from '@graflare/ui/components/skeleton';
 import { useSuspenseQuery } from '@tanstack/react-query';
@@ -61,11 +61,9 @@ const MuteTimingsPage = () => {
     <div className='space-y-4'>
       <div className='flex items-center justify-between'>
         <h2 className='text-lg font-semibold'>Mute Timings</h2>
-        <Link to='/alerting/mute-timings/new'>
-          <Button size='sm'>
-            <Plus className='mr-2 h-4 w-4' />
-            New Mute Timing
-          </Button>
+        <Link to='/alerting/mute-timings/new' className={buttonVariants({ size: 'sm' })}>
+          <Plus className='mr-2 h-4 w-4' />
+          New Mute Timing
         </Link>
       </div>
 

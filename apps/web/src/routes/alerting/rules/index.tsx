@@ -1,5 +1,5 @@
 import { Badge } from '@graflare/ui/components/badge';
-import { Button, buttonVariants } from '@graflare/ui/components/button';
+import { buttonVariants } from '@graflare/ui/components/button';
 import { Skeleton } from '@graflare/ui/components/skeleton';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@graflare/ui/components/table';
 import { useSuspenseQuery } from '@tanstack/react-query';
@@ -46,11 +46,9 @@ const AlertRulesListPage = () => {
     <div className='space-y-6'>
       <div className='flex items-center justify-between'>
         <h2 className='text-lg font-semibold'>Alert Rules</h2>
-        <Link to='/alerting/rules/new'>
-          <Button size='sm'>
-            <Plus className='mr-2 h-4 w-4' />
-            New Alert Rule
-          </Button>
+        <Link to='/alerting/rules/new' className={buttonVariants({ size: 'sm' })}>
+          <Plus className='mr-2 h-4 w-4' />
+          New Alert Rule
         </Link>
       </div>
 
