@@ -38,12 +38,12 @@ const parseInterval = (interval: string): number => {
   return Number(amount) * multiplier;
 };
 
-export interface TimeRange {
+export interface EpochTimeRange {
   from: number;
   to: number;
 }
 
-type MacroHandler = (args: string[], dialect: DatasourceDialect, timeRange: TimeRange, params: (string | number)[]) => string;
+type MacroHandler = (args: string[], dialect: DatasourceDialect, timeRange: EpochTimeRange, params: (string | number)[]) => string;
 
 const macroTime: MacroHandler = args => {
   const col = validateColumn(args[0]);
@@ -97,7 +97,7 @@ const MACROS: Record<string, MacroHandler> = {
 
 const MACRO_RE = /\$__(\w+)\(([^)]*)\)/g;
 
-export const expandSqlMacros = (sql: string, dialect: DatasourceDialect, timeRange: TimeRange): MacroResult => {
+export const expandSqlMacros = (sql: string, dialect: DatasourceDialect, timeRange: EpochTimeRange): MacroResult => {
   const params: (string | number)[] = [];
 
   const expanded = sql.replace(MACRO_RE, (match, macroName: string, argsStr: string) => {
