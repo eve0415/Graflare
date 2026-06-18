@@ -73,13 +73,13 @@ export const DatasourceForm = ({ mode, initialData }: Props) => {
   const [saving, setSaving] = useState(false);
   const [testing, setTesting] = useState(false);
   const [testResult, setTestResult] = useState<TestResult | null>(null);
-  const [error, setError] = useState<string | null>(null);
+  const [saveError, setSaveError] = useState<string | null>(null);
 
   const handleSubmit = useCallback(
     async (e: React.SyntheticEvent) => {
       e.preventDefault();
       setSaving(true);
-      setError(null);
+      setSaveError(null);
 
       try {
         const credentials =
@@ -117,7 +117,7 @@ export const DatasourceForm = ({ mode, initialData }: Props) => {
         }
         await navigate({ to: '/datasources' });
       } catch (error) {
-        setError(error instanceof Error ? error.message : 'Save failed');
+        setSaveError(error instanceof Error ? error.message : 'Save failed');
       } finally {
         setSaving(false);
       }
@@ -233,9 +233,9 @@ export const DatasourceForm = ({ mode, initialData }: Props) => {
           <h1 className='text-base font-medium'>{mode === 'create' ? 'Add Data Source' : 'Edit Data Source'}</h1>
         </CardHeader>
         <CardContent className='space-y-4'>
-          {error !== null && (
+          {saveError !== null && (
             <Alert variant='destructive'>
-              <AlertDescription>{error}</AlertDescription>
+              <AlertDescription>{saveError}</AlertDescription>
             </Alert>
           )}
 
