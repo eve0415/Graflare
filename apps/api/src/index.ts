@@ -32,7 +32,7 @@ import { detectFormat, importDashboard as importDashboardFn } from '@graflare/sh
 import { alertInstanceListQuerySchema, upsertAlertInstanceSchema } from '@graflare/shared/schemas/alert-instance';
 import { createAlertRuleGroupSchema } from '@graflare/shared/schemas/alert-rule-group';
 import { annotationListQuerySchema, createAnnotationSchema } from '@graflare/shared/schemas/annotation';
-import { createDashboardSchema, importDashboardSchema, updateDashboardSchema } from '@graflare/shared/schemas/dashboard';
+import { importDashboardSchema } from '@graflare/shared/schemas/dashboard';
 import { testConnectionInlineSchema } from '@graflare/shared/schemas/datasource';
 import { annotationIdSchema, dashboardIdSchema, datasourceIdSchema } from '@graflare/shared/schemas/ids';
 import { prometheusResponseSchema } from '@graflare/shared/schemas/prometheus';
@@ -40,7 +40,7 @@ import { createServiceTokenSchema, serviceTokenIdParamSchema } from '@graflare/s
 import { expandSqlMacros } from '@graflare/shared/sql/macros';
 import { resolveRange } from '@graflare/shared/time/resolve';
 import { WorkerEntrypoint } from 'cloudflare:workers';
-import { and, desc, eq, gte, like, lte, sql } from 'drizzle-orm';
+import { and, desc, eq, gte, lte, sql } from 'drizzle-orm';
 import { Hono } from 'hono';
 import { HTTPException } from 'hono/http-exception';
 
@@ -67,6 +67,7 @@ import * as notificationPolicyOps from './routes/alerting/notification-policy-op
 import * as silenceOps from './routes/alerting/silence-ops';
 import { silenceRoutes } from './routes/alerting/silences';
 import { dashboardImportRoutes } from './routes/dashboards/dashboard-import';
+import * as dashboardOps from './routes/dashboards/dashboard-ops';
 import { dashboardVersionRoutes } from './routes/dashboards/dashboard-versions';
 import { dashboardRoutes } from './routes/dashboards/dashboards';
 import * as datasourceOps from './routes/datasources/datasource-ops';
@@ -76,7 +77,6 @@ import { proxyRoutes } from './routes/datasources/proxy';
 import * as folderOps from './routes/folders/folder-ops';
 import { folderRoutes } from './routes/folders/folders';
 import { serviceTokenRoutes } from './routes/service-tokens/service-tokens';
-import { slugify } from './slugify';
 import { SqlClient } from './sql/client';
 import { createSqlClient } from './sql/factory';
 import { describeAllColumnsQuery, describeTableQuery, listTablesQuery } from './sql/introspection';
@@ -587,165 +587,27 @@ export class GraflareAPI extends WorkerEntrypoint<Bindings> {
 
   async listDashboards(jwt: string, opts?: DashboardListQuery) {
     const { orgId } = await this.resolveAuth(jwt);
-    const conditions = [eq(dashboards.orgId, orgId)];
-
-    if (opts?.folderId !== undefined) conditions.push(eq(dashboards.folderId, opts.folderId));
-    if (opts?.search !== undefined) conditions.push(like(dashboards.title, `%${opts.search}%`));
-    // Push tag filtering into SQLite (json_each over the tags JSON array) instead of fetching the
-    // whole org's dashboards and filtering in JS.
-    if (opts?.tag !== undefined) conditions.push(sql`exists (select 1 from json_each(${dashboards.tags}) where value = ${opts.tag})`);
-
-    const rows = await this.db
-      .select({
-        id: dashboards.id,
-        orgId: dashboards.orgId,
-        folderId: dashboards.folderId,
-        title: dashboards.title,
-        slug: dashboards.slug,
-        description: dashboards.description,
-        tags: dashboards.tags,
-        version: dashboards.version,
-        createdAt: dashboards.createdAt,
-        updatedAt: dashboards.updatedAt,
-      })
-      .from(dashboards)
-      .where(and(...conditions));
-
-    return rows;
-  }
-
-  private async getDashboardCore(orgId: string, id: string) {
-    dashboardIdSchema.parse(id);
-    const rows = await this.db
-      .select()
-      .from(dashboards)
-      .where(and(eq(dashboards.id, id), eq(dashboards.orgId, orgId)))
-      .limit(1);
-    return rows[0] ?? null;
+    return dashboardOps.listDashboards(this.db, orgId, opts);
   }
 
   async getDashboard(jwt: string, id: string) {
     const { orgId } = await this.resolveAuth(jwt);
-    return this.getDashboardCore(orgId, id);
-  }
-
-  private async insertDashboardWithVersion(orgId: string, input: CreateDashboard, createdBy: string) {
-    const parsed = createDashboardSchema.parse(input);
-    const id = crypto.randomUUID();
-    const now = new Date();
-    const slug = slugify(parsed.title);
-
-    try {
-      await this.db.batch([
-        this.db.insert(dashboards).values({
-          id,
-          orgId,
-          folderId: parsed.folderId ?? null,
-          title: parsed.title,
-          slug,
-          description: parsed.description ?? '',
-          tags: parsed.tags ?? [],
-          panels: parsed.panels ?? [],
-          variables: parsed.variables ?? [],
-          timeRange: parsed.timeRange ?? { from: 'now-1h', to: 'now', refresh: null },
-          version: 1,
-          createdAt: now,
-          updatedAt: now,
-        }),
-        this.db.insert(dashboardVersions).values({
-          id: crypto.randomUUID(),
-          dashboardId: id,
-          version: 1,
-          data: JSON.stringify({ ...parsed, id, orgId, slug, version: 1 }),
-          message: 'Initial version',
-          createdBy,
-          createdAt: now,
-        }),
-      ]);
-    } catch (error) {
-      console.error('createDashboard failed:', error);
-      throw new Error('Failed to create dashboard', { cause: error });
-    }
-
-    return this.getDashboardCore(orgId, id);
+    return dashboardOps.getDashboard(this.db, orgId, id);
   }
 
   async createDashboard(jwt: string, input: CreateDashboard) {
     const { orgId, subject } = await this.resolveAuth(jwt);
-    return this.insertDashboardWithVersion(orgId, input, subjectLabel(subject));
+    return dashboardOps.createDashboard(this.db, orgId, input, subjectLabel(subject));
   }
 
   async updateDashboard(jwt: string, id: string, input: UpdateDashboard) {
     const { orgId, subject } = await this.resolveAuth(jwt);
-    dashboardIdSchema.parse(id);
-    const parsed = updateDashboardSchema.parse(input);
-
-    const existing = await this.db
-      .select()
-      .from(dashboards)
-      .where(and(eq(dashboards.id, id), eq(dashboards.orgId, orgId)))
-      .limit(1);
-
-    const [current] = existing;
-    if (current === undefined) return null;
-
-    const now = new Date();
-    const { message, ...updates } = parsed;
-
-    const changes: Record<string, unknown> = {};
-    if (updates.title !== undefined) {
-      changes['title'] = updates.title;
-      changes['slug'] = slugify(updates.title);
-    }
-    if (updates.folderId !== undefined) changes['folderId'] = updates.folderId;
-    if (updates.description !== undefined) changes['description'] = updates.description;
-    if (updates.tags !== undefined) changes['tags'] = updates.tags;
-    if (updates.panels !== undefined) changes['panels'] = updates.panels;
-    if (updates.variables !== undefined) changes['variables'] = updates.variables;
-    if (updates.timeRange !== undefined) changes['timeRange'] = updates.timeRange;
-
-    try {
-      // One atomic batch — a dashboard update can never land without its
-      // version row. The version row's `version` reads the post-UPDATE value
-      // via subselect so concurrent saves can't collide on it (the JSON
-      // snapshot may lag one save behind in that race).
-      await this.db.batch([
-        this.db
-          .update(dashboards)
-          .set({ ...changes, updatedAt: now, version: sql`version + 1` })
-          .where(and(eq(dashboards.id, id), eq(dashboards.orgId, orgId))),
-        this.db.insert(dashboardVersions).values({
-          id: crypto.randomUUID(),
-          dashboardId: id,
-          version: sql`(select version from ${dashboards} where ${dashboards.id} = ${id})`,
-          data: JSON.stringify({ ...current, ...changes, version: current.version + 1, updatedAt: now }),
-          message: message ?? '',
-          createdBy: subjectLabel(subject),
-          createdAt: now,
-        }),
-      ]);
-
-      const updated = await this.db
-        .select()
-        .from(dashboards)
-        .where(and(eq(dashboards.id, id), eq(dashboards.orgId, orgId)))
-        .limit(1);
-      return updated[0] ?? null;
-    } catch (error) {
-      console.error('updateDashboard failed:', error);
-      throw new Error('Failed to update dashboard', { cause: error });
-    }
+    return dashboardOps.updateDashboard(this.db, orgId, id, input, subjectLabel(subject));
   }
 
   async deleteDashboard(jwt: string, id: string): Promise<void> {
     const { orgId } = await this.resolveAuth(jwt);
-    dashboardIdSchema.parse(id);
-    try {
-      await this.db.delete(dashboards).where(and(eq(dashboards.id, id), eq(dashboards.orgId, orgId)));
-    } catch (error) {
-      console.error('deleteDashboard failed:', error);
-      throw new Error('Failed to delete dashboard', { cause: error });
-    }
+    await dashboardOps.deleteDashboard(this.db, orgId, id);
   }
 
   // --- Dashboard Version RPC ---
@@ -872,7 +734,8 @@ export class GraflareAPI extends WorkerEntrypoint<Bindings> {
     const format = parsed.format ?? detectFormat(parsed.json);
     const { dashboard: imported, warnings } = importDashboardFn(parsed.json, format);
 
-    const dashboard = await this.insertDashboardWithVersion(
+    const dashboard = await dashboardOps.createDashboard(
+      this.db,
       orgId,
       {
         title: imported.title,

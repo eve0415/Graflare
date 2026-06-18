@@ -2,194 +2,47 @@ import type { AppEnv } from '../../index';
 
 import { createDashboardSchema, dashboardIdParamSchema, dashboardListQuerySchema, updateDashboardSchema } from '@graflare/shared/schemas/dashboard';
 import { sValidator } from '@hono/standard-validator';
-import { and, eq, like, sql } from 'drizzle-orm';
 import { Hono } from 'hono';
 
 import { createDb } from '../../db';
-import { dashboardVersions, dashboards } from '../../db/schema';
 import { subjectLabel } from '../../middleware/access';
 import { onValidationError } from '../../middleware/validate';
-import { slugify } from '../../slugify';
+
+import * as dashboardOps from './dashboard-ops';
 
 const app = new Hono<AppEnv>();
 
 app.get('/', sValidator('query', dashboardListQuerySchema, onValidationError), async c => {
-  const db = createDb(c.env.DB);
-  const orgId = c.get('orgId');
-  const query = c.req.valid('query');
-
-  const conditions = [eq(dashboards.orgId, orgId)];
-
-  if (query.folderId !== undefined) {
-    conditions.push(eq(dashboards.folderId, query.folderId));
-  }
-
-  if (query.search !== undefined) {
-    conditions.push(like(dashboards.title, `%${query.search}%`));
-  }
-
-  // Filter tags in SQLite (json_each) rather than fetching the whole org and filtering in JS.
-  if (query.tag !== undefined) {
-    conditions.push(sql`exists (select 1 from json_each(${dashboards.tags}) where value = ${query.tag})`);
-  }
-
-  const rows = await db
-    .select({
-      id: dashboards.id,
-      orgId: dashboards.orgId,
-      folderId: dashboards.folderId,
-      title: dashboards.title,
-      slug: dashboards.slug,
-      description: dashboards.description,
-      tags: dashboards.tags,
-      version: dashboards.version,
-      createdAt: dashboards.createdAt,
-      updatedAt: dashboards.updatedAt,
-    })
-    .from(dashboards)
-    .where(and(...conditions));
-
+  const rows = await dashboardOps.listDashboards(createDb(c.env.DB), c.get('orgId'), c.req.valid('query'));
   return c.json(rows);
 });
 
 app.get('/:id', sValidator('param', dashboardIdParamSchema, onValidationError), async c => {
-  const db = createDb(c.env.DB);
-  const orgId = c.get('orgId');
-  const { id } = c.req.valid('param');
-
-  const rows = await db
-    .select()
-    .from(dashboards)
-    .where(and(eq(dashboards.id, id), eq(dashboards.orgId, orgId)))
-    .limit(1);
-
-  if (rows.length === 0) {
+  const row = await dashboardOps.getDashboard(createDb(c.env.DB), c.get('orgId'), c.req.valid('param').id);
+  if (row === null) {
     return c.json({ error: 'Not found' }, 404);
   }
-
-  return c.json(rows[0]);
+  return c.json(row);
 });
 
 app.post('/', sValidator('json', createDashboardSchema, onValidationError), async c => {
-  const db = createDb(c.env.DB);
-  const orgId = c.get('orgId');
-  const data = c.req.valid('json');
-  const user = c.get('user');
-
-  const id = crypto.randomUUID();
-  const now = new Date();
-  const slug = slugify(data.title);
-
-  await db.batch([
-    db.insert(dashboards).values({
-      id,
-      orgId,
-      folderId: data.folderId ?? null,
-      title: data.title,
-      slug,
-      description: data.description ?? '',
-      tags: data.tags ?? [],
-      panels: data.panels ?? [],
-      variables: data.variables ?? [],
-      timeRange: data.timeRange ?? { from: 'now-1h', to: 'now', refresh: null },
-      version: 1,
-      createdAt: now,
-      updatedAt: now,
-    }),
-    db.insert(dashboardVersions).values({
-      id: crypto.randomUUID(),
-      dashboardId: id,
-      version: 1,
-      data: JSON.stringify({ ...data, id, orgId, slug, version: 1 }),
-      message: 'Initial version',
-      createdBy: subjectLabel(user),
-      createdAt: now,
-    }),
-  ]);
-
-  const created = await db.select().from(dashboards).where(eq(dashboards.id, id)).limit(1);
-  return c.json(created[0], 201);
+  const row = await dashboardOps.createDashboard(createDb(c.env.DB), c.get('orgId'), c.req.valid('json'), subjectLabel(c.get('user')));
+  return c.json(row, 201);
 });
 
 app.put('/:id', sValidator('param', dashboardIdParamSchema, onValidationError), sValidator('json', updateDashboardSchema, onValidationError), async c => {
-  const db = createDb(c.env.DB);
-  const orgId = c.get('orgId');
-  const { id } = c.req.valid('param');
-  const data = c.req.valid('json');
-  const user = c.get('user');
-
-  const existing = await db
-    .select()
-    .from(dashboards)
-    .where(and(eq(dashboards.id, id), eq(dashboards.orgId, orgId)))
-    .limit(1);
-
-  const [current] = existing;
-  if (current === undefined) {
+  const row = await dashboardOps.updateDashboard(createDb(c.env.DB), c.get('orgId'), c.req.valid('param').id, c.req.valid('json'), subjectLabel(c.get('user')));
+  if (row === null) {
     return c.json({ error: 'Not found' }, 404);
   }
-
-  const now = new Date();
-
-  const { message, ...updates } = data;
-  const changes: Record<string, unknown> = {};
-
-  if (updates.title !== undefined) {
-    changes['title'] = updates.title;
-    changes['slug'] = slugify(updates.title);
-  }
-  if (updates.folderId !== undefined) changes['folderId'] = updates.folderId;
-  if (updates.description !== undefined) changes['description'] = updates.description;
-  if (updates.tags !== undefined) changes['tags'] = updates.tags;
-  if (updates.panels !== undefined) changes['panels'] = updates.panels;
-  if (updates.variables !== undefined) changes['variables'] = updates.variables;
-  if (updates.timeRange !== undefined) changes['timeRange'] = updates.timeRange;
-
-  // One atomic batch with a DB-side version increment, mirroring the RPC
-  // path — concurrent saves can't collide on the version number, and an
-  // update can never land without its version row.
-  await db.batch([
-    db
-      .update(dashboards)
-      .set({ ...changes, updatedAt: now, version: sql`version + 1` })
-      .where(and(eq(dashboards.id, id), eq(dashboards.orgId, orgId))),
-    db.insert(dashboardVersions).values({
-      id: crypto.randomUUID(),
-      dashboardId: id,
-      version: sql`(select version from ${dashboards} where ${dashboards.id} = ${id})`,
-      data: JSON.stringify({ ...current, ...changes, version: current.version + 1, updatedAt: now }),
-      message: message ?? '',
-      createdBy: subjectLabel(user),
-      createdAt: now,
-    }),
-  ]);
-
-  const updated = await db
-    .select()
-    .from(dashboards)
-    .where(and(eq(dashboards.id, id), eq(dashboards.orgId, orgId)))
-    .limit(1);
-
-  return c.json(updated[0]);
+  return c.json(row);
 });
 
 app.delete('/:id', sValidator('param', dashboardIdParamSchema, onValidationError), async c => {
-  const db = createDb(c.env.DB);
-  const orgId = c.get('orgId');
-  const { id } = c.req.valid('param');
-
-  const existing = await db
-    .select({ id: dashboards.id })
-    .from(dashboards)
-    .where(and(eq(dashboards.id, id), eq(dashboards.orgId, orgId)))
-    .limit(1);
-
-  if (existing.length === 0) {
+  const deleted = await dashboardOps.deleteDashboard(createDb(c.env.DB), c.get('orgId'), c.req.valid('param').id);
+  if (!deleted) {
     return c.json({ error: 'Not found' }, 404);
   }
-
-  await db.delete(dashboards).where(and(eq(dashboards.id, id), eq(dashboards.orgId, orgId)));
-
   return c.body(null, 204);
 });
 
