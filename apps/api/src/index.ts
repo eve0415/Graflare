@@ -33,7 +33,7 @@ import { alertInstanceListQuerySchema, upsertAlertInstanceSchema } from '@grafla
 import { createAlertRuleGroupSchema } from '@graflare/shared/schemas/alert-rule-group';
 import { annotationListQuerySchema, createAnnotationSchema } from '@graflare/shared/schemas/annotation';
 import { createDashboardSchema, importDashboardSchema, updateDashboardSchema } from '@graflare/shared/schemas/dashboard';
-import { createDatasourceSchema, testConnectionInlineSchema, updateDatasourceSchema } from '@graflare/shared/schemas/datasource';
+import { testConnectionInlineSchema } from '@graflare/shared/schemas/datasource';
 import { annotationIdSchema, dashboardIdSchema, datasourceIdSchema } from '@graflare/shared/schemas/ids';
 import { prometheusResponseSchema } from '@graflare/shared/schemas/prometheus';
 import { createServiceTokenSchema, serviceTokenIdParamSchema } from '@graflare/shared/schemas/service-token';
@@ -47,19 +47,8 @@ import { HTTPException } from 'hono/http-exception';
 import { createRule, deleteRule, deleteRuleGroup, getRule, getRuleGroup, updateRule, updateRuleGroup } from './alerting/rule-lifecycle';
 import { CacheApiStore, cachedProxyQuery } from './cache/query-cache';
 import { createServiceTokenClient } from './cloudflare/access-service-tokens';
-import { encryptCredentials } from './crypto/credentials';
 import { createDb } from './db';
-import {
-  accessServiceTokens,
-  alertInstances,
-  alertRuleGroups,
-  alertRules,
-  annotations,
-  dashboardVersions,
-  dashboards,
-  datasourcePublicColumns,
-  datasources,
-} from './db/schema';
+import { accessServiceTokens, alertInstances, alertRuleGroups, alertRules, annotations, dashboardVersions, dashboards, datasources } from './db/schema';
 import { accessMiddleware, subjectFromPayload, subjectLabel, verifyJwt } from './middleware/access';
 import { orgMiddleware, resolveOrgId } from './middleware/org';
 import { authHeaders, decryptedAuth } from './prometheus/auth';
@@ -80,6 +69,7 @@ import { silenceRoutes } from './routes/alerting/silences';
 import { dashboardImportRoutes } from './routes/dashboards/dashboard-import';
 import { dashboardVersionRoutes } from './routes/dashboards/dashboard-versions';
 import { dashboardRoutes } from './routes/dashboards/dashboards';
+import * as datasourceOps from './routes/datasources/datasource-ops';
 import { datasourceRoutes } from './routes/datasources/datasources';
 import { datasourceTestRoutes } from './routes/datasources/datasources-test';
 import { proxyRoutes } from './routes/datasources/proxy';
@@ -263,91 +253,27 @@ export class GraflareAPI extends WorkerEntrypoint<Bindings> {
 
   async listDatasources(jwt: string) {
     const { orgId } = await this.resolveAuth(jwt);
-    return this.db.select(datasourcePublicColumns).from(datasources).where(eq(datasources.orgId, orgId));
-  }
-
-  private async getDatasourceCore(orgId: string, id: string) {
-    datasourceIdSchema.parse(id);
-    const rows = await this.db
-      .select(datasourcePublicColumns)
-      .from(datasources)
-      .where(and(eq(datasources.id, id), eq(datasources.orgId, orgId)))
-      .limit(1);
-    return rows[0] ?? null;
+    return datasourceOps.listDatasources(this.db, orgId);
   }
 
   async getDatasource(jwt: string, id: string) {
     const { orgId } = await this.resolveAuth(jwt);
-    return this.getDatasourceCore(orgId, id);
+    return datasourceOps.getDatasource(this.db, orgId, id);
   }
 
   async createDatasource(jwt: string, input: CreateDatasource) {
     const { orgId } = await this.resolveAuth(jwt);
-    const parsed = createDatasourceSchema.parse(input);
-    const { credentials, ...rest } = parsed;
-    const id = crypto.randomUUID();
-    const now = new Date();
-
-    try {
-      let encryptedCreds: string | null = null;
-      if (credentials) {
-        encryptedCreds = await encryptCredentials(JSON.stringify(credentials), this.env.ENCRYPTION_KEY);
-      }
-
-      await this.db.insert(datasources).values({
-        id,
-        orgId,
-        ...rest,
-        credentials: encryptedCreds,
-        createdAt: now,
-        updatedAt: now,
-      });
-    } catch (error) {
-      console.error('createDatasource failed:', error);
-      throw new Error('Failed to create datasource', { cause: error });
-    }
-
-    return { id, orgId, ...rest, createdAt: now, updatedAt: now };
+    return datasourceOps.createDatasource(this.db, orgId, input, this.env.ENCRYPTION_KEY);
   }
 
   async updateDatasource(jwt: string, id: string, input: UpdateDatasource) {
     const { orgId } = await this.resolveAuth(jwt);
-    datasourceIdSchema.parse(id);
-    const parsed = updateDatasourceSchema.parse(input);
-    const { credentials, ...rest } = parsed;
-    const now = new Date();
-
-    try {
-      let encryptedCreds: string | undefined;
-      if (credentials) {
-        encryptedCreds = await encryptCredentials(JSON.stringify(credentials), this.env.ENCRYPTION_KEY);
-      }
-
-      await this.db
-        .update(datasources)
-        .set({
-          ...rest,
-          ...(encryptedCreds !== undefined && { credentials: encryptedCreds }),
-          updatedAt: now,
-        })
-        .where(and(eq(datasources.id, id), eq(datasources.orgId, orgId)));
-    } catch (error) {
-      console.error('updateDatasource failed:', error);
-      throw new Error('Failed to update datasource', { cause: error });
-    }
-
-    return this.getDatasourceCore(orgId, id);
+    return datasourceOps.updateDatasource(this.db, orgId, id, input, this.env.ENCRYPTION_KEY);
   }
 
   async deleteDatasource(jwt: string, id: string): Promise<void> {
     const { orgId } = await this.resolveAuth(jwt);
-    datasourceIdSchema.parse(id);
-    try {
-      await this.db.delete(datasources).where(and(eq(datasources.id, id), eq(datasources.orgId, orgId)));
-    } catch (error) {
-      console.error('deleteDatasource failed:', error);
-      throw new Error('Failed to delete datasource', { cause: error });
-    }
+    await datasourceOps.deleteDatasource(this.db, orgId, id);
   }
 
   async testConnection(jwt: string, id: string): Promise<{ success: boolean; latencyMs: number; error?: string }> {
