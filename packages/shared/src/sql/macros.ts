@@ -1,15 +1,9 @@
 import type { DatasourceDialect } from '#schemas/datasource';
 
+import { TIME_MULTIPLIERS } from '#time/resolve';
+
 const COLUMN_RE = /^[a-zA-Z_][a-zA-Z0-9_]*$/;
 const INTERVAL_RE = /^(\d+)([smhdw])$/;
-
-const INTERVAL_MULTIPLIERS: Record<string, number> = {
-  s: 1,
-  m: 60,
-  h: 3600,
-  d: 86400,
-  w: 604800,
-};
 
 export interface MacroResult {
   sql: string;
@@ -37,7 +31,7 @@ const parseInterval = (interval: string): number => {
   if (amount === undefined || unit === undefined) {
     throw new Error(`Invalid interval: ${trimmed}`);
   }
-  const multiplier = INTERVAL_MULTIPLIERS[unit];
+  const multiplier = TIME_MULTIPLIERS[unit];
   if (multiplier === undefined) {
     throw new Error(`Invalid interval unit: ${unit}`);
   }
