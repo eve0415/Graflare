@@ -18,6 +18,15 @@ export const listTablesQuery = (dialect: DatasourceDialect): IntrospectionQuery 
   };
 };
 
+// Postgres can return every table's columns in ONE query (information_schema), avoiding the
+// per-table fan-out describeDatabase otherwise does. SQLite has no equivalent single-statement
+// form (pragma_table_info is per-table and the bridge rejects multi-statement), so it keeps the
+// per-table path. `table` aliases the grouping key.
+export const describeAllColumnsQuery = (): IntrospectionQuery => ({
+  sql: "SELECT table_name AS \"table\", column_name AS name, data_type AS type, CASE WHEN is_nullable = 'YES' THEN 1 ELSE 0 END AS nullable FROM information_schema.columns WHERE table_schema NOT IN ('pg_catalog', 'information_schema') ORDER BY table_name, ordinal_position",
+  params: [],
+});
+
 export const describeTableQuery = (dialect: DatasourceDialect, tableName: string, schema?: string): IntrospectionQuery => {
   if (dialect === 'postgres') {
     return {

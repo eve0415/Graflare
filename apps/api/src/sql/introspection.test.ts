@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { describeTableQuery, listTablesQuery } from './introspection';
+import { describeAllColumnsQuery, describeTableQuery, listTablesQuery } from './introspection';
 
 describe('listTablesQuery', () => {
   it('generates SQLite query excluding system tables', () => {
@@ -37,5 +37,15 @@ describe('describeTableQuery', () => {
   it('generates PostgreSQL query with provided schema', () => {
     const q = describeTableQuery('postgres', 'events', 'analytics');
     expect(q.params).toEqual(['events', 'analytics']);
+  });
+});
+
+describe('describeAllColumnsQuery', () => {
+  it('selects every column grouped by table in one statement', () => {
+    const q = describeAllColumnsQuery();
+    expect(q.sql).toContain('information_schema.columns');
+    expect(q.sql).toContain('table_name AS "table"');
+    expect(q.sql).toContain("'pg_catalog'");
+    expect(q.params).toEqual([]);
   });
 });

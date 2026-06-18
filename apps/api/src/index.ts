@@ -104,7 +104,7 @@ import { serviceTokenRoutes } from './routes/service-tokens/service-tokens';
 import { slugify } from './slugify';
 import { SqlClient } from './sql/client';
 import { createSqlClient } from './sql/factory';
-import { describeTableQuery, listTablesQuery } from './sql/introspection';
+import { describeAllColumnsQuery, describeTableQuery, listTablesQuery } from './sql/introspection';
 
 interface Bindings {
   DB: D1Database;
@@ -187,6 +187,21 @@ const parseColumnRows = (result: SqlResponse): { name: string; type: string; nul
     type: String(row[typeIdx] ?? ''),
     nullable: Number(row[nullableIdx]) === 1,
   }));
+};
+
+/** Group a flat {table, name, type, nullable} introspection result into columns keyed by table. */
+const groupColumnsByTable = (result: SqlResponse): Record<string, { name: string; type: string; nullable: boolean }[]> => {
+  const tableIdx = result.columns.findIndex(c => c.name === 'table');
+  const nameIdx = result.columns.findIndex(c => c.name === 'name');
+  const typeIdx = result.columns.findIndex(c => c.name === 'type');
+  const nullableIdx = result.columns.findIndex(c => c.name === 'nullable');
+  const tables: Record<string, { name: string; type: string; nullable: boolean }[]> = {};
+  for (const row of result.rows) {
+    const table = String(row[tableIdx] ?? '');
+    if (table === '') continue;
+    (tables[table] ??= []).push({ name: String(row[nameIdx] ?? ''), type: String(row[typeIdx] ?? ''), nullable: Number(row[nullableIdx]) === 1 });
+  }
+  return tables;
 };
 
 /** Narrow a Prometheus label/metric response payload to a string[]. */
@@ -533,6 +548,14 @@ export class GraflareAPI extends WorkerEntrypoint<Bindings> {
 
       const sqlClient = await this.loadSqlClient(orgId, datasourceId);
       if ('error' in sqlClient) return { tables: {}, error: sqlClient.error };
+
+      // Postgres: one information_schema query for every column, instead of a per-table fan-out.
+      if (sqlClient.dialect === 'postgres') {
+        const aq = describeAllColumnsQuery();
+        const result = await sqlClient.client.query(aq.sql, aq.params);
+        if (result.error !== undefined) return { tables: {}, error: result.error };
+        return { tables: groupColumnsByTable(result) };
+      }
 
       const tq = listTablesQuery(sqlClient.dialect);
       const tablesResult = await sqlClient.client.query(tq.sql, tq.params);
