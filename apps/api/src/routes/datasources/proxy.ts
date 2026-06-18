@@ -7,6 +7,7 @@ import { sValidator } from '@hono/standard-validator';
 import { and, eq } from 'drizzle-orm';
 import { Hono } from 'hono';
 
+import { CacheApiStore, cachedProxyQuery } from '../../cache/query-cache';
 import { decryptCredentials } from '../../crypto/credentials';
 import { createDb } from '../../db';
 import { datasources } from '../../db/schema';
@@ -35,7 +36,7 @@ const getClient = async (c: { env: AppEnv['Bindings']; get: (key: string) => str
     credentials = datasourceCredentialsSchema.parse(JSON.parse(await decryptCredentials(ds.credentials, c.env.ENCRYPTION_KEY)));
   }
 
-  return new PrometheusClient(
+  const client = new PrometheusClient(
     ds.url,
     {
       type: datasourceAuthType.parse(ds.authType),
@@ -43,6 +44,7 @@ const getClient = async (c: { env: AppEnv['Bindings']; get: (key: string) => str
     },
     ds.queryTimeoutMs,
   );
+  return { client, cacheTtl: ds.cacheTtl };
 };
 
 // `match[]` is a repeated query param: Hono hands sValidator('query', …) a bare
@@ -56,11 +58,19 @@ app.post(
   sValidator('param', datasourceIdParamSchema, onValidationError),
   sValidator('form', instantQueryBodySchema, onValidationError),
   async c => {
-    const client = await getClient(c);
-    if (!client) return c.json({ status: 'error', error: 'Not found' }, 404);
+    const got = await getClient(c);
+    if (!got) return c.json({ status: 'error', error: 'Not found' }, 404);
 
     const { query, time } = c.req.valid('form');
-    const result = await client.instantQuery(query, time === undefined ? undefined : Number(time));
+    const params: Record<string, string> = { query, ...(time !== undefined && { time }) };
+    const result = await cachedProxyQuery(
+      new CacheApiStore(caches.default),
+      { orgId: c.get('orgId'), datasourceId: c.req.param('id'), endpoint: '/api/v1/query', params, cacheTtl: got.cacheTtl },
+      () => got.client.instantQuery(query, time === undefined ? undefined : Number(time)),
+      work => {
+        c.executionCtx.waitUntil(work);
+      },
+    );
     return c.json(result);
   },
 );
@@ -70,31 +80,40 @@ app.post(
   sValidator('param', datasourceIdParamSchema, onValidationError),
   sValidator('form', rangeQueryBodySchema, onValidationError),
   async c => {
-    const client = await getClient(c);
-    if (!client) return c.json({ status: 'error', error: 'Not found' }, 404);
+    const got = await getClient(c);
+    if (!got) return c.json({ status: 'error', error: 'Not found' }, 404);
 
     const { query, start, end, step } = c.req.valid('form');
-    const result = await client.rangeQuery(query, Number(start), Number(end), step);
+    const params: Record<string, string> = { query, start, end, step };
+    const result = await cachedProxyQuery(
+      new CacheApiStore(caches.default),
+      { orgId: c.get('orgId'), datasourceId: c.req.param('id'), endpoint: '/api/v1/query_range', params, cacheTtl: got.cacheTtl },
+      // cachedProxyQuery snaps start/end into params for cache bucketing; query the upstream with those.
+      p => got.client.rangeQuery(query, Number(p['start'] ?? start), Number(p['end'] ?? end), step),
+      work => {
+        c.executionCtx.waitUntil(work);
+      },
+    );
     return c.json(result);
   },
 );
 
 app.get('/:id/proxy/api/v1/labels', sValidator('param', datasourceIdParamSchema, onValidationError), async c => {
-  const client = await getClient(c);
-  if (!client) return c.json({ status: 'error', error: 'Not found' }, 404);
+  const got = await getClient(c);
+  if (!got) return c.json({ status: 'error', error: 'Not found' }, 404);
 
   const match = readMatch(c);
   if (!match.success) {
     return c.json({ error: 'Validation failed', details: match.error.issues }, 400);
   }
 
-  const result = await client.labels(match.data['match[]']);
+  const result = await got.client.labels(match.data['match[]']);
   return c.json(result);
 });
 
 app.get('/:id/proxy/api/v1/label/:name/values', sValidator('param', labelNameParamSchema, onValidationError), async c => {
-  const client = await getClient(c);
-  if (!client) return c.json({ status: 'error', error: 'Not found' }, 404);
+  const got = await getClient(c);
+  if (!got) return c.json({ status: 'error', error: 'Not found' }, 404);
 
   const match = readMatch(c);
   if (!match.success) {
@@ -102,7 +121,7 @@ app.get('/:id/proxy/api/v1/label/:name/values', sValidator('param', labelNamePar
   }
 
   const { name } = c.req.valid('param');
-  const result = await client.labelValues(name, match.data['match[]']);
+  const result = await got.client.labelValues(name, match.data['match[]']);
   return c.json(result);
 });
 
