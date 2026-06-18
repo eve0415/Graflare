@@ -24,7 +24,7 @@ const formOf = (el: Element): HTMLFormElement => {
 
 const submitFor = async (initial: ReturnType<typeof contactPointToForm>, edit: (() => void) | null): Promise<CreateContactPoint> => {
   const onSubmit = vi.fn<(data: CreateContactPoint) => Promise<void>>(() => Promise.resolve());
-  render(<ContactPointForm initialForm={initial} submitLabel='Create' onSubmit={onSubmit} />);
+  render(<ContactPointForm initialForm={initial} mode='create' submitLabel='Create' onSubmit={onSubmit} />);
   edit?.();
   fireEvent.submit(formOf(screen.getByText('Create')));
   await waitFor(() => {
@@ -39,7 +39,7 @@ describe('contact-point-form slack/discord', () => {
   it('renders slack fields when initialized as slack', () => {
     const initial = contactPointToForm({ name: 'S', settings: { type: 'slack', webhookUrl: 'https://hooks.slack.com/x', channel: '#ops', username: 'Bot' } });
     const onSubmit = vi.fn<(data: CreateContactPoint) => Promise<void>>(() => Promise.resolve());
-    render(<ContactPointForm initialForm={initial} submitLabel='Create' onSubmit={onSubmit} />);
+    render(<ContactPointForm initialForm={initial} mode='create' submitLabel='Create' onSubmit={onSubmit} />);
 
     expect(screen.getByLabelText('Webhook URL')).toBeDefined();
     expect(screen.getByLabelText('Channel (optional)')).toBeDefined();
@@ -51,7 +51,7 @@ describe('contact-point-form slack/discord', () => {
       settings: { type: 'discord', webhookUrl: 'https://discord.com/api/webhooks/x', username: 'Bot', avatarUrl: 'https://a/b.png' },
     });
     const onSubmit = vi.fn<(data: CreateContactPoint) => Promise<void>>(() => Promise.resolve());
-    render(<ContactPointForm initialForm={initial} submitLabel='Create' onSubmit={onSubmit} />);
+    render(<ContactPointForm initialForm={initial} mode='create' submitLabel='Create' onSubmit={onSubmit} />);
 
     expect(screen.getByLabelText('Webhook URL')).toBeDefined();
     expect(screen.getByLabelText('Avatar URL (optional)')).toBeDefined();
@@ -84,7 +84,7 @@ describe('contact-point-form slack/discord', () => {
   it('gates per-type fields: an email form shows neither the slack nor discord secret field', () => {
     const initial = contactPointToForm({ name: 'E', settings: { type: 'email', addresses: ['a@b.com'] } });
     const onSubmit = vi.fn<(data: CreateContactPoint) => Promise<void>>(() => Promise.resolve());
-    render(<ContactPointForm initialForm={initial} submitLabel='Create' onSubmit={onSubmit} />);
+    render(<ContactPointForm initialForm={initial} mode='create' submitLabel='Create' onSubmit={onSubmit} />);
 
     expect(screen.queryByLabelText('Webhook URL')).toBeNull();
     expect(screen.getByText('Email Addresses')).toBeDefined();
@@ -100,17 +100,17 @@ describe('contact-point-form slack/discord', () => {
     [contactPointToForm({ name: 'D', settings: { type: 'discord', webhookUrl: '', username: '', avatarUrl: '' } }), 'Discord settings'],
   ])('groups the %o settings block under a labelled fieldset', (initial, legend) => {
     const onSubmit = vi.fn<(data: CreateContactPoint) => Promise<void>>(() => Promise.resolve());
-    render(<ContactPointForm initialForm={initial} submitLabel='Create' onSubmit={onSubmit} />);
+    render(<ContactPointForm initialForm={initial} mode='create' submitLabel='Create' onSubmit={onSubmit} />);
     expect(screen.getByRole('group', { name: legend })).toBeDefined();
   });
 
   it('shows the redaction hint for the slack secret only in edit mode', () => {
     const initial = contactPointToForm({ name: 'S', settings: { type: 'slack', webhookUrl: '******', channel: '', username: '' } });
     const onSubmit = vi.fn<(data: CreateContactPoint) => Promise<void>>(() => Promise.resolve());
-    const { rerender } = render(<ContactPointForm initialForm={initial} submitLabel='Create' onSubmit={onSubmit} />);
+    const { rerender } = render(<ContactPointForm initialForm={initial} mode='create' submitLabel='Create' onSubmit={onSubmit} />);
     expect(screen.queryByText('Leave as ****** to keep the current URL.')).toBeNull();
 
-    rerender(<ContactPointForm initialForm={initial} submitLabel='Save Changes' onSubmit={onSubmit} />);
+    rerender(<ContactPointForm initialForm={initial} mode='edit' submitLabel='Save Changes' onSubmit={onSubmit} />);
     expect(screen.getByText('Leave as ****** to keep the current URL.')).toBeDefined();
   });
 });

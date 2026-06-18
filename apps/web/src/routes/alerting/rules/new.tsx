@@ -30,7 +30,7 @@ const NewAlertRulePage = () => {
     [navigate],
   );
 
-  return <AlertRuleForm groups={groupItems} initialForm={defaultAlertRuleForm} submitLabel='Create Alert Rule' onSubmit={handleSubmit} />;
+  return <AlertRuleForm groups={groupItems} initialForm={defaultAlertRuleForm} mode='create' submitLabel='Create Alert Rule' onSubmit={handleSubmit} />;
 };
 
 export const Route = createFileRoute('/alerting/rules/new')({

@@ -34,7 +34,7 @@ const EditContactPointPage = () => {
     return <p className='text-muted-foreground text-sm'>Contact point not found.</p>;
   }
 
-  return <ContactPointForm initialForm={contactPointToForm(contactPoint)} submitLabel='Save Changes' onSubmit={handleSubmit} />;
+  return <ContactPointForm initialForm={contactPointToForm(contactPoint)} mode='edit' submitLabel='Save Changes' onSubmit={handleSubmit} />;
 };
 
 export const Route = createFileRoute('/alerting/notifications/contact-points/$id')({

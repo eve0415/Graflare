@@ -36,7 +36,7 @@ const EditAlertRulePage = () => {
     return <p className='text-muted-foreground text-sm'>Rule not found.</p>;
   }
 
-  return <AlertRuleForm groups={groupItems} initialForm={ruleToForm(rule)} submitLabel='Save Changes' onSubmit={handleSubmit} />;
+  return <AlertRuleForm groups={groupItems} initialForm={ruleToForm(rule)} mode='edit' submitLabel='Save Changes' onSubmit={handleSubmit} />;
 };
 
 export const Route = createFileRoute('/alerting/rules/$id')({

@@ -191,6 +191,7 @@ const MuteTimingCheckbox = ({
 
 interface Props {
   initialForm: FormState;
+  mode: 'create' | 'edit';
   submitLabel: string;
   contactPoints: { id: string; name: string }[];
   muteTimings: { id: string; name: string }[];
@@ -198,11 +199,11 @@ interface Props {
   onSubmit: (data: CreateNotificationPolicy) => Promise<void>;
 }
 
-export const NotificationPolicyForm = ({ initialForm, submitLabel, contactPoints, muteTimings, parentOptions, onSubmit }: Props) => {
+export const NotificationPolicyForm = ({ initialForm, mode, submitLabel, contactPoints, muteTimings, parentOptions, onSubmit }: Props) => {
   const [submitting, setSubmitting] = useState(false);
   const [form, setForm] = useState<FormState>(initialForm);
 
-  const title = submitLabel === 'Save Changes' ? 'Edit Notification Policy' : 'New Notification Policy';
+  const title = mode === 'edit' ? 'Edit Notification Policy' : 'New Notification Policy';
 
   const parentItems = useMemo(() => [ROOT_PARENT_OPTION, ...parentOptions], [parentOptions]);
   const contactPointItems = useMemo(() => [NO_CONTACT_POINT_OPTION, ...contactPoints.map(cp => ({ value: cp.id, label: cp.name }))], [contactPoints]);

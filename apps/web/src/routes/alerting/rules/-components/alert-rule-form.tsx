@@ -213,15 +213,16 @@ const KvRow = ({
 interface Props {
   groups: { value: string; label: string }[];
   initialForm: FormState;
+  mode: 'create' | 'edit';
   submitLabel: string;
   onSubmit: (data: CreateAlertRule) => Promise<void>;
 }
 
-export const AlertRuleForm = ({ groups, initialForm, submitLabel, onSubmit }: Props) => {
+export const AlertRuleForm = ({ groups, initialForm, mode, submitLabel, onSubmit }: Props) => {
   const [submitting, setSubmitting] = useState(false);
   const [form, setForm] = useState<FormState>(initialForm);
 
-  const title = submitLabel === 'Save Changes' ? 'Edit Alert Rule' : 'New Alert Rule';
+  const title = mode === 'edit' ? 'Edit Alert Rule' : 'New Alert Rule';
 
   const queryRefItems = useMemo(() => form.queries.map(q => ({ value: q.refId, label: q.refId })), [form.queries]);
 

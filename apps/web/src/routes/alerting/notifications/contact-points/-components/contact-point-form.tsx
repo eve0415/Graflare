@@ -148,15 +148,16 @@ const AddressRow = ({
 
 interface Props {
   initialForm: FormState;
+  mode: 'create' | 'edit';
   submitLabel: string;
   onSubmit: (data: CreateContactPoint) => Promise<void>;
 }
 
-export const ContactPointForm = ({ initialForm, submitLabel, onSubmit }: Props) => {
+export const ContactPointForm = ({ initialForm, mode, submitLabel, onSubmit }: Props) => {
   const [submitting, setSubmitting] = useState(false);
   const [form, setForm] = useState<FormState>(initialForm);
 
-  const isEdit = submitLabel === 'Save Changes';
+  const isEdit = mode === 'edit';
   const title = isEdit ? 'Edit Contact Point' : 'New Contact Point';
 
   const handleSubmit = useCallback(

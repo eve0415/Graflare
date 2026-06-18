@@ -44,6 +44,7 @@ const EditPolicyPage = () => {
   return (
     <NotificationPolicyForm
       initialForm={initialForm}
+      mode='edit'
       submitLabel='Save Changes'
       contactPoints={contactPoints}
       muteTimings={muteTimings}

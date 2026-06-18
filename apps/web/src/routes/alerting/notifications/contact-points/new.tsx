@@ -18,7 +18,7 @@ const NewContactPointPage = () => {
     [navigate],
   );
 
-  return <ContactPointForm initialForm={defaultContactPointForm} submitLabel='Create Contact Point' onSubmit={handleSubmit} />;
+  return <ContactPointForm initialForm={defaultContactPointForm} mode='create' submitLabel='Create Contact Point' onSubmit={handleSubmit} />;
 };
 
 export const Route = createFileRoute('/alerting/notifications/contact-points/new')({

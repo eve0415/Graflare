@@ -37,6 +37,7 @@ const NewPolicyPage = () => {
   return (
     <NotificationPolicyForm
       initialForm={defaultNotificationPolicyForm}
+      mode='create'
       submitLabel='Create Policy'
       contactPoints={contactPoints}
       muteTimings={muteTimings}
