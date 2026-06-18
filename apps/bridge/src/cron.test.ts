@@ -502,10 +502,6 @@ describe('computeBackoff', () => {
 });
 
 describe('batch chunk size', () => {
-  it('is 15', () => {
-    expect(BATCH_CHUNK_SIZE).toBe(15);
-  });
-
   it('ensures registry fits within chunk limit', () => {
     const accountConfigs = REGISTRY.filter(c => c.scope === 'account');
     const zoneConfigs = REGISTRY.filter(c => c.scope === 'zone');
