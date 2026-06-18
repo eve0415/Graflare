@@ -12,6 +12,7 @@ export interface PanelActions {
 
 const PanelActionsContext = createContext<PanelActions | null>(null);
 
-export const PanelActionsProvider = PanelActionsContext.Provider;
+// React 19 renders a context object directly as its provider, so the alias is the context itself.
+export const PanelActionsProvider = PanelActionsContext;
 
 export const usePanelActions = (): PanelActions | null => useContext(PanelActionsContext);
