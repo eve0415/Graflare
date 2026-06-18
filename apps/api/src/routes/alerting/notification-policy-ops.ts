@@ -6,6 +6,7 @@ import { createNotificationPolicySchema, updateNotificationPolicySchema } from '
 import { and, eq } from 'drizzle-orm';
 
 import { notificationPolicies } from '../../db/schema';
+import { pickDefined } from '../../pick-defined';
 
 // Shared notification-policy CRUD used by BOTH the Hono route and the RPC method. Org-scoped.
 type NotificationPolicyRow = typeof notificationPolicies.$inferSelect;
@@ -58,16 +59,20 @@ export const updateNotificationPolicy = async (
   notificationPolicyIdSchema.parse(id);
   const parsed = updateNotificationPolicySchema.parse(input);
   const now = new Date();
-  const setData: Record<string, unknown> = { updatedAt: now };
-  if (parsed.parentId !== undefined) setData['parentId'] = parsed.parentId;
-  if (parsed.contactPointId !== undefined) setData['contactPointId'] = parsed.contactPointId;
-  if (parsed.groupBy !== undefined) setData['groupBy'] = parsed.groupBy;
-  if (parsed.matchers !== undefined) setData['matchers'] = parsed.matchers;
-  if (parsed.muteTimingIds !== undefined) setData['muteTimingIds'] = parsed.muteTimingIds;
-  if (parsed.groupWaitS !== undefined) setData['groupWaitS'] = parsed.groupWaitS;
-  if (parsed.groupIntervalS !== undefined) setData['groupIntervalS'] = parsed.groupIntervalS;
-  if (parsed.repeatIntervalS !== undefined) setData['repeatIntervalS'] = parsed.repeatIntervalS;
-  if (parsed.continueMatching !== undefined) setData['continueMatching'] = parsed.continueMatching;
+  const setData = {
+    ...pickDefined(parsed, [
+      'parentId',
+      'contactPointId',
+      'groupBy',
+      'matchers',
+      'muteTimingIds',
+      'groupWaitS',
+      'groupIntervalS',
+      'repeatIntervalS',
+      'continueMatching',
+    ]),
+    updatedAt: now,
+  };
   try {
     await db
       .update(notificationPolicies)

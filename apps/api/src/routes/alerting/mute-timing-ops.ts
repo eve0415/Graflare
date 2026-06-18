@@ -6,6 +6,7 @@ import { createMuteTimingSchema, updateMuteTimingSchema } from '@graflare/shared
 import { and, eq } from 'drizzle-orm';
 
 import { muteTimings } from '../../db/schema';
+import { pickDefined } from '../../pick-defined';
 
 // Shared mute-timing CRUD used by BOTH the Hono route and the RPC method, so the two surfaces
 // can't drift (the F1 bug class). Every op is org-scoped; reads re-fetch the stored row.
@@ -40,9 +41,7 @@ export const updateMuteTiming = async (db: Database, orgId: string, id: string, 
   muteTimingIdSchema.parse(id);
   const parsed = updateMuteTimingSchema.parse(input);
   const now = new Date();
-  const setData: Record<string, unknown> = { updatedAt: now };
-  if (parsed.name !== undefined) setData['name'] = parsed.name;
-  if (parsed.intervals !== undefined) setData['intervals'] = parsed.intervals;
+  const setData = { ...pickDefined(parsed, ['name', 'intervals']), updatedAt: now };
   try {
     await db
       .update(muteTimings)
