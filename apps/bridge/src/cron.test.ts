@@ -388,13 +388,15 @@ describe('collectMetrics orchestrator', () => {
       .bind(cachedSchema, nowSeconds)
       .run();
 
+    // The query alias derives from the dataset name; the schema-derived config reuses the curated
+    // REGISTRY name 'workers' (so it matches the REGISTRY-fallback path), so the alias is 'workers'.
     mockSmartFetch({
       accountResponse: {
         data: {
           viewer: {
             accounts: [
               {
-                workersInvocations: [],
+                workers: [],
               },
             ],
           },
@@ -402,7 +404,7 @@ describe('collectMetrics orchestrator', () => {
         errors: [
           {
             message: "does not have access to the field 'edgetimetofirstbytems'",
-            path: ['viewer', 'accounts', 0, 'workersInvocations'],
+            path: ['viewer', 'accounts', 0, 'workers'],
           },
         ],
       },
