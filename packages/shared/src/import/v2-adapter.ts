@@ -8,6 +8,7 @@ import { grafanaV2Schema } from '../schemas/grafana-v2';
 import { isPanelType } from '../schemas/panel';
 
 import { mapOverrides } from './override-mapping';
+import { clampTextMode } from './text-mode';
 import { mapTransformations } from './transformation-mapping';
 import { mapAdhocFilters, resolveVariableType, splitCsv } from './variable-mapping';
 
@@ -23,11 +24,6 @@ const PANEL_KIND_MAP: Record<string, string> = {
   statetimeline: 'state-timeline',
   statushistory: 'status-history',
 };
-
-// Grafana's text panel `mode` is one of code/text/html/markdown; we render only markdown
-// or sanitized html, so anything other than 'html' clamps to 'markdown'. Mirrors the
-// classic adapter.
-const clampTextMode = (mode: string): 'markdown' | 'html' => (mode === 'html' ? 'html' : 'markdown');
 
 const mapV2Queries = (el: V2Element): PanelQuery[] =>
   el.spec.data.queries.map((q, i) => ({
