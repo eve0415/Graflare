@@ -32,10 +32,9 @@ import { detectFormat, importDashboard as importDashboardFn } from '@graflare/sh
 import { alertInstanceListQuerySchema, upsertAlertInstanceSchema } from '@graflare/shared/schemas/alert-instance';
 import { createAlertRuleGroupSchema } from '@graflare/shared/schemas/alert-rule-group';
 import { annotationListQuerySchema, createAnnotationSchema } from '@graflare/shared/schemas/annotation';
-import { createContactPointSchema, updateContactPointSchema } from '@graflare/shared/schemas/contact-point';
 import { createDashboardSchema, importDashboardSchema, updateDashboardSchema } from '@graflare/shared/schemas/dashboard';
 import { createDatasourceSchema, testConnectionInlineSchema, updateDatasourceSchema } from '@graflare/shared/schemas/datasource';
-import { annotationIdSchema, contactPointIdSchema, dashboardIdSchema, datasourceIdSchema, notificationPolicyIdSchema } from '@graflare/shared/schemas/ids';
+import { annotationIdSchema, dashboardIdSchema, datasourceIdSchema, notificationPolicyIdSchema } from '@graflare/shared/schemas/ids';
 import { createNotificationPolicySchema, updateNotificationPolicySchema } from '@graflare/shared/schemas/notification-policy';
 import { prometheusResponseSchema } from '@graflare/shared/schemas/prometheus';
 import { createServiceTokenSchema, serviceTokenIdParamSchema } from '@graflare/shared/schemas/service-token';
@@ -46,7 +45,6 @@ import { and, desc, eq, gte, like, lte, sql } from 'drizzle-orm';
 import { Hono } from 'hono';
 import { HTTPException } from 'hono/http-exception';
 
-import { encryptSecret, redactSecret, resolveSecretOnUpdate } from './alerting/contact-point-secrets';
 import { createRule, deleteRule, deleteRuleGroup, getRule, getRuleGroup, updateRule, updateRuleGroup } from './alerting/rule-lifecycle';
 import { CacheApiStore, cachedProxyQuery } from './cache/query-cache';
 import { createServiceTokenClient } from './cloudflare/access-service-tokens';
@@ -58,7 +56,6 @@ import {
   alertRuleGroups,
   alertRules,
   annotations,
-  contactPoints,
   dashboardVersions,
   dashboards,
   datasourcePublicColumns,
@@ -74,6 +71,7 @@ import { alertInstanceRoutes } from './routes/alerting/alert-instances';
 import { alertRuleGroupRoutes } from './routes/alerting/alert-rule-groups';
 import { alertRuleRoutes } from './routes/alerting/alert-rules';
 import { annotationRoutes } from './routes/alerting/annotations';
+import * as contactPointOps from './routes/alerting/contact-point-ops';
 import { contactPointRoutes } from './routes/alerting/contact-points';
 import * as muteTimingOps from './routes/alerting/mute-timing-ops';
 import { muteTimingRoutes } from './routes/alerting/mute-timings';
@@ -1096,97 +1094,27 @@ export class GraflareAPI extends WorkerEntrypoint<Bindings> {
 
   async listContactPoints(jwt: string) {
     const { orgId } = await this.resolveAuth(jwt);
-    const rows = await this.db.select().from(contactPoints).where(eq(contactPoints.orgId, orgId));
-    return rows.map(r => ({ ...r, settings: redactSecret(r.settings) }));
-  }
-
-  private async getContactPointCore(orgId: string, id: string) {
-    contactPointIdSchema.parse(id);
-    const rows = await this.db
-      .select()
-      .from(contactPoints)
-      .where(and(eq(contactPoints.id, id), eq(contactPoints.orgId, orgId)))
-      .limit(1);
-    const row = rows[0] ?? null;
-    if (row === null) return null;
-    return { ...row, settings: redactSecret(row.settings) };
+    return contactPointOps.listContactPoints(this.db, orgId);
   }
 
   async getContactPoint(jwt: string, id: string) {
     const { orgId } = await this.resolveAuth(jwt);
-    return this.getContactPointCore(orgId, id);
+    return contactPointOps.getContactPoint(this.db, orgId, id);
   }
 
   async createContactPoint(jwt: string, input: CreateContactPoint) {
     const { orgId } = await this.resolveAuth(jwt);
-    const parsed = createContactPointSchema.parse(input);
-    const id = crypto.randomUUID();
-    const now = new Date();
-
-    try {
-      const settings = await encryptSecret(parsed.settings, this.env.ENCRYPTION_KEY);
-
-      await this.db.insert(contactPoints).values({
-        id,
-        orgId,
-        name: parsed.name,
-        type: parsed.type,
-        settings,
-        createdAt: now,
-        updatedAt: now,
-      });
-    } catch (error) {
-      console.error('createContactPoint failed:', error);
-      throw new Error('Failed to create contact point', { cause: error });
-    }
-
-    return this.getContactPointCore(orgId, id);
+    return contactPointOps.createContactPoint(this.db, orgId, input, this.env.ENCRYPTION_KEY);
   }
 
   async updateContactPoint(jwt: string, id: string, input: UpdateContactPoint) {
     const { orgId } = await this.resolveAuth(jwt);
-    contactPointIdSchema.parse(id);
-    const parsed = updateContactPointSchema.parse(input);
-    const now = new Date();
-
-    const existingRows = await this.db
-      .select()
-      .from(contactPoints)
-      .where(and(eq(contactPoints.id, id), eq(contactPoints.orgId, orgId)))
-      .limit(1);
-    const existingRow = existingRows[0] ?? null;
-    if (existingRow === null) return null;
-
-    const setData: Record<string, unknown> = { updatedAt: now };
-    if (parsed.name !== undefined) setData['name'] = parsed.name;
-    if (parsed.type !== undefined) setData['type'] = parsed.type;
-
-    try {
-      if (parsed.settings !== undefined) {
-        setData['settings'] = await resolveSecretOnUpdate(parsed.settings, existingRow.settings, this.env.ENCRYPTION_KEY);
-      }
-
-      await this.db
-        .update(contactPoints)
-        .set(setData)
-        .where(and(eq(contactPoints.id, id), eq(contactPoints.orgId, orgId)));
-    } catch (error) {
-      console.error('updateContactPoint failed:', error);
-      throw new Error('Failed to update contact point', { cause: error });
-    }
-
-    return this.getContactPointCore(orgId, id);
+    return contactPointOps.updateContactPoint(this.db, orgId, id, input, this.env.ENCRYPTION_KEY);
   }
 
   async deleteContactPoint(jwt: string, id: string): Promise<void> {
     const { orgId } = await this.resolveAuth(jwt);
-    contactPointIdSchema.parse(id);
-    try {
-      await this.db.delete(contactPoints).where(and(eq(contactPoints.id, id), eq(contactPoints.orgId, orgId)));
-    } catch (error) {
-      console.error('deleteContactPoint failed:', error);
-      throw new Error('Failed to delete contact point', { cause: error });
-    }
+    await contactPointOps.deleteContactPoint(this.db, orgId, id);
   }
 
   // --- Notification Policy RPC ---

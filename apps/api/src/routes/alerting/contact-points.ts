@@ -2,125 +2,46 @@ import type { AppEnv } from '../../index';
 
 import { contactPointIdParamSchema, createContactPointSchema, updateContactPointSchema } from '@graflare/shared/schemas/contact-point';
 import { sValidator } from '@hono/standard-validator';
-import { and, eq } from 'drizzle-orm';
 import { Hono } from 'hono';
 
-import { encryptSecret, redactSecret, resolveSecretOnUpdate } from '../../alerting/contact-point-secrets';
 import { createDb } from '../../db';
-import { contactPoints } from '../../db/schema';
 import { onValidationError } from '../../middleware/validate';
+
+import * as contactPointOps from './contact-point-ops';
 
 const app = new Hono<AppEnv>();
 
 app.get('/', async c => {
-  const db = createDb(c.env.DB);
-  const orgId = c.get('orgId');
-
-  const rows = await db.select().from(contactPoints).where(eq(contactPoints.orgId, orgId));
-  return c.json(rows.map(r => Object.assign(r, { settings: redactSecret(r.settings) })));
+  const rows = await contactPointOps.listContactPoints(createDb(c.env.DB), c.get('orgId'));
+  return c.json(rows);
 });
 
 app.get('/:id', sValidator('param', contactPointIdParamSchema, onValidationError), async c => {
-  const db = createDb(c.env.DB);
-  const orgId = c.get('orgId');
-  const { id } = c.req.valid('param');
-
-  const rows = await db
-    .select()
-    .from(contactPoints)
-    .where(and(eq(contactPoints.id, id), eq(contactPoints.orgId, orgId)))
-    .limit(1);
-
-  const [row] = rows;
-  if (row === undefined) {
+  const row = await contactPointOps.getContactPoint(createDb(c.env.DB), c.get('orgId'), c.req.valid('param').id);
+  if (row === null) {
     return c.json({ error: 'Not found' }, 404);
   }
-
-  return c.json({ ...row, settings: redactSecret(row.settings) });
+  return c.json(row);
 });
 
 app.post('/', sValidator('json', createContactPointSchema, onValidationError), async c => {
-  const db = createDb(c.env.DB);
-  const orgId = c.get('orgId');
-  const data = c.req.valid('json');
-
-  const id = crypto.randomUUID();
-  const now = new Date();
-
-  const encryptedSettings = await encryptSecret(data.settings, c.env.ENCRYPTION_KEY);
-
-  await db.insert(contactPoints).values({
-    id,
-    orgId,
-    name: data.name,
-    type: data.type,
-    settings: encryptedSettings,
-    createdAt: now,
-    updatedAt: now,
-  });
-
-  return c.json({ id, orgId, name: data.name, type: data.type, settings: redactSecret(data.settings), createdAt: now, updatedAt: now }, 201);
+  const row = await contactPointOps.createContactPoint(createDb(c.env.DB), c.get('orgId'), c.req.valid('json'), c.env.ENCRYPTION_KEY);
+  return c.json(row, 201);
 });
 
 app.put('/:id', sValidator('param', contactPointIdParamSchema, onValidationError), sValidator('json', updateContactPointSchema, onValidationError), async c => {
-  const db = createDb(c.env.DB);
-  const orgId = c.get('orgId');
-  const { id } = c.req.valid('param');
-
-  const existing = await db
-    .select()
-    .from(contactPoints)
-    .where(and(eq(contactPoints.id, id), eq(contactPoints.orgId, orgId)))
-    .limit(1);
-
-  const [existingRow] = existing;
-  if (existingRow === undefined) {
+  const row = await contactPointOps.updateContactPoint(createDb(c.env.DB), c.get('orgId'), c.req.valid('param').id, c.req.valid('json'), c.env.ENCRYPTION_KEY);
+  if (row === null) {
     return c.json({ error: 'Not found' }, 404);
   }
-
-  const data = c.req.valid('json');
-  const now = new Date();
-  const updates: Record<string, unknown> = { updatedAt: now };
-
-  if (data.name !== undefined) updates['name'] = data.name;
-  if (data.type !== undefined) updates['type'] = data.type;
-  if (data.settings !== undefined) {
-    updates['settings'] = await resolveSecretOnUpdate(data.settings, existingRow.settings, c.env.ENCRYPTION_KEY);
-  }
-
-  await db
-    .update(contactPoints)
-    .set(updates)
-    .where(and(eq(contactPoints.id, id), eq(contactPoints.orgId, orgId)));
-
-  const [updatedRow] = await db
-    .select()
-    .from(contactPoints)
-    .where(and(eq(contactPoints.id, id), eq(contactPoints.orgId, orgId)))
-    .limit(1);
-  if (updatedRow === undefined) {
-    return c.json({ error: 'Not found' }, 404);
-  }
-  return c.json({ ...updatedRow, settings: redactSecret(updatedRow.settings) });
+  return c.json(row);
 });
 
 app.delete('/:id', sValidator('param', contactPointIdParamSchema, onValidationError), async c => {
-  const db = createDb(c.env.DB);
-  const orgId = c.get('orgId');
-  const { id } = c.req.valid('param');
-
-  const existing = await db
-    .select({ id: contactPoints.id })
-    .from(contactPoints)
-    .where(and(eq(contactPoints.id, id), eq(contactPoints.orgId, orgId)))
-    .limit(1);
-
-  if (existing.length === 0) {
+  const deleted = await contactPointOps.deleteContactPoint(createDb(c.env.DB), c.get('orgId'), c.req.valid('param').id);
+  if (!deleted) {
     return c.json({ error: 'Not found' }, 404);
   }
-
-  await db.delete(contactPoints).where(and(eq(contactPoints.id, id), eq(contactPoints.orgId, orgId)));
-
   return c.body(null, 204);
 });
 
