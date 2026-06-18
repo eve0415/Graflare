@@ -120,6 +120,21 @@ describe('createDatasourceSchema', () => {
     });
     expect('id' in parsed).toBe(false);
   });
+
+  it('accepts a SQL datasource with a dialect', () => {
+    const result = createDatasourceSchema.safeParse({ name: 'D1', type: 'sql', dialect: 'sqlite', url: 'https://bridge.example.com', authType: 'none' });
+    expect(result.success).toBe(true);
+  });
+
+  it('rejects a SQL datasource without a dialect', () => {
+    const result = createDatasourceSchema.safeParse({ name: 'D1', type: 'sql', url: 'https://bridge.example.com', authType: 'none' });
+    expect(result.success).toBe(false);
+  });
+
+  it('rejects a Prometheus datasource that carries a dialect', () => {
+    const result = createDatasourceSchema.safeParse({ name: 'Prom', type: 'prometheus', dialect: 'sqlite', url: 'https://prom.example.com', authType: 'none' });
+    expect(result.success).toBe(false);
+  });
 });
 
 describe('updateDatasourceSchema', () => {

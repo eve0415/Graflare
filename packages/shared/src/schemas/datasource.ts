@@ -37,13 +37,23 @@ export const datasourceSchema = z.object({
 
 export type Datasource = z.infer<typeof datasourceSchema>;
 
-export const createDatasourceSchema = z.extend(z.omit(datasourceSchema, { id: true, orgId: true, createdAt: true, updatedAt: true }), {
+const datasourceCreateShape = z.extend(z.omit(datasourceSchema, { id: true, orgId: true, createdAt: true, updatedAt: true }), {
   credentials: z.optional(datasourceCredentialsSchema),
 });
 
+// A SQL datasource carries a dialect; a Prometheus one must not — the field is meaningless (and
+// ignored) for non-SQL types. Enforced on create so a stored row can't hold an impossible combo.
+export const createDatasourceSchema = datasourceCreateShape.check(
+  z.refine(v => (v.type === 'sql' ? v.dialect !== undefined : v.dialect === undefined), {
+    error: 'dialect is required for SQL datasources and not allowed otherwise',
+  }),
+);
+
 export type CreateDatasource = z.infer<typeof createDatasourceSchema>;
 
-export const updateDatasourceSchema = z.partial(createDatasourceSchema);
+// Updates are partial of the UNREFINED shape: a partial patch legitimately omits `type`, so the
+// create-time cross-field rule can't apply cleanly here.
+export const updateDatasourceSchema = z.partial(datasourceCreateShape);
 
 export type UpdateDatasource = z.infer<typeof updateDatasourceSchema>;
 
