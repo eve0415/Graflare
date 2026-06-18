@@ -43,12 +43,10 @@ import {
   datasourceIdSchema,
   folderIdSchema,
   notificationPolicyIdSchema,
-  silenceIdSchema,
 } from '@graflare/shared/schemas/ids';
 import { createNotificationPolicySchema, updateNotificationPolicySchema } from '@graflare/shared/schemas/notification-policy';
 import { prometheusResponseSchema } from '@graflare/shared/schemas/prometheus';
 import { createServiceTokenSchema, serviceTokenIdParamSchema } from '@graflare/shared/schemas/service-token';
-import { createSilenceSchema, updateSilenceSchema } from '@graflare/shared/schemas/silence';
 import { expandSqlMacros } from '@graflare/shared/sql/macros';
 import { resolveRange } from '@graflare/shared/time/resolve';
 import { WorkerEntrypoint } from 'cloudflare:workers';
@@ -75,7 +73,6 @@ import {
   datasources,
   folders,
   notificationPolicies,
-  silences,
 } from './db/schema';
 import { accessMiddleware, subjectFromPayload, subjectLabel, verifyJwt } from './middleware/access';
 import { orgMiddleware, resolveOrgId } from './middleware/org';
@@ -90,6 +87,7 @@ import { contactPointRoutes } from './routes/alerting/contact-points';
 import * as muteTimingOps from './routes/alerting/mute-timing-ops';
 import { muteTimingRoutes } from './routes/alerting/mute-timings';
 import { notificationPolicyRoutes } from './routes/alerting/notification-policies';
+import * as silenceOps from './routes/alerting/silence-ops';
 import { silenceRoutes } from './routes/alerting/silences';
 import { dashboardImportRoutes } from './routes/dashboards/dashboard-import';
 import { dashboardVersionRoutes } from './routes/dashboards/dashboard-versions';
@@ -1363,85 +1361,27 @@ export class GraflareAPI extends WorkerEntrypoint<Bindings> {
 
   async listSilences(jwt: string) {
     const { orgId } = await this.resolveAuth(jwt);
-    return this.db.select().from(silences).where(eq(silences.orgId, orgId));
-  }
-
-  private async getSilenceCore(orgId: string, id: string) {
-    silenceIdSchema.parse(id);
-    const rows = await this.db
-      .select()
-      .from(silences)
-      .where(and(eq(silences.id, id), eq(silences.orgId, orgId)))
-      .limit(1);
-    return rows[0] ?? null;
+    return silenceOps.listSilences(this.db, orgId);
   }
 
   async getSilence(jwt: string, id: string) {
     const { orgId } = await this.resolveAuth(jwt);
-    return this.getSilenceCore(orgId, id);
+    return silenceOps.getSilence(this.db, orgId, id);
   }
 
   async createSilence(jwt: string, input: CreateSilence) {
     const { orgId } = await this.resolveAuth(jwt);
-    const parsed = createSilenceSchema.parse(input);
-    const id = crypto.randomUUID();
-    const now = new Date();
-
-    try {
-      await this.db.insert(silences).values({
-        id,
-        orgId,
-        matchers: parsed.matchers,
-        startsAt: new Date(parsed.startsAt),
-        endsAt: new Date(parsed.endsAt),
-        comment: parsed.comment ?? '',
-        createdBy: parsed.createdBy ?? '',
-        createdAt: now,
-        updatedAt: now,
-      });
-    } catch (error) {
-      console.error('createSilence failed:', error);
-      throw new Error('Failed to create silence', { cause: error });
-    }
-
-    return this.getSilenceCore(orgId, id);
+    return silenceOps.createSilence(this.db, orgId, input);
   }
 
   async updateSilence(jwt: string, id: string, input: UpdateSilence) {
     const { orgId } = await this.resolveAuth(jwt);
-    silenceIdSchema.parse(id);
-    const parsed = updateSilenceSchema.parse(input);
-    const now = new Date();
-
-    const setData: Record<string, unknown> = { updatedAt: now };
-    if (parsed.matchers !== undefined) setData['matchers'] = parsed.matchers;
-    if (parsed.startsAt !== undefined) setData['startsAt'] = new Date(parsed.startsAt);
-    if (parsed.endsAt !== undefined) setData['endsAt'] = new Date(parsed.endsAt);
-    if (parsed.comment !== undefined) setData['comment'] = parsed.comment;
-    if (parsed.createdBy !== undefined) setData['createdBy'] = parsed.createdBy;
-
-    try {
-      await this.db
-        .update(silences)
-        .set(setData)
-        .where(and(eq(silences.id, id), eq(silences.orgId, orgId)));
-    } catch (error) {
-      console.error('updateSilence failed:', error);
-      throw new Error('Failed to update silence', { cause: error });
-    }
-
-    return this.getSilenceCore(orgId, id);
+    return silenceOps.updateSilence(this.db, orgId, id, input);
   }
 
   async deleteSilence(jwt: string, id: string): Promise<void> {
     const { orgId } = await this.resolveAuth(jwt);
-    silenceIdSchema.parse(id);
-    try {
-      await this.db.delete(silences).where(and(eq(silences.id, id), eq(silences.orgId, orgId)));
-    } catch (error) {
-      console.error('deleteSilence failed:', error);
-      throw new Error('Failed to delete silence', { cause: error });
-    }
+    await silenceOps.deleteSilence(this.db, orgId, id);
   }
 
   // --- Mute Timing RPC ---
