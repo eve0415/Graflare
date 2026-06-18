@@ -263,10 +263,11 @@ export class AlertRuleDO extends DurableObject<Env> {
           .where(eq(instances.labelsHash, inst.labelsHash))
           .run();
 
-        if (transition.notify) {
-          const labels = labelsMapSchema.parse(JSON.parse(inst.labels));
-          pending.push(this.syncInstance(config, inst.labelsHash, labels, transition.state, String(inst.value ?? 0), inst.firedAt, now, true));
-        }
+        // Sync EVERY cleanup transition to D1 (so a Pending→Normal isn't left stale at Pending in
+        // the alert_instances mirror); the notify flag only governs whether it joins the batch
+        // that triggers the workflow.
+        const labels = labelsMapSchema.parse(JSON.parse(inst.labels));
+        pending.push(this.syncInstance(config, inst.labelsHash, labels, transition.state, String(inst.value ?? 0), inst.firedAt, now, transition.notify));
       }
 
       // One workflow run per evaluation, after every instance has synced to D1.
