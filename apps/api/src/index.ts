@@ -733,8 +733,11 @@ export class GraflareAPI extends WorkerEntrypoint<Bindings> {
 
     if (opts?.folderId !== undefined) conditions.push(eq(dashboards.folderId, opts.folderId));
     if (opts?.search !== undefined) conditions.push(like(dashboards.title, `%${opts.search}%`));
+    // Push tag filtering into SQLite (json_each over the tags JSON array) instead of fetching the
+    // whole org's dashboards and filtering in JS.
+    if (opts?.tag !== undefined) conditions.push(sql`exists (select 1 from json_each(${dashboards.tags}) where value = ${opts.tag})`);
 
-    let rows = await this.db
+    const rows = await this.db
       .select({
         id: dashboards.id,
         orgId: dashboards.orgId,
@@ -749,11 +752,6 @@ export class GraflareAPI extends WorkerEntrypoint<Bindings> {
       })
       .from(dashboards)
       .where(and(...conditions));
-
-    if (opts?.tag !== undefined) {
-      const { tag } = opts;
-      rows = rows.filter(r => r.tags.includes(tag));
-    }
 
     return rows;
   }
@@ -1515,18 +1513,12 @@ export class GraflareAPI extends WorkerEntrypoint<Bindings> {
     if (parsed?.alertRuleId !== undefined) conditions.push(eq(annotations.alertRuleId, parsed.alertRuleId));
     if (parsed?.from !== undefined) conditions.push(gte(annotations.time, new Date(parsed.from)));
     if (parsed?.to !== undefined) conditions.push(lte(annotations.time, new Date(parsed.to)));
+    if (parsed?.tag !== undefined) conditions.push(sql`exists (select 1 from json_each(${annotations.tags}) where value = ${parsed.tag})`);
 
-    let rows = await this.db
+    return this.db
       .select()
       .from(annotations)
       .where(and(...conditions));
-
-    if (parsed?.tag !== undefined) {
-      const { tag } = parsed;
-      rows = rows.filter(r => r.tags.includes(tag));
-    }
-
-    return rows;
   }
 
   async createAnnotation(jwt: string, input: CreateAnnotation) {

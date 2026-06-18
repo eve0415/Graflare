@@ -2,7 +2,7 @@ import type { AppEnv } from '../../index';
 
 import { annotationIdParamSchema, annotationListQuerySchema, createAnnotationSchema } from '@graflare/shared/schemas/annotation';
 import { sValidator } from '@hono/standard-validator';
-import { and, eq, gte, lte } from 'drizzle-orm';
+import { and, eq, gte, lte, sql } from 'drizzle-orm';
 import { Hono } from 'hono';
 
 import { createDb } from '../../db';
@@ -21,16 +21,13 @@ app.get('/', sValidator('query', annotationListQuerySchema, onValidationError), 
   if (query.alertRuleId !== undefined) conditions.push(eq(annotations.alertRuleId, query.alertRuleId));
   if (query.from !== undefined) conditions.push(gte(annotations.time, new Date(query.from)));
   if (query.to !== undefined) conditions.push(lte(annotations.time, new Date(query.to)));
+  // Filter tags in SQLite (json_each) rather than fetching the whole org and filtering in JS.
+  if (query.tag !== undefined) conditions.push(sql`exists (select 1 from json_each(${annotations.tags}) where value = ${query.tag})`);
 
-  let rows = await db
+  const rows = await db
     .select()
     .from(annotations)
     .where(and(...conditions));
-
-  if (query.tag !== undefined) {
-    const { tag } = query;
-    rows = rows.filter(r => r.tags.includes(tag));
-  }
 
   return c.json(rows);
 });

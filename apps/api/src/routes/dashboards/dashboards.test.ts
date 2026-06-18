@@ -170,6 +170,19 @@ describe('dashboard routes', () => {
     expect(await res.json()).toEqual([]);
   });
 
+  it('filters by tag via SQL json_each, not in-memory', async () => {
+    const app = createApp();
+    const create = (title: string, tags: string[]) =>
+      app.request(req('/', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ title, tags }) }), {}, testBindings);
+    await create('Prod Board', ['prod', 'web']);
+    await create('Staging Board', ['staging']);
+
+    const res = await app.request(req('/?tag=prod'), {}, testBindings);
+    expect(res.status).toBe(200);
+    const list = await readList(res);
+    expect(list.map(d => d.title)).toEqual(['Prod Board']);
+  });
+
   it('creates a dashboard (title -> slug, version 1)', async () => {
     const app = createApp();
     const res = await app.request(

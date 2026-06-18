@@ -28,7 +28,12 @@ app.get('/', sValidator('query', dashboardListQuerySchema, onValidationError), a
     conditions.push(like(dashboards.title, `%${query.search}%`));
   }
 
-  let rows = await db
+  // Filter tags in SQLite (json_each) rather than fetching the whole org and filtering in JS.
+  if (query.tag !== undefined) {
+    conditions.push(sql`exists (select 1 from json_each(${dashboards.tags}) where value = ${query.tag})`);
+  }
+
+  const rows = await db
     .select({
       id: dashboards.id,
       orgId: dashboards.orgId,
@@ -43,11 +48,6 @@ app.get('/', sValidator('query', dashboardListQuerySchema, onValidationError), a
     })
     .from(dashboards)
     .where(and(...conditions));
-
-  if (query.tag !== undefined) {
-    const { tag } = query;
-    rows = rows.filter(r => r.tags.includes(tag));
-  }
 
   return c.json(rows);
 });
