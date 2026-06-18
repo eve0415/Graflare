@@ -1,3 +1,5 @@
+import { isPermissionError } from '../cf-graphql/client';
+
 import { isRecord } from './typed-access';
 
 interface TokenCheckResult {
@@ -45,7 +47,7 @@ export const checkTokenPermissions = async (token: string): Promise<TokenCheckRe
   const gqlJson: unknown = await settingsRes.json();
   if (isRecord(gqlJson) && 'errors' in gqlJson && Array.isArray(gqlJson.errors) && gqlJson.errors.length > 0) {
     const msg = String(gqlJson.errors[0]?.message ?? '');
-    if (msg.includes('not authorized') || msg.includes('does not have access') || msg.includes('permission')) {
+    if (isPermissionError({ message: msg })) {
       const missing = REQUIRED_PERMISSIONS.map(p => PERMISSION_LABELS[p] ?? p);
       return { valid: true, missingPermissions: missing };
     }
