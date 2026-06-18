@@ -3,6 +3,8 @@ import type { SqlResponse } from '@graflare/shared/schemas/sql';
 
 import { sqlResponseSchema } from '@graflare/shared/schemas/sql';
 
+import { authHeaders } from '../prometheus/auth';
+
 interface SqlAuth {
   type: 'none' | 'basic' | 'bearer';
   credentials?: DatasourceCredentials;
@@ -27,7 +29,7 @@ export class SqlClient {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          ...this.getHeaders(),
+          ...authHeaders(this.auth),
         },
         body: JSON.stringify({ sql, params }),
         signal: AbortSignal.timeout(this.timeoutMs),
@@ -51,19 +53,6 @@ export class SqlClient {
       return { success: false, latencyMs, error: result.error };
     }
     return { success: true, latencyMs };
-  }
-
-  private getHeaders(): Record<string, string> {
-    const headers: Record<string, string> = {};
-    if (this.auth.type === 'basic' && this.auth.credentials) {
-      const { username, password } = this.auth.credentials;
-      if (username !== undefined && password !== undefined) {
-        headers['Authorization'] = `Basic ${btoa(`${username}:${password}`)}`;
-      }
-    } else if (this.auth.type === 'bearer' && this.auth.credentials?.token) {
-      headers['Authorization'] = `Bearer ${this.auth.credentials.token}`;
-    }
-    return headers;
   }
 
   private errorResponse(error: unknown): SqlResponse {
