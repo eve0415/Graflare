@@ -1,6 +1,6 @@
 import type { DatasourceDialect } from '#schemas/datasource';
 
-import { TIME_MULTIPLIERS } from '#time/resolve';
+import { TIME_MULTIPLIERS } from '../time/resolve';
 
 const COLUMN_RE = /^[a-zA-Z_][a-zA-Z0-9_]*$/;
 const INTERVAL_RE = /^(\d+)([smhdw])$/;
