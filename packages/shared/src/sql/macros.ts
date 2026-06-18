@@ -81,31 +81,18 @@ const macroTimeGroup: MacroHandler = (args, dialect, _timeRange, params) => {
   return `(${col} / ?) * ?`;
 };
 
-const macroUnixEpochFilter: MacroHandler = (args, _dialect, timeRange, params) => {
-  const col = validateColumn(args[0]);
-  params.push(timeRange.from, timeRange.to);
-  return `${col} >= ? AND ${col} <= ?`;
-};
-
-const macroUnixEpochFrom: MacroHandler = (_args, _dialect, timeRange, params) => {
-  params.push(timeRange.from);
-  return '?';
-};
-
-const macroUnixEpochTo: MacroHandler = (_args, _dialect, timeRange, params) => {
-  params.push(timeRange.to);
-  return '?';
-};
-
+// Grafana keeps $__timeFilter / $__unixEpochFilter (and the From/To pairs) as distinct macro
+// names that historically differed in timestamp formatting; Graflare parameterizes both with the
+// same bound values, so each pair shares one handler — distinct names, single implementation.
 const MACROS: Record<string, MacroHandler> = {
   $__time: macroTime,
   $__timeFilter: macroTimeFilter,
   $__timeFrom: macroTimeFrom,
   $__timeTo: macroTimeTo,
   $__timeGroup: macroTimeGroup,
-  $__unixEpochFilter: macroUnixEpochFilter,
-  $__unixEpochFrom: macroUnixEpochFrom,
-  $__unixEpochTo: macroUnixEpochTo,
+  $__unixEpochFilter: macroTimeFilter,
+  $__unixEpochFrom: macroTimeFrom,
+  $__unixEpochTo: macroTimeTo,
 };
 
 const MACRO_RE = /\$__(\w+)\(([^)]*)\)/g;
